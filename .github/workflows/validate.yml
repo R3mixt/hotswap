@@ -1,0 +1,32 @@
+name: Validate Hot Swap
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+          cache: pip
+          cache-dependency-path: requirements-dev.txt
+      - name: Install test dependencies
+        run: python -m pip install -r requirements-dev.txt
+      - name: Run Lua 5.1 regressions and build verified packages
+        run: python package.py
+      - name: Upload verified packages
+        uses: actions/upload-artifact@v4
+        with:
+          name: HotSwap-packages
+          path: |
+            dist/*.zip
+            dist/*.sha256
+          if-no-files-found: error

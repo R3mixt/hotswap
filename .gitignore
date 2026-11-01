@@ -1,0 +1,20 @@
+/python-deps/
+/backups/
+/dist/
+/test-results.txt
+/*-results.txt
+/performance-findings.txt
+/install-hardcore.ps1
+/update-hotswap.ps1
+/ui-qa/*.json
+/ui-qa/*.png
+__pycache__/
+*.pyc
+.venv/
+.env
+*.hotswap
+*.log
+# Never publish SavedVariables or machine-specific recovery data.
+WTF/
+SavedVariables/
+KeybindOptimizerDB.lua

@@ -1,0 +1,57 @@
+{
+  "format": "Hot Swap manual publishing worksheet",
+  "formatVersion": 1,
+  "publishingState": "draft-local-only",
+  "name": "Hot Swap",
+  "summary": "Build and switch class keybind presets on Blizzard's original action bars, with a visual keyboard editor, generated macros, item choices, and named backups.",
+  "release": {
+    "version": "0.3.0",
+    "displayName": "Hot Swap 0.3.0 beta",
+    "releaseType": "beta",
+    "automatedTests": 191,
+    "testMethod": "Actual Lua modules executed under Lua 5.1 with mocked WoW APIs",
+    "liveClientAcceptance": "pending"
+  },
+  "game": "World of Warcraft",
+  "projectClass": "Addons",
+  "categories": {
+    "primary": "Action Bars",
+    "additional": ["PvP", "Class"]
+  },
+  "compatibility": {
+    "currentTestClients": ["Classic Era", "Hardcore"],
+    "finalReleaseTarget": "Forever",
+    "unsupportedReleaseTargets": ["Retail", "Other Classic expansions"],
+    "uploadGameVersionSelection": "Select only client versions actually verified for the uploaded file; live acceptance is pending. No game-version IDs are supplied here."
+  },
+  "license": "All Rights Reserved",
+  "files": {
+    "description": "curseforge-description.md",
+    "logo": "logo.png",
+    "logoVectorSource": "logo.svg",
+    "logoBuildScript": "build-logo.ps1"
+  },
+  "logo": {
+    "width": 400,
+    "height": 400,
+    "format": "PNG",
+    "artwork": "Original gold HS keycap and swap arrows; no Blizzard or third-party artwork or fonts",
+    "rebuild": "powershell -NoProfile -ExecutionPolicy Bypass -File work/publishing/build-logo.ps1"
+  },
+  "publishingNotes": [
+    "This file is a local worksheet, not a CurseForge API payload.",
+    "No project has been created or uploaded by preparing these files.",
+    "Check project-name availability before creating the project.",
+    "Category labels are verified on CurseForge; numeric category, game-version, and project IDs are deliberately omitted.",
+    "Do not label this beta as live-client verified until acceptance checks pass.",
+    "Keep the name Hot Swap without a version number; use the release display name for file uploads.",
+    "Choose the matching All Rights Reserved license option, or Custom with the included release license text if necessary."
+  ],
+  "references": {
+    "checkedOn": "2026-11-01",
+    "submissionGuide": "https://support.curseforge.com/support/solutions/articles/9000199552-project-submission-guide-and-tips",
+    "actionBarsCategory": "https://www.curseforge.com/wow/search?categories=action-bars&class=addons&page=1&pageSize=50&sortBy=latest+update",
+    "pvpCategory": "https://www.curseforge.com/wow/search?categories=pvp&class=addons&page=1&pageSize=50&sortBy=popularity",
+    "classCategory": "https://www.curseforge.com/wow/search?categories=class&class=addons&page=1&pageSize=50&sortBy=latest+update"
+  }
+}

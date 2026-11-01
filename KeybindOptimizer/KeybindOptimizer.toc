@@ -1,0 +1,23 @@
+## Interface: 16001, 11509
+## Title: Hot Swap
+## Notes: Original action bars, optimized class bindings, spellbook editing, presets and recovery.
+## Author: Clay
+## Version: 0.3.0
+## SavedVariablesPerCharacter: KeybindOptimizerDB
+## Category: Action Bars
+
+Core.lua
+API.lua
+Profiles.lua
+Macros.lua
+Items.lua
+LibraryData.lua
+Library.lua
+NativeBars.lua
+Planner.lua
+Engine.lua
+Presets.lua
+ItemsUI.lua
+UI.lua
+LibraryUI.lua
+Launcher.lua

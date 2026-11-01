@@ -1,0 +1,2 @@
+# Used only by the regression harness; the addon itself has no dependencies.
+lupa==2.8
