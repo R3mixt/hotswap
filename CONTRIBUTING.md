@@ -1,6 +1,6 @@
 # Working on Hot Swap
 
-Read the [license](LICENSE) before redistributing changes. This repository makes the source and development history available; it does not change the project's All Rights Reserved terms.
+Hot Swap is available under the [MIT license](LICENSE). Preserve its copyright and license notice when redistributing substantial portions of the code.
 
 ## Bug reports
 

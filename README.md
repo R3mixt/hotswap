@@ -71,4 +71,4 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for the module map, change workflow and u
 
 ## License
 
-[All Rights Reserved](LICENSE), with permission for personal gameplay. Public source visibility does not grant permission to redistribute modified copies. World of Warcraft and its game artwork belong to their respective owners.
+[MIT](LICENSE). You may use, modify and redistribute the code under the terms of that license. World of Warcraft and its game artwork belong to their respective owners.

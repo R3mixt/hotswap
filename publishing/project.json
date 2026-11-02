@@ -33,7 +33,7 @@
     ],
     "uploadGameVersionSelection": "Select only client versions actually verified for the uploaded file; live acceptance is pending. No game-version IDs are supplied here."
   },
-  "license": "All Rights Reserved",
+  "license": "MIT",
   "files": {
     "description": "curseforge-description.md",
     "logo": "logo.png",
@@ -55,7 +55,7 @@
     "Open the existing Hot Swap project for this file upload.",
     "Do not label this build as live-client verified until acceptance checks pass.",
     "Keep the name Hot Swap without a version number; use the release display name for file uploads.",
-    "Choose the matching All Rights Reserved license option, or Custom with the included release license text if necessary.",
+    "Use the MIT license option for current project metadata; older published files may retain their original notices.",
     "GitHub Actions uploads on published releases; CURSEFORGE_API_TOKEN is a repository secret. First automated upload remains to be verified."
   ],
   "references": {

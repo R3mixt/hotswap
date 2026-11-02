@@ -42,7 +42,7 @@ Do not repeatedly rerun a successful upload: it can create duplicate files. If a
 - **Failed tests:** fix the failure; the workflow stops before uploading.
 - **Upload returned a file ID but download is unavailable:** inspect moderation/release status on CurseForge.
 
-For a manual fallback, run `python package.py` and upload only `dist/HotSwap-<version>-CurseForge.zip`. Its immediate root must be `KeybindOptimizer/KeybindOptimizer.toc`. Never upload the developer-source ZIP. Keep the All Rights Reserved license and accurate client claims.
+For a manual fallback, run `python package.py` and upload only `dist/HotSwap-<version>-CurseForge.zip`. Its immediate root must be `KeybindOptimizer/KeybindOptimizer.toc`. Never upload the developer-source ZIP. Select MIT as the project license and keep client claims accurate. Older published files may retain their original license notices.
 
 ## Why not enable a second packager webhook?
 

@@ -55,4 +55,4 @@ New characters can inherit custom or missing controls from WoW's saved account b
 
 The defaults are configurable recommendations, not a verified worldwide optimum or a completed top-20-player consensus. Automatic best-food/water selection is not implemented. Hot Swap does not choose a combat rotation or trigger actions without your input.
 
-**License: All Rights Reserved.**
+**License: MIT.**
