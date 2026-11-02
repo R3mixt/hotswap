@@ -1,7 +1,7 @@
 local function operationUI(allowFixtureOverflow)
     local k=TestAddon; k:Init()
     -- Apply/rollback scenarios use the artificial all-talents Druid fixture.
-    if allowFixtureOverflow then k:GetSettings().allowAccountMacros=true end
+    if allowFixtureOverflow then Mock:AllowFullCatalogMacros() end
     k.UI:Open(); k.UI:SetBindingSource("draft"); Mock.async=true
     return k
 end

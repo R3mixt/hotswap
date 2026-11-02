@@ -1,3 +1,7 @@
+# Review history
+
+The entries below describe earlier releases and may be superseded. For version 1.0 use [release review](release-1.0-review.md) and [behavior contract](behavior.md).
+
 # 0.3.0 review record
 
 Reviewed 1 November 2026 across runtime, UI, import/export, native actions and recovery, including independent cross-checks between module owners. The release remains beta until client acceptance is complete.

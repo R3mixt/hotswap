@@ -1,9 +1,9 @@
--- These fixtures exercise full catalogs/visible reservations with account overflow explicitly enabled.
+-- Full-catalog transaction fixtures explicitly use synthetic character capacity; capacity tests retain 30.
 local function equal(actual,expected,label)
  assert(actual==expected,(label or "value")..": expected "..tostring(expected)..", got "..tostring(actual))
 end
 local function init()
- TestAddon:Init(); TestAddon:GetSettings().allowAccountMacros=true; return TestAddon
+ TestAddon:Init(); Mock:AllowFullCatalogMacros(); return TestAddon
 end
 function Tests.native_bar_settings_distinguish_hidden_from_unsupported()
  local k=init(); local plan=k:Preview()

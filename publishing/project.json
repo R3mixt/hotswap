@@ -5,12 +5,12 @@
   "name": "Hot Swap",
   "summary": "Build and switch class keybind presets on Blizzard's original action bars, with a visual keyboard editor, generated macros, item choices, and named backups.",
   "release": {
-    "version": "0.4.9",
-    "displayName": "Hot Swap 0.4.9 Beta",
-    "releaseType": "beta",
-    "automatedTests": 458,
+    "version": "1.0.0",
+    "displayName": "Hot Swap 1.0.0",
+    "releaseType": "release",
+    "automatedTests": 494,
     "testMethod": "Actual Lua modules executed under Lua 5.1 with mocked WoW APIs",
-    "liveClientAcceptance": "pending"
+    "liveClientAcceptance": "pending local Classic Era user testing"
   },
   "game": "World of Warcraft",
   "projectClass": "Addons",
@@ -39,9 +39,9 @@
     "logo": "logo.png",
     "logoVectorSource": "logo.svg",
     "logoBuildScript": "build-logo.ps1",
-    "curseforgeUpload": "HotSwap-0.4.9-CurseForge.zip",
-    "developerArchive": "HotSwap-0.4.9-developer-source-NOT-FOR-UPLOAD.zip",
-    "changelog": "changelog-0.4.9.txt"
+    "curseforgeUpload": "HotSwap-1.0.0-CurseForge.zip",
+    "developerArchive": "HotSwap-1.0.0-developer-source-NOT-FOR-UPLOAD.zip",
+    "changelog": "changelog-1.0.0.txt"
   },
   "logo": {
     "width": 400,
@@ -55,7 +55,7 @@
     "The author reports the project was created; no project ID, URL or verified file upload has been recorded here.",
     "Open the existing Hot Swap project for this file upload.",
     "Category labels are verified on CurseForge; numeric category, game-version, and project IDs are deliberately omitted.",
-    "Do not label this beta as live-client verified until acceptance checks pass.",
+    "Do not label this build as live-client verified until acceptance checks pass.",
     "Keep the name Hot Swap without a version number; use the release display name for file uploads.",
     "Choose the matching All Rights Reserved license option, or Custom with the included release license text if necessary."
   ],

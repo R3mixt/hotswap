@@ -3,7 +3,7 @@ function Tests.priority_restore_resolves_overflow_macro_identity()
 local k=TestAddon
 Mock.class='WARLOCK'; Mock.spells={}; Mock.petSpells={}; Mock.forms={}; Mock.catalog={}
 _G.MultiBar5=nil; _G.MultiBar6=nil; _G.MultiBar7=nil
-k:Init(); k:GetSettings().flavor='era'; k:GetSettings().allowAccountMacros=true
+k:Init(); k:GetSettings().flavor='era'; Mock:AllowFullCatalogMacros()
 for _,def in ipairs(k.Profiles:Get('WARLOCK','era')) do
  local id=def.spellIDs and def.spellIDs[1]
  if id and not def.combo then Mock.catalog[id]={id=id,name=def.name,icon=id} end
@@ -34,7 +34,7 @@ end
 function Tests.priority_form_failure_preserves_personal_changes()
 
 local k=TestAddon
-k:Init(); k:GetSettings().allowAccountMacros=true; assert(k:Apply())
+k:Init(); Mock:AllowFullCatalogMacros(); assert(k:Apply())
 SetBinding('CTRL-F24','OPENCHAT'); Mock.actions[2]={'item',900001}
 local formAction
 for _,a in ipairs(k.db.appliedPlan.actions) do
@@ -56,7 +56,7 @@ end
 
 function Tests.priority_import_discards_reserved_shortcut()
 
-local k=TestAddon; k:Init(); k:GetSettings().allowAccountMacros=true
+local k=TestAddon; k:Init(); Mock:AllowFullCatalogMacros()
 assert(#k:Preview().errors==0)
 assert(not k.Presets:SetHotkey('Leveling','W'))
 Mock:ResetWrites()
@@ -72,7 +72,7 @@ end
 
 function Tests.priority_copy_preserves_displayed_fixed_rank()
 
-local k=TestAddon; k:Init(); k:GetSettings().allowAccountMacros=true
+local k=TestAddon; k:Init(); Mock:AllowFullCatalogMacros()
 assert(k.Library:SetRank('druid.wrath.caster',5176))
 local selected
 for _,entry in ipairs(k.Library:List({tab='spells'})) do
@@ -91,7 +91,7 @@ end
 
 function Tests.priority_items_enters_draft_and_opens_spellbook()
 
-local k=TestAddon; k:Init(); k:GetSettings().allowAccountMacros=true
+local k=TestAddon; k:Init(); Mock:AllowFullCatalogMacros()
 k.UI:Open(); k.UI:ShowPage("Items")
 local page=k.UI.pages.Items
 page.idInput:SetText("1710"); page.addID:Click(); page.useChoice:Click()
@@ -105,14 +105,14 @@ end
 
 function Tests.priority_spells_only_enters_editable_draft()
 
-local k=TestAddon; k:Init(); k:GetSettings().allowAccountMacros=true
+local k=TestAddon; k:Init(); Mock:AllowFullCatalogMacros()
 k.UI:Open(); k.UI:ShowPage("Settings"); k.UI.pages.Settings.spellsOnly:Click()
 assert(k:GetSettings().preserveMovement and k.UI.bindingSource=="draft" and k.UI.apply:IsEnabled())
 end
 
 function Tests.priority_recommendation_resets_unrelated_search()
 
-local k=TestAddon; k:Init(); k:GetSettings().allowAccountMacros=true
+local k=TestAddon; k:Init(); Mock:AllowFullCatalogMacros()
 k.UI:Open(); local page=k.UI.pages.Bindings
 page.search:SetText("ZZZZunlikely"); page.search:GetScript("OnTextChanged")(page.search,true)
 k.UI:ShowPage("Presets"); page=nil
@@ -121,7 +121,7 @@ assert(k.UI.bindingSource=="recommendation" and k.UI.bindingView=="keyboard" and
 end
 
 function Tests.priority_recovery_defers_combat_and_preserves_personal_macro()
- local k=TestAddon; k:Init(); k:GetSettings().allowAccountMacros=true; assert(k:Apply())
+ local k=TestAddon; k:Init(); Mock:AllowFullCatalogMacros(); assert(k:Apply())
  local action
  for _,a in ipairs(k.db.appliedPlan.actions) do if a.targeting=="form" and a.macroName then action=a; break end end
  assert(action)

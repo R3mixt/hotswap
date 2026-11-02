@@ -5,7 +5,7 @@ local function same(a,b,label)
 end
 local function initNative()
   TestAddon:Init(); Mock.async=true
-  TestAddon:GetSettings().allowAccountMacros=true -- Native paging/identity tests need the full Druid reservation set.
+  Mock:AllowFullCatalogMacros() -- Native paging/identity tests need the full Druid reservation set.
   return TestAddon
 end
 local function applyNative(k)
@@ -115,11 +115,9 @@ function Tests.native_pending_spell_gets_real_macro_on_original_bar_before_learn
   Mock.catalog[19434]={id=19434,name="Aimed Shot",icon=135130}
   applyNative(k)
   local aimed=namedAction(k.db.appliedPlan,"hunter.aimed_shot")
-  assert(not aimed.known and aimed.nativeMacro and aimed.macroIndex,"Unlearned native spell was left empty")
-  local action=Mock:NativeActionFor("2")
-  equal(action[1],"macro","Reserved spell is not a native macro action")
-  local _,_,body=GetMacroInfo(action[2])
-  assert(body:find("Aimed Shot",1,true),"Reserved macro does not target its future spell")
+  assert(not aimed.known and aimed.nativeHidden and not aimed.body,"Unlearned native spell must reserve an empty slot")
+  equal(Mock:NativeActionFor("2"),nil,"Future spell unexpectedly occupied the reserved slot")
+  equal(GetBindingAction("2"),aimed.nativeCommand)
 end
 function Tests.native_vehicle_and_manual_page_controls_remain_owned_by_blizzard()
   local k=initNative(); applyNative(k)
@@ -175,26 +173,26 @@ end
 function Tests.native_incomplete_combo_activates_only_when_all_spells_are_learned_and_reverts_safely()
   local k=initNative(); applyNative(k)
   local action=namedAction(k.db.appliedPlan,"druid.natures_swiftness_heal")
-  assert(not action.known and action.macroName,"Unknown combo fixture was not reserved")
-  local index=GetMacroIndexByName(action.macroName)
-  local _,_,body=GetMacroInfo(index)
-  assert(not body:find("/cast",1,true),"Incomplete combo can cast a partial spell")
+  assert(not action.known and action.nativeHidden and not action.body,"Unknown combo fixture was not reserved")
+  equal(GetActionInfo(action.nativeSlot),nil,"Incomplete combo occupied a slot")
+  local body
   local binds=k.Copy(Mock.bindings)
   Mock:Learn(17116,"Nature's Swiftness"); Mock:ResetWrites(); Mock:Fire("SPELLS_CHANGED")
   local ok,why=Mock:Drain(); assert(ok,why)
-  _,_,body=GetMacroInfo(index)
+  _,_,body=GetMacroInfo(GetMacroIndexByName(action.macroName))
   assert(action.known and body:find("/cast [@player] Nature's Swiftness",1,true) and body:find("/cast [@player] Healing Touch",1,true),"Newly learned combo did not activate both spells")
   same(Mock.bindings,binds,"Learning the combo changed existing bindings")
   for index,spell in ipairs(Mock.spells) do if spell.id==17116 then table.remove(Mock.spells,index); break end end
   Mock:Fire("SPELLS_CHANGED"); ok,why=Mock:Drain(); assert(ok,why)
-  _,_,body=GetMacroInfo(GetMacroIndexByName(action.macroName))
-  assert(not action.known and not body:find("/cast",1,true),"Unlearning a component left a partial combo active")
+  assert(not action.known and not action.body and not GetActionInfo(action.nativeSlot),"Unlearning a component left a partial combo active")
 end
 
 function Tests.native_maintenance_preserves_macro_edits_made_after_job_was_queued()
   local k=initNative(); applyNative(k)
-  local action=namedAction(k.db.appliedPlan,"druid.natures_swiftness_heal")
-  Mock:Learn(17116,"Nature's Swiftness"); k.API:InvalidateSpellbook()
+  local action=namedAction(k.db.appliedPlan,"druid.form_cat")
+  k.OnApplyComplete=function() end
+  local forms=k.API:GetForms()
+  Mock.forms[forms.cat.index],Mock.forms[forms.bear.index]=Mock.forms[forms.bear.index],Mock.forms[forms.cat.index]
   equal(k.Engine:RepairLearnedActions(k.db.appliedPlan),"pending","Learned combo maintenance was not queued")
   local index=GetMacroIndexByName(action.macroName)
   EditMacro(index,nil,nil,"/say my personal edit")
@@ -230,8 +228,7 @@ function Tests.native_respec_away_from_moonkin_removes_the_old_cancel_form_macro
   for index,spell in ipairs(Mock.spells) do if spell.id==24858 then table.remove(Mock.spells,index); break end end
   Mock:Fire("PLAYER_TALENT_UPDATE")
   local ok,why=Mock:Drain(); assert(ok,why)
-  assert(not moonkin.known and not moonkin.spellID and moonkin.nativePending,"Lost Moonkin talent still appears learned")
-  assert(not moonkin.body:find("/cast",1,true) and not moonkin.body:find("/use",1,true) and not moonkin.body:find("/cancelform",1,true),"Unlearned talent form must stay entirely inactive")
-  local _,_,body=GetMacroInfo(GetMacroIndexByName(moonkin.macroName))
-  equal(body,moonkin.body,"Removed form metadata and installed macro disagree")
+  assert(not moonkin.known and not moonkin.spellID and moonkin.nativeHidden,"Lost Moonkin talent still appears learned")
+  assert(not moonkin.body and not moonkin.macroName,"Unlearned talent form must stay entirely inactive")
+  equal(GetActionInfo(moonkin.nativeSlot),nil,"Removed form left a callable native action")
 end

@@ -3,7 +3,7 @@ local function ready()
   TestAddon:Init()
   -- Every backup scenario installs the artificial Druid fixture with talents
   -- from multiple specs/versions. Explicitly allow its oversized macro set.
-  for _,preset in pairs(TestAddon.db.presets) do preset.settings.allowAccountMacros=true end
+  Mock:AllowFullCatalogMacros()
   return TestAddon
 end
 local function equal(a,b,label) assert(a==b,(label or "value")..": expected "..tostring(b)..", got "..tostring(a)) end
@@ -120,6 +120,7 @@ function Tests.named_restore_preflight_rejects_full_macro_banks_without_mutation
   local k=ready(); assert(k:Apply()); assert(k:Apply())
   local appliedID=k.Engine:ListBackups()[1].id
   assert(k:Restore())
+  MAX_CHARACTER_MACROS=30; Constants.MacroConsts.MAX_CHARACTER_MACROS=30
   for i=1,150 do Mock.macros[i]={name="Personal"..i,icon=1,body="/say personal "..i} end
   Mock:ResetWrites(); local count=#k.Engine:ListBackups()
   local ok,why=k.Engine:RestoreBackup(appliedID)

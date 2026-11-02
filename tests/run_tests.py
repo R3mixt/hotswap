@@ -69,13 +69,14 @@ def lua_table(lua, value):
 
 def reload_from_saved_variables():
     first = environment()
-    first.execute("TestAddon:Init(); TestAddon:GetSettings().allowAccountMacros=true; assert(TestAddon:Apply())")
+    first.execute("TestAddon:Init(); Mock:AllowFullCatalogMacros(); assert(TestAddon:Apply())")
     saved = plain(first.globals().KeybindOptimizerDB)
     persistent = {
         field: plain(first.globals().Mock[field])
         for field in ["macros", "bindings", "bindingSets", "bindingSet", "modified", "cvars", "actions", "actionToggles", "actionPage"]
     }
     second = environment()
+    second.execute("Mock:AllowFullCatalogMacros()")
     second.globals().KeybindOptimizerDB = lua_table(second, saved)
     for field, value in persistent.items():
         second.globals().Mock[field] = lua_table(second, value)

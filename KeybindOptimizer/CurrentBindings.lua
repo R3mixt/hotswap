@@ -51,6 +51,17 @@ function C:ActionPage()
  return page,"Main"
 end
 function C:ActionSlot(command,page,pageType)
+ -- Resolve supported action-bar addon buttons through their live slot, never
+ -- by assuming their visible button number equals Blizzard's action slot.
+ local frameName,mouse=command:match("^CLICK ([%w_]+):([%w]+)$")
+ if frameName and (frameName:match("^BT4Button%d+$") or frameName:match("^DominosActionButton%d+$")) and (mouse=="LeftButton" or mouse=="HOTKEY" or mouse=="Keybind") then
+  local button=_G[frameName]
+  if button then
+   local kind=read(button.GetAttribute,button,"type")
+   if kind==nil or kind=="action" then return buttonAction(button) end
+  end
+  return nil
+ end
  local index=tonumber(command:match("^ACTIONBUTTON(%d+)$"))
  if index and index>=1 and index<=12 then
   if pageType=="Vehicle" or pageType=="Override" or pageType=="TempShapeshift" then

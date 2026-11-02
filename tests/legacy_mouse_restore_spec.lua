@@ -1,6 +1,6 @@
 local function restoreLegacyMouseSets(originalSet)
     local k=TestAddon; k:Init()
-    k:GetSettings().allowAccountMacros=true -- Legacy restoration uses the full Druid layout, not a capacity fixture.
+    Mock:AllowFullCatalogMacros() -- Legacy restoration uses the full Druid layout, not a capacity fixture.
     Mock.bindingSet=originalSet; Mock.bindings=k.Copy(Mock.bindingSets[originalSet])
     assert(k:Apply())
     local legacy=k.db.backup; legacy.mouseBindingsVersion=nil
@@ -37,7 +37,7 @@ function Tests.legacy_mouse_restore_preserves_each_sets_custom_controls_when_cha
 end
 
 local function repairWithNewPersonalMouseEdit(failSave)
-    local k=TestAddon; k:Init(); k:GetSettings().allowAccountMacros=true; assert(k:Apply())
+    local k=TestAddon; k:Init(); Mock:AllowFullCatalogMacros(); assert(k:Apply())
     k.db.appliedPlan.mouseBindingsVersion=nil
     Mock.bindings.BUTTON1=nil; Mock.bindings.BUTTON2=nil
     Mock.bindingSets[2].BUTTON1=nil; Mock.bindingSets[2].BUTTON2=nil

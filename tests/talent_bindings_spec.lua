@@ -53,10 +53,10 @@ end
 
 function Tests.talent_bindings_no_learned_choice_stays_inert_or_hidden_with_reservation()
  local k=ready(); choose(k,{primary,alternate})
- k:GetSettings().allowAccountMacros=true -- Exercise visible placeholders when there is room for them.
+ Mock:AllowFullCatalogMacros() -- Exercise visible placeholders when there is room for them.
  local a=action(preview(k),primary)
  assert(not a.known and not a.talentSelectionID and a.nativeSlot and a.key)
- assert(a.body and not a.body:find("/cast",1,true) and not a.body:find("/use",1,true),"Unlearned shared choice contains an executable cast")
+ assert(a.nativeHidden and not a.body,"Unlearned shared choice should reserve an empty slot")
  local slot,key=a.nativeSlot,a.key
  k:GetSettings().adaptTalents=true
  local hidden=action(preview(k),primary)
@@ -95,7 +95,7 @@ function Tests.talent_bindings_import_export_preserves_order_without_live_writes
  local k=ready(); choose(k,{alternate,primary}); k:GetSettings().adaptTalents=true
  local payload,why=k:Export("Leveling"); assert(payload,why)
  assert(payload:find("t\tLeveling\t"..primary.."\t"..alternate,1,true))
- Mock:ResetWrites(); local ok,message=k:Import(payload); assert(ok,message)
+ Mock:ResetWrites(); local ok,message=k:Import(payload); assert(ok,message); assert(k.Presets:Select("Leveling (2)"))
  local choices=k.TalentBindings:GetChoices(primary)
  equal(choices[1],alternate); equal(choices[2],primary); equal(k:GetSettings().adaptTalents,true)
  equal(#Mock.writes,0,"Importing talent choices changed live native actions")

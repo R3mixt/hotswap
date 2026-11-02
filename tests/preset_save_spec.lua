@@ -30,7 +30,7 @@ function Tests.preset_apply_edited_draft_prompts_before_saving_and_installing()
  k:GetSettings().primarySchool='fire'; k.Presets:Changed(); Mock:ResetWrites()
  k.UI:UseSelectedPreset(); assert(k.UI.saveDialog:IsShown() and #Mock.writes==0)
  k.UI.saveDialog.cancel:Click(); assert(k.Presets:HasSaveChanges() and #Mock.writes==0)
- k:GetSettings().allowAccountMacros=true
+ Mock:AllowFullCatalogMacros()
  k.UI:UseSelectedPreset(); k.UI.saveDialog.overwrite:Click(); Mock:Drain()
  assert(k.db.enabled and not k.Presets:HasSaveChanges())
 end

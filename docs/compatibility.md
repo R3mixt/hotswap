@@ -1,3 +1,5 @@
+Version 1.0 acceptance: use [behavior.md](behavior.md) for the current interaction contract and [release review](release-1.0-review.md) for automated evidence. Older checklist items below are supplementary where consistent with that contract.
+
 # Hot Swap compatibility and verification
 
 Status: initial implementation is exercised by an automated Lua 5.1 regression suite. The runner reports the current scenario count and results. Source/API research and mocked Lua tests do not establish in-game compatibility. Installation is recorded separately from automated validation. No live-client casting test has been performed.
@@ -66,7 +68,7 @@ Version 0.3.0 also addresses the user's Engine timeout during Apply & save and i
 
 
 26. With account macro space full and character space available, preview recommendations for a new Warrior, save a new preset, apply it, and verify learned abilities install, future keys remain visible in the editor, and reserved native slots populate on learning. Repeat with account space empty: default setup must still create only character macros. Log into a second character and confirm the account bank did not accumulate new generated macros.
-27. In Settings > Action bars, enable account-wide macro overflow and Apply & save. Character slots must fill before account slots are used. Personal macros in either bank must remain unchanged. With insufficient room for learned abilities, expect a bank-specific error before any game writes. Test existing owned account macros from an older version: they may be reused, but are not migrated automatically.
+27. New generated macros must use character slots even if an older imported preset enabled account overflow. Personal macros in either bank must remain unchanged. With insufficient character room, expect a capacity error before writes. Existing owned account macros may be reused for upgrades/recovery, but no new account macros are allowed.
 
 Native availability behavior follows Blizzard's [action-bar visibility rules](https://github.com/Gethe/wow-ui-source/blob/classic_era/Interface/AddOns/Blizzard_ActionBar/Shared/ActionBar.lua): an empty slot's frame can remain visible when the grid is enabled. Macro-label hiding changes the original fontstring used by [ActionButton.lua](https://github.com/Gethe/wow-ui-source/blob/classic_era/Interface/AddOns/Blizzard_ActionBar/Shared/ActionButton.lua), not the secure button. [SpellBook API documentation](https://github.com/Gethe/wow-ui-source/blob/classic_era/Interface/AddOns/Blizzard_APIDocumentationGenerated/SpellBookDocumentation.lua) distinguishes actual knowledge from spellbook presence, which may include unlearned talent overrides.
 

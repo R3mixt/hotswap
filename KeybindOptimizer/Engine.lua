@@ -135,7 +135,6 @@ end
 function E:CreateMacros(plan,created)
     local bodies={}
     local _,_,maxAccount,maxCharacter=K.Macros:Budget(plan)
-    local allowAccount=(plan.settings or K:GetSettings()).allowAccountMacros==true
     for _,a in ipairs(plan.actions) do
         if (a.known or a.nativeMacro) and a.body then
             if not bodies[a.body] then
@@ -149,8 +148,7 @@ function E:CreateMacros(plan,created)
                     end
                     local account,character=GetNumMacros()
                     local perCharacter=character<maxCharacter
-                    if not perCharacter and not allowAccount then error("No free character-specific macro slots remain. Account-wide overflow is disabled.") end
-                    if not perCharacter and account>=maxAccount then error("No free macro slots remain.") end
+                    if not perCharacter then error("No free character-specific macro slots remain.") end
                     index=CreateMacro(name,a.icon or "INV_MISC_QUESTIONMARK",a.body,perCharacter)
                     if not index or index==0 then error("Could not create "..a.label.." macro.") end
                     K.db.ownedMacros[name]=a.body; created[name]=a.body
@@ -888,6 +886,32 @@ function E:Restore()
     end
     return self:StartJob(job)
 end
+-- Reset only this character's bindings. Native bar contents and personal macros
+-- remain available; the named snapshot can undo the complete operation.
+function E:RestoreDefaults()
+    if self.busy then return false,"Wait for the current operation to finish." end
+    if inCombat() then return false,"Leave combat before restoring default bindings." end
+    if not LoadBindings or not SaveBindings then return false,"Default binding recovery is unavailable on this client." end
+    local job={kind="restore-defaults",previous=runtimeState(),created={}}
+    job.steps=snapshotSteps(job); job.rollback=rollbackJob
+    addStep(job.steps,function()
+        E:Deactivate()
+        loadBindings(0)
+        job.currentBindings=captureBindings()
+        saveBindings(2)
+        if GetCurrentBindingSet and GetCurrentBindingSet()~=2 then error("Could not select character-specific default bindings.") end
+    end,"Restoring Blizzard default character bindings",true,true)
+    job.commit=function()
+        K.db.enabled=false; K.db.appliedPlan=nil; K.db.currentLayout=nil
+        K.db.appliedPreset=nil; K.db.appliedPresetSignature=nil
+        K.db.recoveryRequired=nil; K.recoveryQuarantined=nil; K.needsRefresh=nil
+        K.pendingSpellMaintenance=nil; K.pendingItemMaintenance=nil; K.pendingMouseRepair=nil
+        job.entry.status="restored"; K.db.lastBindingBackupID=job.entry.id
+        if K.CurrentBindings then K.CurrentBindings:Discard() end
+        return "Blizzard default keybindings restored for this character. Your previous layout is in Backups."
+    end
+    return self:StartJob(job)
+end
 function E:Activate(plan)
     if self.busy then return "pending","An operation is already running." end
     if inCombat() then return false,"Leave combat before activating the layout." end
@@ -900,7 +924,7 @@ function E:Activate(plan)
     return self:RepairLearnedActions(plan)
 end
 function E:RepairLearnedActions(plan,itemsOnly)
-    if not itemsOnly and K.AvailabilityEngine and (K.AvailabilityEngine:Handles(plan) or K.AvailabilityEngine:RequiresTalentPlacement(plan)) then return K.AvailabilityEngine:Repair(plan) end
+    if not itemsOnly and K.AvailabilityEngine and (K.AvailabilityEngine:RequiresSlotUpdates(plan)) then return K.AvailabilityEngine:Repair(plan) end
     if self.busy then return "pending","Form maintenance is already queued." end
     if inCombat() then return false,"Form maintenance waits until combat ends." end
     local forms=itemsOnly and {} or K.API:GetForms(); local changes={}; local book

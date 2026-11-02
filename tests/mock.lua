@@ -467,13 +467,19 @@ function ClearOverrideBindings(owner) Mock:Write("clearoverrides") end
 function RegisterStateDriver(frame,state,condition) Mock:Write("statedriver",state,condition); frame.stateDrivers=frame.stateDrivers or {}; frame.stateDrivers[state]=condition end
 function UnregisterStateDriver(frame,state) Mock:Write("unstatedriver",state); if frame.stateDrivers then frame.stateDrivers[state]=nil end end
 
-function GetNumMacros() local a,c=0,0; for i in pairs(Mock.macros) do if i<=120 then a=a+1 else c=c+1 end end; return a,c end
+-- Only transaction/identity fixtures opt into this synthetic capacity.
+-- Real-client capacity scenarios retain the default 30 character slots.
+function Mock:AllowFullCatalogMacros()
+  MAX_CHARACTER_MACROS=150
+  Constants.MacroConsts.MAX_CHARACTER_MACROS=150
+end
+function GetNumMacros() local a,c=0,0; for i in pairs(Mock.macros) do if i<=MAX_ACCOUNT_MACROS then a=a+1 else c=c+1 end end; return a,c end
 function GetMacroInfo(index) local m=Mock.macros[index]; if type(index)=="string" then for _,x in pairs(Mock.macros) do if x.name==index then m=x end end end; if m then return m.name,m.icon,m.body end end
 function GetMacroIndexByName(name) for i,m in pairs(Mock.macros) do if m.name==name then return i end end; return 0 end
 function CreateMacro(name,icon,body,character)
   Mock:Write("createmacro",name)
   if #body>255 then error("Macro body exceeds 255 bytes") end
-  local start,last=character and 121 or 1,character and 150 or 120
+  local start,last=character and (MAX_ACCOUNT_MACROS+1) or 1,character and (MAX_ACCOUNT_MACROS+MAX_CHARACTER_MACROS) or MAX_ACCOUNT_MACROS
   for i=start,last do if not Mock.macros[i] then Mock.macros[i]={name=name,icon=icon,body=body}; return i end end
   error("Macro capacity exceeded")
 end
@@ -489,7 +495,7 @@ function DeleteMacro(index)
   if type(index)=="string" then index=GetMacroIndexByName(index) end
   Mock.macros[index]=nil
   -- Real client compacts each macro bank after deletion.
-  local last=index<=120 and 120 or 150
+  local last=index<=MAX_ACCOUNT_MACROS and MAX_ACCOUNT_MACROS or (MAX_ACCOUNT_MACROS+MAX_CHARACTER_MACROS)
   for i=index,last-1 do Mock.macros[i]=Mock.macros[i+1] end
   Mock.macros[last]=nil
 end

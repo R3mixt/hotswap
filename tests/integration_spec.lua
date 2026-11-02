@@ -1,7 +1,7 @@
 local function initUI(allowFixtureOverflow)
   TestAddon:Init()
   -- These activation scenarios need all spells in the cross-spec Druid fixture.
-  if allowFixtureOverflow then TestAddon:GetSettings().allowAccountMacros=true end
+  if allowFixtureOverflow then Mock:AllowFullCatalogMacros() end
   TestAddon.UI:Open(); TestAddon.UI:SetBindingSource("draft")
   return TestAddon
 end
@@ -59,7 +59,8 @@ function Tests.sharing_selected_preset_merges_without_replacing_current_active_l
   local installed=GetBindingAction("Q")
   Mock:ResetWrites()
   local ok,why=k:Import(encoded); assert(ok,why)
-  eq(k.db.activePreset,"Shared healer (2)","Import overwrote the existing mode")
+  eq(k.db.activePreset,"Shared healer","Import changed selected mode")
+  assert(k.db.presets["Shared healer (2)"],"Import did not add renamed copy")
   eq(k.db.appliedPreset,"Leveling","Import activated unreviewed bindings")
   eq(GetBindingAction("Q"),installed,"Import changed live bindings")
   eq(#k.Engine:ListBackups(),before,"Import unnecessarily created a live backup")
@@ -93,7 +94,7 @@ function Tests.preset_tab_creates_names_and_activates_complete_layout_with_named
   eq(k.db.presets["Healing dungeon"].hotkey,"CTRL-F11","Preset shortcut was not captured")
   assert(not k.db.enabled,"Binding a shortcut applied the preset")
   -- A new preset starts with safe defaults; explicitly permit this oversized fixture.
-  k:UpdateSetting("allowAccountMacros",true)
+  Mock:AllowFullCatalogMacros()
   page.usePreset:Click(); if k.UI.saveDialog and k.UI.saveDialog:IsShown() then k.UI.saveDialog.overwrite:Click() end; Mock:Advance(0.2)
   eq(k.db.appliedPreset,"Healing dungeon","Use preset did not activate the selected mode")
   assert(k.db.enabled,"Preset was not enabled")
@@ -115,7 +116,8 @@ function Tests.import_export_has_own_page_and_import_never_activates_bindings()
   assert(page.transfer:GetText():match("^KBO2"),"Export selected did not populate transferable text")
   Mock:ResetWrites()
   page.import:Click(); Mock:Advance(0.2)
-  eq(k.db.activePreset,"Leveling (2)","Import did not preserve colliding local preset")
+  eq(k.db.activePreset,"Leveling","Import changed current settings")
+  assert(k.db.presets["Leveling (2)"],"Import did not preserve colliding local preset")
   eq(k.db.appliedPreset,"Leveling","Import switched the active game layout")
   eq(#Mock.writes,0,"Import/export UI changed protected bindings")
   assert(page.help:GetText():find(".hotswap",1,true),"Export lacks external-file instructions")

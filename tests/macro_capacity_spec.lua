@@ -81,7 +81,7 @@ function Tests.macro_capacity_fresh_character_databases_share_account_macros_wit
  end
 end
 
-function Tests.macro_capacity_explicit_account_overflow_fills_character_bank_first_and_preserves_both_banks()
+function Tests.macro_capacity_legacy_account_overflow_is_ignored_and_preserves_both_banks()
  local k=ready("WARRIOR",150); local personal={}
  for index=1,2 do
   local name="Account personal "..index; local body="/say Account "..index
@@ -92,21 +92,10 @@ function Tests.macro_capacity_explicit_account_overflow_fills_character_bank_fir
   Mock.macros[index]={name=name,body=body,icon=1}; personal[name]=body
  end
  k:GetSettings().allowAccountMacros=true
- local plan=k:Preview(); equal(plan.macrosAvailable,119); equal(#plan.errors,0,table.concat(plan.errors,"; "))
- local create=CreateMacro; local destination={}
- CreateMacro=function(name,icon,body,perCharacter)
-  destination[#destination+1]=perCharacter and "character" or "account"
-  return create(name,icon,body,perCharacter)
- end
- local ok,why=k:Apply(); assert(ok,why)
- assert(#destination>1,"Fixture did not exhaust the character bank")
- equal(destination[1],"character","Account overflow was used before the last character slot")
- for index=2,#destination do equal(destination[index],"account") end
- local account,character=GetNumMacros(); equal(character,30); assert(account>2)
- personalUnchanged(k,personal)
- local payload=k:Export(k.db.activePreset); assert(payload)
- Mock:ResetWrites(); ok,why=k:Import(payload); assert(ok,why)
- equal(k:GetSettings().allowAccountMacros,true); equal(#Mock.writes,0)
+ local plan=k:Preview(); equal(plan.macrosAvailable,1)
+ assert(#plan.errors>0,"Legacy preference silently enabled account macro creation")
+ Mock:ResetWrites(); local ok,why=k:Apply(); assert(not ok and why:find("character-specific",1,true),why)
+ equal(#Mock.writes,0); personalUnchanged(k,personal)
 end
 
 function Tests.macro_capacity_existing_exact_owned_account_macro_is_reused_without_new_account_creation()

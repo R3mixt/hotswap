@@ -47,7 +47,7 @@ local function macroReferences()
 end
 local function sortMacroBanks(refs)
   local indices={}
-  for _,bounds in ipairs({{1,120},{121,150}}) do
+  for _,bounds in ipairs({{1,MAX_ACCOUNT_MACROS},{MAX_ACCOUNT_MACROS+1,MAX_ACCOUNT_MACROS+MAX_CHARACTER_MACROS}}) do
     local entries={}
     for index=bounds[1],bounds[2] do
       if Mock.macros[index] then entries[#entries+1]={macro=Mock.macros[index],previous=index} end

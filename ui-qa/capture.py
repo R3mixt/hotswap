@@ -77,6 +77,7 @@ for module in modules:
 lua.globals().K=namespace
 lua.globals().TestAddon=namespace
 lua.execute(r'''
+Mock.build='1.15.9'; Mock.buildNumber='70576'
 K:Init(); K:GetSettings().flavor='era'
 for _,s in ipairs(Mock.spells) do s.icon='QA:'..s.name end
 Mock.itemInfo[5512]={name='Minor Healthstone',effect='Restores health'}

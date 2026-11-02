@@ -1,7 +1,7 @@
 local function readyItems(allowFixtureOverflow)
   local k=TestAddon; k:Init()
   -- Item maintenance scenarios install the oversized all-talents Druid fixture.
-  if allowFixtureOverflow then k:GetSettings().allowAccountMacros=true end
+  if allowFixtureOverflow then Mock:AllowFullCatalogMacros() end
   return k
 end
 local function itemAction(plan,id) for _,action in ipairs(plan.actions) do if action.id==id then return action end end end
@@ -89,7 +89,7 @@ function Tests.item_binding_library_items_and_manual_choices_roundtrip_in_a_pres
   k:GetSettings().bindingOverrides[id]="CTRL-SHIFT-F20"
   assert(k.Items:AddAlternative(id,1251))
   local exported,why=k.Presets:Export("Leveling"); assert(exported,why)
-  local imported,message=k.Presets:Import(exported); assert(imported,message)
+  local imported,message=k.Presets:Import(exported); assert(imported,message); assert(k.Presets:Select("Leveling (2)"))
   local record=k:GetSettings().itemBindings[id]
   assert(record and record.selected==14530 and record.alternatives[2]==1251 and record.targetMode=="focus","Per-key item settings did not survive import")
   local action=itemAction(k:Preview(),id)

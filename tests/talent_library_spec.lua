@@ -25,7 +25,7 @@ function Tests.talent_library_fixed_rank_freezes_the_selected_family_and_failed_
     assert(not shared(k),"Fixed rank left an incompatible shared group")
     local fixed=action(k,primary)
     assert(fixed.spellID==15407 and fixed.explicitRank and fixed.key==key,"Fixing the alternate rank reverted to the primary spell family")
-    assert(fixed.body:find("Mind Flay(Rank 1)",1,true),"Fixed alternate rank lost its exact cast")
+    assert(not fixed.body and fixed.spellID==15407,"Fixed alternate rank should use its native spell ID")
     assert(k:GetSettings().actionOverrides[primary].replacement.sourceID==alternate,"Alternate family was not preserved")
     assert(k.Library:SetRank(primary,nil))
     assert(action(k,primary).spellName=="Mind Flay","Returning to highest rank changed the frozen family")
@@ -69,7 +69,7 @@ end
 
 function Tests.talent_library_reset_restores_primary_and_default_targeting_when_alternate_mode_is_incompatible()
     local k=TestAddon; k:Init()
-    k:GetSettings().allowAccountMacros=true -- Full Druid catalog; target validation is independent of capacity.
+    Mock:AllowFullCatalogMacros() -- Full Druid catalog; target validation is independent of capacity.
     assert(k.TalentBindings:SetChoices("druid.form_moonkin",{"druid.swiftmend"}))
     assert(k.Library:SetTargetMode("druid.form_moonkin","mouseover"))
     assert(action(k,"druid.form_moonkin").spellName=="Swiftmend")

@@ -605,7 +605,7 @@ function UI:AssignBinding(action, key)
         end
         local normalized=K.API:NormalizeKey(key)
         local other=normalized and K.CurrentBindings:EditingView().byKey[normalized]
-        if other and other.key~=action.key and not immediate then
+        if other and other.key~=action.key and not immediate and self:ShouldConfirmBinding("replace") then
             self:EndCapture()
             self:Confirm("Replace "..keyName(normalized).."?","Move "..(action.label or action.command).." here and replace "..other.label.."? Apply changes installs this edit.",stage)
             return false
@@ -667,7 +667,7 @@ function UI:AssignBinding(action, key)
                 UI:Stage("bindingOverrides",overrides)
                 UI:Notice(linked and "Positions swapped in every form. Apply & save installs them." or "Bindings swapped in this preset. Apply & save installs them.")
             end
-            if immediate then swap(); return true end
+            if immediate or not self:ShouldConfirmBinding("swap") then swap(); return true end
             self:Confirm(linked and "Swap these action-bar positions?" or "Swap these bindings?",detail,swap)
             return false
         end
@@ -1045,6 +1045,9 @@ function UI:AttachTestMouse(frame, preserveWheel)
         end)
     end
 end
+function UI:IsNativeSpellbookShown()
+    return (SpellBookFrame and SpellBookFrame:IsShown()) or (PlayerSpellsFrame and PlayerSpellsFrame:IsShown()) or false
+end
 function UI:UpdateBindingTester()
     if self.hoverBindings and self.hoverBindings.active then
         if self.tester then self.tester:Hide() end
@@ -1057,7 +1060,7 @@ function UI:UpdateBindingTester()
     local sink=mouseContext and not (GetCurrentKeyBoardFocus and GetCurrentKeyBoardFocus()) and not (self.escapeModal and self.escapeModal==self.capture)
     if not sink then
         if self.tester then self.tester:Hide() end
-        if self.testMouseShield then self.testMouseShield:SetShown(mouseContext and true or false) end
+        if self.testMouseShield then self.testMouseShield:SetShown(mouseContext and not self:IsNativeSpellbookShown() and true or false) end
         self:ResetKeyTest()
         local board=self.pages and self.pages.Bindings and self.pages.Bindings.keyboard
         if board then
@@ -1080,6 +1083,8 @@ function UI:UpdateBindingTester()
         end)
         listener:SetScript("OnKeyUp", function(_, key) UI:TestKeyUp(key) end)
         listener:SetScript("OnUpdate", function(owner, elapsed)
+            local nativeBook=UI:IsNativeSpellbookShown()
+            if UI.nativeBookShown~=nativeBook then UI.nativeBookShown=nativeBook; UI:UpdateBindingTester() end
             if UI.testerClose then UI.testerClose=nil; UI.frame:Hide(); return end
             if UI.testerDismiss then local target=UI.testerDismiss; UI.testerDismiss=nil; target:Hide(); UI:UpdateBindingTester(); return end
             if not UI:IsKeyTestAvailable() then UI:UpdateBindingTester(); return end
@@ -1102,11 +1107,12 @@ function UI:UpdateBindingTester()
         self:AttachTestMouse(shield)
         self.testMouseShield=shield
     end
-    self.testMouseShield:Show()
+    self.testMouseShield:SetShown(not self:IsNativeSpellbookShown())
     self.tester:Show()
     if available then
         local view=self.bindingSource=="current" and "Current bindings" or self.bindingSource=="recommendation" and "Recommendation preview" or "Preset draft"
         self.pages.Bindings.keyboard.note:SetText(self.lastTest and (view.." — no casting  |  "..self.lastTest) or (self.bindingSource~="recommendation" and "Test keys here — no casting. Click to rebind. L = unlearned; T = talent." or view.." - read-only. Press keys to inspect; no casting. Use List for other keys."))
+        if self:IsNativeSpellbookShown() then self.pages.Bindings.keyboard.note:SetText("Drag from the game spellbook. Mouse clicks outside Hot Swap use normal game controls.") end
     else
         self:ResetKeyTest()
         self.pages.Bindings.keyboard.note:SetText("Choose an action or press Escape to return to key testing. No casting.")
@@ -1147,7 +1153,7 @@ local function makeKey(parent, base, caption, x, y, width, height, mouse)
     b.targetBadge:SetPoint("TOPRIGHT",-4,-3); b.targetBadge:SetWidth(15); b.targetBadge:SetJustifyH("RIGHT")
     b.base = base
     b:SetScript("OnClick", function() UI:KeyboardKeyClick(base) end)
-    b:SetScript("OnReceiveDrag",function() if UI.libraryDrag then UI:DropLibraryEntry(b.fullKey) end end)
+    b:SetScript("OnReceiveDrag",function() UI:ReceiveSpellDrop(b.fullKey) end)
     UI:AttachTestMouse(b)
     return b
 end
@@ -1937,6 +1943,13 @@ function UI:BuildSafety(page)
             if ok then UI:Notice(why or "Original setup restored.") end
         end)
     end); page.original:SetPoint("BOTTOMLEFT",0,17)
+    page.defaults=button(page,"Restore default keys",185,function()
+        UI:Confirm("Restore Blizzard default keybinds?","Back up your current setup, then replace this character's keybindings with Blizzard defaults. Action-bar spells and preset drafts are kept. Use Restore selected to undo this reset.",function()
+            local ok,why=UI:Call(K.Engine,"RestoreDefaults")
+            if K.QueueRefresh then K:QueueRefresh() end
+            if ok then UI:Notice(why or "Default keybindings restored.") end
+        end)
+    end); page.defaults:SetPoint("BOTTOMLEFT",205,17)
 end
 function UI:RenderSafety()
     local page=self.pages and self.pages.Safety
@@ -2030,6 +2043,11 @@ function UI:RenderReview()
         row:SetText(entry.text); color(row,entry.tone); row:Show(); y=y+math.max(17,row:GetStringHeight())+9
     end
     list:UpdateHeight(y)
+end
+-- Binding prompts are optional; restore/delete/apply safety prompts remain mandatory.
+function UI:ShouldConfirmBinding(kind)
+    local p=K.db and K.db.preferences or {}
+    return p[kind=="swap" and "confirmSwaps" or "confirmReplacements"]~=false
 end
 function UI:Confirm(title, detail, callback)
     if K.Engine and K.Engine.busy then self:UpdateBusyState(); return end

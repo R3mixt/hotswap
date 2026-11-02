@@ -5,7 +5,7 @@ local function combat() return InCombatLockdown and InCombatLockdown() end
 local function spell(a) return a and not a.kind and not a.builtin end
 function A:Handles(plan)
  local settings=plan and plan.settings or {}
- return (plan and plan.deferFutureMacros==true) or settings.hideUnavailableSpells==true or settings.adaptTalents==true or next(settings.talentAlternatives or {})~=nil
+ return (plan and plan.nativeLayout~=nil) or (plan and plan.deferFutureMacros==true) or settings.hideUnavailableSpells==true or settings.adaptTalents==true or next(settings.talentAlternatives or {})~=nil
 end
 function A:HasTalentActions(plan)
  for _,action in ipairs(plan and plan.actions or {}) do if spell(action) and action.key then
@@ -15,12 +15,7 @@ function A:HasTalentActions(plan)
  return false
 end
 function A:RequiresTalentPlacement(plan)
- -- Upgrade earlier applied plans that installed an already-learned talent as
- -- a raw spell. New plans always reserve a managed macro for independent keys.
- for _,action in ipairs(plan and plan.actions or {}) do if spell(action) and action.key and action.nativeSlot and not action.macroName then
-  local annotated=K.Availability:Annotate(K.Copy(action),plan.class,plan.flavor)
-  if annotated.talent and not action.nativeHidden then return true end
- end end
+ -- All native layouts are maintained directly; talents need no special macro.
  return false
 end
 function A:HasUnboundLearnedSpells(plan,book)
@@ -112,7 +107,7 @@ function A:Resolve(action,plan,book,forms)
  end
  if updated.explicitRank and updated.selectedRank then updated.label=(updated.label or updated.name).." · "..updated.selectedRank end
  K.Availability:Annotate(updated,plan.class,plan.flavor)
- updated.nativeDeferred=plan.deferFutureMacros and not updated.known or nil
+ updated.nativeDeferred=not updated.known or nil
  updated.nativeHidden=K.Availability:IsHidden(updated,plan.settings) or updated.nativeDeferred or nil
  local body,why=K.Macros:Build(updated,plan.settings)
  if why then return nil,why end
@@ -122,6 +117,20 @@ function A:Resolve(action,plan,book,forms)
  -- Keep a still-valid generated identity when its body did not change.
  if updated.body==action.body then updated.macroName=action.macroName; updated.macroIndex=action.macroIndex end
  return updated
+end
+-- In-place conditional macro maintenance retains established identities and
+-- works with a full character bank. Use the slot transaction only when content
+-- actually changes between an empty slot, a native spell and a macro.
+function A:RequiresSlotUpdates(plan)
+ local book,forms=K.API:GetCachedSpellbook(),K.API:GetForms()
+ for _,action in ipairs(plan and plan.actions or {}) do if spell(action) and action.key then
+  local updated,why=self:Resolve(action,plan,book,forms)
+  if not updated then return true end -- Let Repair report the validation error.
+  if action.nativeHidden~=updated.nativeHidden or (not action.body)~=(not updated.body) then return true end
+  if not action.body and (action.known~=updated.known or action.spellID~=updated.spellID) then return true end
+  if action.body==updated.body and action.spellID~=updated.spellID then return true end
+ end end
+ return false
 end
 local function macroReferenced(name)
  local index=GetMacroIndexByName(name)

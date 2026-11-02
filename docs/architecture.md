@@ -1,4 +1,4 @@
-# Hot Swap architecture — 0.4.4
+# Hot Swap architecture — 1.0.0
 
 Hot Swap first displays the bindings currently installed in the game. Recommendations are a separate temporary preview; a user saves one as a named preset before explicitly installing it onto Blizzard's original bars outside combat. Reading current controls, previewing recommendations and editing drafts never mutate live game bindings. There are no custom combat bars or rotation decisions.
 
@@ -12,7 +12,7 @@ Hot Swap first displays the bindings currently installed in the game. Recommenda
 | Availability / TalentBindings | Learned/talent presentation and validated ordered shared-key choices |
 | AvailabilityEngine | Bounded owned-slot refresh using the installed layout, separate from draft edits |
 | API | Client feature detection, localized spell/item metadata and game API wrappers |
-| CurrentBindings | Read-only current bindings, native action slots, macro identities and pet-bar presentation; independent of the planner |
+| CurrentBindings | Live bindings, staged sparse edits, native action slots, macro identities, pet and supported third-party button presentation; independent of the planner |
 | Profiles / LibraryData | Stable class IDs, recommended keys and display-only specialization/talent metadata |
 | Macros | Supported target, form, rank and item macro bodies |
 | Items | Inventory capabilities, explicit choices/alternatives and equipment operations |
@@ -28,7 +28,7 @@ Each Lua module receives the shared `K` namespace through addon varargs. The TOC
 
 ## Data and flow
 
-1. Opening Hot Swap selects the read-only current-game view on Bindings; tab navigation retains an explicitly selected draft or recommendation. Its data comes from actual binding commands and native action contents, not recommendations or an unapplied preset.
+1. Opening Hot Swap selects the current-game editing view on Bindings; tab navigation retains an explicitly selected draft or recommendation. Its data comes from actual binding commands and native action contents, not recommendations or an unapplied preset.
 2. Presets → Preview recommendations builds a temporary read-only plan without inserting a saved preset or advancing its ID counter. Save as new preset copies the preview into a uniquely named draft, preserving existing presets. Preview does not create macros, backups or live bindings.
 3. The selected saved preset holds editable settings. Stable action IDs connect bindings, overrides and item alternatives; preset IDs survive renames.
 4. Planner resolves current-client metadata. Display metadata is separate from learned eligibility. Future actions reserve positions without becoming usable.
@@ -39,7 +39,7 @@ Each Lua module receives the shared `K` namespace through addon varargs. The TOC
 
 `bindingOverrides` maps action IDs to keys. `actionOverrides` holds rank, targeting and replacement edits. `customActions` contains typed spell/item/system/emote/macro-reference descriptors. `itemBindings` holds a selected item ID, ordered alternatives, target mode and explicit empty state. UI calls these domain methods rather than constructing executable text.
 
-The Hover bind editor is available only while editing a saved preset draft. It renders planned spell actions in a scrollable grid, grouped by native form and specialization / skill line. Future talents and custom ranks remain accessible regardless of the normal unavailable-entry filter. Hovered keyboard, Shift/Ctrl, side-button and wheel input goes through the existing binding-assignment path, including protection, collision and linked-form checks. Alt and primary mouse clicks are not assigned by this mode. Wheel input over a spell assigns it; blank grid space scrolls. Done retains the preset draft, while Apply uses the normal preflight, named backup and bounded worker. The editor consumes gameplay input only while active; modal Escape handling, close, page change, operations and combat release capture without casting.
+The Hover bind editor is available for Current edits and saved preset drafts. It renders planned spell actions in a scrollable grid, grouped by native form and specialization / skill line. Future talents and custom ranks remain accessible regardless of the normal unavailable-entry filter. Hovered keyboard, Shift/Ctrl, side-button and wheel input goes through the existing binding-assignment path, including protection, collision and linked-form checks. Alt and primary mouse clicks are not assigned by this mode. Wheel input over a spell assigns it; blank grid space scrolls. Done retains the preset draft, while Apply uses the normal preflight, named backup and bounded worker. The editor consumes gameplay input only while active; modal Escape handling, close, page change, operations and combat release capture without casting.
 
 Apply merges planned keys into the captured live binding map. `appliedPlan.bindingOwnership[key]` records the installed command and the command it displaced, with false representing an unbound key. If a later preset releases that key, the displaced command is restored only while the live command still matches Hot Swap's owned command. Personal edits and unrelated shortcuts remain. Explicit Restore and rollback continue to recover full saved binding maps; they are not scoped Apply operations.
 
@@ -100,3 +100,7 @@ Protection classifies the currently bound command, not a hard-coded default key.
 Local `showMacroNames`, `showMacroCode` and `showUnavailableBindings` preferences default true and stay outside presets. Native macro labels use original button fontstring text/alpha with secure post-update hooks; disabling labels never hides a secure action button. Cosmetic labels are indexed from the installed plan and verified against the current paged action, macro name/body and ownership before display. No stored macro is renamed. Trinket tooltip post-hooks retain native equipped-item details and only clarify the live equipment slot. Settings is split into four native subsections while the main tab count stays unchanged.
 
 Talent-key mode uses the existing data model: no `talentAlternatives` entry means Own key; an entry means Shared key. Switching to Own key removes only that choice policy, retaining independent `bindingOverrides`. Unknown catalog talents use inert tooltip-only managed macros or empty native reservations under visibility/capacity policy. Separate learned talent transitions use bounded owned updates.
+
+## Version 1.0 boundaries
+
+The current player contract is [behavior.md](behavior.md). Current edits are separate persisted sparse operations; import never switches the active draft. Confirmation and window preferences remain character-local. Future spell reservations use empty owned native slots and learned-action maintenance. New macros use only character slots; legacy account macros are retained only through ownership-checked reuse. Default keybind reset captures a named backup before loading client defaults and saving the character binding set. See the release review for exact validation and limits.

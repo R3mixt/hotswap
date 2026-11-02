@@ -236,19 +236,65 @@ function UI:FinishLibraryDrag()
     end
     self:CancelLibraryDrag()
 end
+-- Blizzard spellbook cursors carry a book index plus an optional spell ID.
+-- Never interpret the book index as a spell ID; older clients require lookup.
+function UI:ReceiveSpellDrop(key)
+    if self.libraryDrag then return self:DropLibraryEntry(key) end
+    if self.bindingSource~="current" and self.bindingSource~="draft" then return false end
+    if self.escapeModal or (K.Engine and K.Engine.busy) or (InCombatLockdown and InCombatLockdown()) then return false end
+    if not GetCursorInfo then return false end
+    local read,kind,index,bank,spellID=pcall(GetCursorInfo)
+    if not read or kind~="spell" then return false end
+    if not spellID and GetSpellBookItemInfo then
+        local ok,typ,id=pcall(GetSpellBookItemInfo,index,bank or BOOKTYPE_SPELL or "spell")
+        if ok and (typ=="SPELL" or typ=="FUTURESPELL") then spellID=id end
+    end
+    if not spellID and C_SpellBook and C_SpellBook.GetSpellBookItemInfo then
+        local bookBank=Enum and Enum.SpellBookSpellBank and Enum.SpellBookSpellBank.Player
+        local ok,info=pcall(C_SpellBook.GetSpellBookItemInfo,index,bookBank)
+        if ok and info then spellID=info.spellID end
+    end
+    if type(spellID)~="number" or spellID<=0 then self:Notice("This spell could not be read from the spellbook.",true); return false end
+    local name,icon=K.API:SpellInfo(spellID)
+    if not name then self:Notice("This spell is unavailable on this client.",true); return false end
+    local rank=K.API:SpellRank(spellID)
+    self.libraryEntry={label=name,name=name,icon=icon,spellID=spellID,descriptor={kind="spell",name=name,spellID=spellID,rank=rank}}
+    local ok=self:DropLibraryEntry(key)
+    -- A staged edit or visible confirmation has accepted the payload. Failed
+    -- validation leaves the cursor intact so the player can choose another key.
+    if ok or (self.confirm and self.confirm:IsShown()) then if ClearCursor then ClearCursor() end end
+    return ok
+end
 function UI:DropLibraryEntry(key)
     local entry=self.libraryDrag or self.libraryEntry
     if not entry or not key or not K.Library then return false end
+    if self.bindingSource~="current" and self.bindingSource~="draft" then return false end
+    if (self.escapeModal and not (self.escapeModal==self.hoverBindings and self.hoverBindings.assigning)) or (InCombatLockdown and InCombatLockdown()) then return false end
     self:CancelLibraryDrag()
     if K.Engine and K.Engine.busy then return false end
     if self.bindingSource=="current" then
+        K.CurrentBindings:Build()
         local destination=K.CurrentBindings:EditingView().byKey[key]
+        local reviewedCommand=GetBindingAction(key) or ""
+        local reviewedSlot=destination and destination.liveSlot
+        local reviewedContent=reviewedSlot and K.NativeBars:ReadSlot(reviewedSlot) or false
         local function stage()
+            if self.bindingSource~="current" or (InCombatLockdown and InCombatLockdown()) then
+                self:Notice("Return to Current outside combat and review this replacement again.",true); return false
+            end
+            K.CurrentBindings:Build()
+            local current=K.CurrentBindings:EditingView().byKey[key]
+            if (GetBindingAction(key) or "")~=reviewedCommand or (current and current.liveSlot)~=reviewedSlot
+                or (reviewedSlot and not K.NativeBars:SameContent(K.NativeBars:ReadSlot(reviewedSlot),reviewedContent)) then
+                self.currentBindingPlan=nil; self:Refresh()
+                self:Notice("This key or action slot changed while you were reviewing it. Choose the destination again.",true)
+                return false
+            end
             local ok,why=self:Call(K.CurrentBindings,"StageEntry",entry,key)
             self.currentBindingPlan=nil; self:Refresh(); self:Notice(why,not ok)
             return ok
         end
-        if destination and not (self.hoverBindings and self.hoverBindings.active and self.hoverBindings.assigning) then
+        if destination and self:ShouldConfirmBinding("replace") and not (self.hoverBindings and self.hoverBindings.active and self.hoverBindings.assigning) then
             local scope=destination.liveSlot and "This replaces the live action-bar slot, including other keys that use that slot." or "This replaces this key's current command."
             self:Confirm("Replace "..keyName(key).."?",(entry.label or entry.name or "This action").." will replace "..destination.label..". "..scope.." Apply changes installs the edit.",stage)
             return false
@@ -264,16 +310,20 @@ function UI:DropLibraryEntry(key)
             if destination.selfKey==key and destination.key~=key then self:Notice("Self-cast follows the normal spell. Drop onto its normal key to replace it.",true); return end
             local scope=destination.form and destination.form~="all" and ("This changes the "..(actionPageNames[destination.form] or destination.form).." page only.") or "This shared action is used in every form."
             if (settings().talentAlternatives or {})[destination.id] then scope=scope.." This replaces the shared talent choices on this key." end
-            UI:Confirm("Replace "..keyName(key).."?",(entry.label or entry.name).." will replace "..(destination.label or destination.id)..".\n\n"..scope.." Apply & save installs the change.",function()
+            local function stageReplacement()
                 local ok,why=UI:Call(K.Library,"Place",entry,destination.id)
                 if ok then UI.selectedAction=destination; UI:Refresh(); UI:Notice(why or "Action replaced in the preset. Apply & save installs it.") end
-            end)
+                return ok
+            end
+            if UI:ShouldConfirmBinding("replace") then
+                UI:Confirm("Replace "..keyName(key).."?",(entry.label or entry.name).." will replace "..(destination.label or destination.id)..".\n\n"..scope.." Apply & save installs the change.",stageReplacement)
+            else return stageReplacement() end
         end
         if #destinations>1 then
             local options={}; for _,destination in ipairs(destinations) do options[#options+1]={value=destination,label=(destination.label or destination.id).." · "..(actionPageNames[destination.form] or destination.form or "Shared")} end
             local base=key:gsub("ALT%-",""):gsub("CTRL%-",""):gsub("SHIFT%-","")
             self:Menu(self.pages.Bindings.keyboard.keys[base] or self.pages.Bindings.form,options,nil,replace)
-        else replace(destinations[1]) end
+        else return replace(destinations[1]) end
         return false
     end
     -- Empty keys may need a new custom action. Keep an undo token until key
@@ -326,6 +376,7 @@ function UI:BuildLibrary()
         end)
         b:SetHeight(24); b:SetPoint("TOPLEFT",12+((i-1)%3)*97,i<=3 and -34 or -62)
         f.tabs[name]=b
+        if name=="game" then tooltip(b,"Game controls","Bindable movement, camera, targeting and interface commands from this client. Choose a category or search, then drag a command onto a key.") end
     end
     f.category=button(f,"All categories",151,function(self)
         local opts={{value=false,label="All categories"}}
@@ -349,10 +400,19 @@ function UI:BuildLibrary()
     local shell,search=edit(f,286,28); shell:SetPoint("TOPLEFT",12,-132); f.search=search
     search:SetScript("OnTextChanged",function(_,user) if user then UI:CancelLibraryDrag(); UI:RenderLibrary() end end)
     tooltip(shell,"Search the spellbook","Find an ability, command, emote or macro.")
-    f.list=scroll(f); f.list:SetPoint("TOPLEFT",12,-169); f.list:SetPoint("BOTTOMRIGHT",-12,68)
+    f.list=scroll(f); f.list:SetPoint("TOPLEFT",12,-169); f.list:SetPoint("BOTTOMRIGHT",-12,94)
     f.list.slider:HookScript("OnValueChanged",function() if not UI.libraryRendering then UI:RenderLibraryRows() end end)
     f.note=label(f,"Drag an icon onto a key, or click an ability and then a key.",10,C.muted)
-    f.note:SetPoint("BOTTOMLEFT",12,14); f.note:SetWidth(285); f.note:SetHeight(42)
+    f.note:SetPoint("BOTTOMLEFT",12,46); f.note:SetWidth(285); f.note:SetHeight(36)
+    f.nativeBook=button(f,"Game spellbook",150,function()
+        if InCombatLockdown and InCombatLockdown() then UI:Notice("Leave combat before opening the game spellbook here.",true); return end
+        if ToggleSpellBook then
+            local ok,why=pcall(ToggleSpellBook,BOOKTYPE_SPELL or "spell")
+            if not ok then UI:Notice(tostring(why),true) end
+            UI:UpdateBindingTester()
+        else UI:Notice("Open your game spellbook before Hot Swap to drag its spells here.",true) end
+    end); f.nativeBook:SetPoint("BOTTOMLEFT",12,12)
+    tooltip(f.nativeBook,"Game spellbook","Open Blizzard's spellbook and drag a spell onto the keyboard. Other mouse clicks outside Hot Swap return to normal game behavior while it is open.")
     f:SetScript("OnHide",function() search:ClearFocus(); UI:CancelLibraryDrag() end)
     f:Hide(); self.library=f
 end

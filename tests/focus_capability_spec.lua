@@ -1,6 +1,6 @@
 local function focusInit(supported)
     local k=TestAddon; k:Init(); k:GetSettings().flavor="era"
-    k:GetSettings().allowAccountMacros=true -- Full Druid catalog; test command support independently of capacity.
+    Mock:AllowFullCatalogMacros() -- Full Druid catalog; test command support independently of capacity.
     Mock:SetBindingCommandAvailable("TARGETFOCUS",supported)
     Mock:SetBindingCommandAvailable("FOCUSTARGET",supported)
     k.API:InvalidateBindingCommands()

@@ -86,7 +86,7 @@ function K.Macros:Build(action,settings)
             else cond="[mod:alt,@player][@mouseover,help,nodead][help,nodead]"..(settings.selfFallback and "[@player]" or "") end
         elseif target=="dead" then cond="[@mouseover,help,dead][help,dead]"
         elseif target=="focus" then cond="[@focus,harm,nodead]"
-        elseif target=="self" then cond="[@player]"
+        elseif target=="self" then cond="" -- Catalog self-only spells already target the player.
         elseif target=="ground" and settings.groundAtCursor then cond="[@cursor]" end
         local mode=action.targetMode
         if mode and mode~="default" then
@@ -105,9 +105,11 @@ function K.Macros:Build(action,settings)
             if target=="help" or target=="dead" then push("/cancelform "..cond)
             else push("/cancelform") end
         end
+        -- A plain spell (including an exact rank) belongs directly on the bar.
+        -- Keep macros only for actual conditional targeting, toggles or form work.
+        if #lines==1 and cond=="" and not action.nonToggle then return nil end
         push("/cast "..cond..(#cond>0 and " " or "")..(action.nonToggle and "!" or "")..name)
     end
-    if #lines==0 and action.explicitRank then push("#showtooltip "..name); push("/cast "..name) end
     if #lines==0 then return nil end
     local body=table.concat(lines,"\n")
     if #body>255 then return nil,"Macro exceeds the client's 255-byte limit: "..action.label end
@@ -153,19 +155,15 @@ function K.Macros:Budget(plan)
     local constants=Constants and Constants.MacroConsts
     local maxAccount=(constants and constants.MAX_ACCOUNT_MACROS) or MAX_ACCOUNT_MACROS or 120
     local maxCharacter=(constants and constants.MAX_CHARACTER_MACROS) or MAX_CHARACTER_MACROS or 18
-    local settings=plan.settings or K:GetSettings()
     local characterFree=math.max(0,maxCharacter-character)
-    local accountFree=math.max(0,maxAccount-account)
-    local available=characterFree+(settings.allowAccountMacros and accountFree or 0)
+    local available=characterFree
     return count,available,maxAccount,maxCharacter
 end
 
 function K.Macros:CapacityMessage(plan,needed,available,context)
-    local account=(plan.settings or K:GetSettings()).allowAccountMacros
-    local scope=account and "macro slots" or "character-specific macro slots"
-    local help=account and " Free some macro slots before trying again." or " Free character macro slots, or enable account-wide macro overflow in Settings > Action bars and choose Apply & save."
-    -- A named backup restores its saved storage policy, never the editing
-    -- draft. Changing today's checkbox cannot add capacity to that snapshot.
+    local scope="character-specific macro slots"
+    local help=" Free character macro slots before trying again."
+    -- A named backup restores saved actions, never the current editing draft.
     if context=="restore" then help=" Free "..scope.." to restore this saved layout." end
     return "Need "..needed.." free "..scope.."; only "..available.." are available."..help.." No macros will be overwritten."
 end

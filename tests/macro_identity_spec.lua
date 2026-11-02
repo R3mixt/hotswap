@@ -1,4 +1,4 @@
--- These fixtures exercise full catalogs/visible reservations with account overflow explicitly enabled.
+-- Full-catalog transaction fixtures explicitly use synthetic character capacity; capacity tests retain 30.
 local function equal(a,b,label) assert(a==b,(label or "value")..": expected "..tostring(b)..", got "..tostring(a)) end
 local function body(name)
   local found,_,text=GetMacroInfo(GetMacroIndexByName(name))
@@ -9,7 +9,7 @@ local function sameMap(actual,expected)
   for key in pairs(actual) do assert(expected[key],"Unexpected binding "..key) end
 end
 local function ready()
-  local k=TestAddon; k:Init(); k:GetSettings().allowAccountMacros=true; Mock.async=true
+  local k=TestAddon; k:Init(); Mock:AllowFullCatalogMacros(); Mock.async=true
   CreateMacro("ZZZ test personal",1,"/say character original",true)
   return k
 end
@@ -159,7 +159,9 @@ end
 
 function Tests.macro_identity_maintenance_preserves_a_touched_macro_edited_before_rollback()
   local k=ready(); apply(k)
-  Mock:Learn(17116,"Nature's Swiftness"); k.API:InvalidateSpellbook()
+  k.OnApplyComplete=function() end
+  local forms=k.API:GetForms()
+  Mock.forms[forms.cat.index],Mock.forms[forms.bear.index]=Mock.forms[forms.bear.index],Mock.forms[forms.cat.index]
   local edit=EditMacro; local touched
   EditMacro=function(index,...)
     touched=GetMacroInfo(index)
@@ -177,7 +179,9 @@ end
 
 function Tests.macro_identity_maintenance_does_not_edit_replacement_after_touched_macro_is_removed()
   local k=ready(); apply(k)
-  Mock:Learn(17116,"Nature's Swiftness"); k.API:InvalidateSpellbook()
+  k.OnApplyComplete=function() end
+  local forms=k.API:GetForms()
+  Mock.forms[forms.cat.index],Mock.forms[forms.bear.index]=Mock.forms[forms.bear.index],Mock.forms[forms.cat.index]
   local edit=EditMacro; local removed
   EditMacro=function(index,...)
     removed=GetMacroInfo(index)

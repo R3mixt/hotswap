@@ -1,6 +1,6 @@
--- These fixtures exercise full catalogs/visible reservations with account overflow explicitly enabled.
+-- Full-catalog transaction fixtures explicitly use synthetic character capacity; capacity tests retain 30.
 local function libraryInit()
-    TestAddon:Init(); TestAddon:GetSettings().allowAccountMacros=true; TestAddon.db.settings.flavor='era'; return TestAddon
+    TestAddon:Init(); Mock:AllowFullCatalogMacros(); TestAddon.db.settings.flavor='era'; return TestAddon
 end
 local function actionFor(k,id)
     for _,action in ipairs(k:Preview().actions) do if action.id==id then return action end end
@@ -17,7 +17,7 @@ function Tests.library_uses_real_rank_metadata_and_explicit_ranks_keep_separate_
     local ok,id,why=k.Library:Stage(rank); assert(ok,why)
     local custom=actionFor(k,id)
     assert(custom.known and custom.spellID==5176 and custom.explicitRank)
-    assert(custom.body:find('/cast Wrath(Rank 1)',1,true),'Exact rank macro upgraded to highest')
+    assert(not custom.body and custom.spellID==5176,'Exact rank should use its native spell ID')
     assert(custom.form=='all' and custom.key~=actionFor(k,'druid.wrath.caster').key)
     assert(actionFor(k,'druid.wrath.caster').spellID==5177,'Adding rank1 changed the default highest rank')
     assert(k:Apply())
@@ -40,18 +40,19 @@ function Tests.library_unknown_rank_stays_unlearned_and_missing_rank_text_blocks
     local k=libraryInit(); Mock.catalog[991234]={id=991234,name='Wrath',rank='Rank 9',icon=123}
     local ok,id=k.Library:Stage({descriptor={kind='spell',spellID=991234,name='Wrath',rank='Rank 9',targeting='harm'}}); assert(ok)
     local action=actionFor(k,id)
-    assert(not action.known and action.nativeMacro and action.body:find('Wrath(Rank 9)',1,true))
+    assert(not action.known and action.nativeHidden and not action.body and action.selectedSpellID==991234)
     local body,why=k.Macros:Build({known=true,explicitRank=true,name='Wrath'},k:GetSettings())
     assert(not body and why:find('rank',1,true),'Missing subtext silently cast highest rank')
 end
 function Tests.library_target_modes_keep_alt_self_first_and_reject_incompatible_targets()
-    local k=libraryInit()
+    local k=libraryInit(); k:GetSettings().cancelForUtility=true
     assert(k.Library:SetTargetMode('druid.rejuvenation','focus'))
     local a=actionFor(k,'druid.rejuvenation')
     assert(a.body:find('/cast [mod:alt,@player][@focus,help,nodead] Rejuvenation',1,true))
     assert(a.body:find('/cancelform [mod:alt,@player][@focus,help,nodead]',1,true))
     assert(not k.Library:SetTargetMode('druid.wrath.caster','self'))
     assert(not k.Library:SetTargetMode('druid.wrath.caster','cursor'))
+    Mock:Learn(16914,'Hurricane'); k.API:InvalidateSpellbook()
     assert(k.Library:SetTargetMode('druid.hurricane.caster','cursor'))
     assert(actionFor(k,'druid.hurricane.caster').body:find('[@cursor]',1,true))
 end
@@ -73,7 +74,7 @@ function Tests.library_stage_undo_and_import_are_data_only_and_preserve_rank_rep
     assert(k.Library:Place(rank,'druid.wrath.caster','target'))
     ok,id=k.Library:Stage(rank); assert(ok)
     k.db.settings.bindingOverrides[id]='SHIFT-F24'
-    local payload=k:Export('Leveling'); assert(k:Import(payload))
+    local payload=k:Export('Leveling'); assert(k:Import(payload)); assert(k.Presets:Select('Leveling (2)'))
     assert(k.db.settings.actionOverrides['druid.wrath.caster'].replacement.spellID==5176)
     assert(k.db.settings.customActions[id].rank=='Rank 1')
     assert(not k:Import(payload..'\nu\tLeveling\tcustom.999\tbody\t/run CastSpellByName("Wrath")'))
@@ -117,7 +118,7 @@ function Tests.library_item_choices_and_explicit_empty_roundtrip_without_code()
     assert(k.Library:Place({descriptor={kind='item',itemID=1251}},'druid.wrath.caster'))
     assert(k.Items:AddAlternative('druid.wrath.caster',2581))
     assert(k.Items:SetBindingItem('druid.wrath.caster',nil))
-    local payload=k:Export('Leveling'); assert(k:Import(payload))
+    local payload=k:Export('Leveling'); assert(k:Import(payload)); assert(k.Presets:Select('Leveling (2)'))
     local record=k.db.settings.itemBindings['druid.wrath.caster']
     assert(record.empty and not record.selected and #record.alternatives==2)
     local a=actionFor(k,'druid.wrath.caster'); assert(not a.known and not a.itemSelectedID,'Cleared selection revived the original item descriptor')

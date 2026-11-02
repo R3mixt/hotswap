@@ -1,4 +1,4 @@
--- These fixtures exercise full catalogs/visible reservations with account overflow explicitly enabled.
+-- Full-catalog transaction fixtures explicitly use synthetic character capacity; capacity tests retain 30.
 local function equal(a,b,label) assert(a==b,(label or "value")..": expected "..tostring(b)..", got "..tostring(a)) end
 local function find(plan,id)
  for _,a in ipairs(plan.actions) do if a.id==id then return a end end
@@ -8,7 +8,7 @@ local function ready()
  Mock.build="1.60.1"; Mock.class="PRIEST"; Mock.spells={}; Mock.petSpells={}; Mock.forms={}; Mock.catalog={}
  Mock:Learn(585,"Smite")
  Mock.catalog[15487]={id=15487,name="Silence",icon=136164}
- local k=TestAddon; k:Init(); k:GetSettings().allowAccountMacros=true
+ local k=TestAddon; k:Init(); Mock:AllowFullCatalogMacros()
  local ok,id,why=k.Library:Stage({descriptor={kind="spell",sourceID="priest.silence"}})
  assert(ok,why); k:GetSettings().bindingOverrides[id]="CTRL-F22"
  ok,why=k.Library:SetTargetMode(id,"mouseover"); assert(ok,why)
@@ -46,7 +46,7 @@ function Tests.custom_spell_layout_learning_splits_shared_silence_placeholder_by
  for _,actionID in ipairs(ids) do
   local a=find(k.db.appliedPlan,actionID)
   before[actionID]={key=a.key,slot=a.nativeSlot,command=a.nativeCommand}
-  assert(not a.known and a.talent and not installedBody(a):find("/cast",1,true))
+  assert(not a.known and a.talent and not a.body and not GetActionInfo(a.nativeSlot))
   placeholder=placeholder or a.macroName; equal(a.macroName,placeholder,"Fixture did not share its inert placeholder")
  end
  local bindings=k.Copy(Mock.bindings)
@@ -55,11 +55,13 @@ function Tests.custom_spell_layout_learning_splits_shared_silence_placeholder_by
  for _,actionID in ipairs(ids) do
   local a=find(k.db.appliedPlan,actionID); local old=before[actionID]
   assert(a.known); equal(a.key,old.key); equal(a.nativeSlot,old.slot); equal(a.nativeCommand,old.command)
-  assert(not macroNames[a.macroName],"Different target variants retained a shared executable macro")
-  macroNames[a.macroName]=true; installedBody(a)
+  if a.body then
+   assert(not macroNames[a.macroName],"Different target variants retained a shared executable macro")
+   macroNames[a.macroName]=true; installedBody(a)
+  else equal(GetActionInfo(a.nativeSlot),"spell"); equal(select(2,GetActionInfo(a.nativeSlot)),15487) end
  end
  local base,focus,custom=find(k.db.appliedPlan,ids[1]),find(k.db.appliedPlan,ids[2]),find(k.db.appliedPlan,id)
- assert(base.body:find("/cast Silence",1,true),"Base key did not activate plain Silence")
+ assert(not base.body and base.spellID==15487,"Base key did not activate native Silence")
  assert(focus.body:find("/cast [@focus,harm,nodead] Silence",1,true),"Focus key lost its focus condition")
  assert(custom.body:find("/cast [@mouseover,harm,nodead][harm,nodead] Silence",1,true),"Custom key lost mouseover targeting")
  for key,command in pairs(bindings) do equal(Mock.bindings[key],command,"Learning changed "..key) end
@@ -68,7 +70,7 @@ function Tests.custom_spell_layout_learning_splits_shared_silence_placeholder_by
  Mock:Fire("PLAYER_TALENT_UPDATE"); finish(k)
  for _,actionID in ipairs(ids) do
   local a=find(k.db.appliedPlan,actionID)
-  assert(not a.known and not installedBody(a):find("/cast",1,true),"Unlearning left an executable Silence variant")
+  assert(not a.known and not a.body and not GetActionInfo(a.nativeSlot),"Unlearning left an executable Silence variant")
   equal(a.key,before[actionID].key); equal(a.nativeSlot,before[actionID].slot)
  end
 end

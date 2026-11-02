@@ -62,7 +62,7 @@ function Tests.character_login_replaces_foreign_selected_draft_without_deleting_
  k:Init(); assert(k.db.activePreset~='Warlock' and k.db.presets.Warlock==foreign)
  assert(#k.Presets:List()==1 and k.db.presets[k.db.activePreset].sourceClass=='MAGE')
  assert(not k.Presets:Select('Warlock')); assert(#Mock.writes==0)
- k:GetSettings().allowAccountMacros=true
+ Mock:AllowFullCatalogMacros()
  local ok,why=k.Presets:Activate(k.db.activePreset); assert(ok,why)
  assert(k.db.appliedPlan.class=='MAGE')
 end

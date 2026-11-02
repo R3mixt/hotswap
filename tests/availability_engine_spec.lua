@@ -13,7 +13,7 @@ local function ready()
   TestAddon:Init(); Mock.async=true
   -- These scenarios test availability policy with room for visible future
   -- placeholders; character-only budget compaction has separate regressions.
-  TestAddon:GetSettings().allowAccountMacros=true
+  Mock:AllowFullCatalogMacros()
   return TestAddon
 end
 local function finish()
@@ -38,7 +38,8 @@ function Tests.availability_engine_defaults_keep_future_reservations_visible()
   apply(k)
   local moonfire=action(k.db.appliedPlan,"druid.moonfire.caster")
   assert(not moonfire.known and moonfire.key and moonfire.nativeSlot)
-  equal(GetActionInfo(moonfire.nativeSlot),"macro","Default future spell reservation disappeared")
+  equal(GetActionInfo(moonfire.nativeSlot),nil,"Future spells should reserve empty native slots")
+  assert(not moonfire.body and GetBindingAction(moonfire.key)==moonfire.nativeCommand)
 end
 
 function Tests.availability_engine_success_does_not_report_an_unapplied_draft()
@@ -102,7 +103,7 @@ function Tests.availability_engine_talent_adaptation_is_independent_from_hiding_
   local talent=action(k.db.appliedPlan,"druid.natures_grasp")
   local ordinary=action(k.db.appliedPlan,"druid.moonfire.caster")
   assert(talent.talent and talent.nativeHidden and not GetActionInfo(talent.nativeSlot),"Unselected talent was not hidden")
-  assert(not ordinary.nativeHidden and GetActionInfo(ordinary.nativeSlot),"Talent adaptation hid an ordinary future spell")
+  assert(ordinary.nativeHidden and not GetActionInfo(ordinary.nativeSlot),"Ordinary future spells should also reserve empty slots")
   local key,slot=talent.key,talent.nativeSlot
   Mock:Learn(16689,"Nature's Grasp"); changed(k,"PLAYER_TALENT_UPDATE")
   local learned=action(k.db.appliedPlan,"druid.natures_grasp")

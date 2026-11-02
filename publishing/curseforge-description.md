@@ -4,7 +4,7 @@ Build a comfortable keyboard layout, keep it consistent across your class, and s
 
 Hot Swap places spells and generated macros on **Blizzard's original action bars**. Its in-game keyboard opens on your current game bindings in edit mode, including native pet controls. Build your own Current layout with the spellbook or Hover bind, including future spells and missing items. Future reservations do not consume macro slots. Saved preset drafts provide a separate editor for Shift and Ctrl layers, mouse buttons, and optional wheel bindings. The interface uses WoW's own frames and controls.
 
-**0.4.9 beta:** Classic Era and Hardcore are the current test clients; Forever is the final release target. Automated tests exercise the actual Lua modules with mocked WoW APIs. Live-client acceptance testing is still pending. Retail and other Classic expansions are not supported release targets.
+**1.0.0 user-test build:** Classic Era and Hardcore are the current test clients; Forever is the final release target. Automated tests exercise the actual Lua modules with mocked WoW APIs. Live-client acceptance testing is still pending. Retail and other Classic expansions are not supported release targets.
 
 ## Set up your keys
 
@@ -18,7 +18,7 @@ Hot Swap places spells and generated macros on **Blizzard's original action bars
 
 In Hover bind, **Done - keep draft** saves the edits in your preset without installing them; **Apply & save** installs them with a named backup. The wheel binds over a spell and scrolls over blank grid space. No spells cast while the mode is active. Escape closes a confirmation first, then leaves the mode; closing the window or entering combat also releases capture.
 
-Generated macros use **character-specific slots by default**. Each preset can opt into **Settings → Action bars → Allow account-wide macro overflow** when it needs extra shared slots. Existing owned account macros are reused without being moved; personal macros are never overwritten.
+New generated macros use **character-specific slots only**. Ordinary spells and future reservations use native actions; conditional targeting and form behavior use macros where necessary. Existing owned account macros can be reused for upgrades; personal macros are never overwritten.
 
 Current uses native actions for simple spells and items. Future spells and missing items reserve their positions without macros and activate outside combat when available. Macro-only Current actions wait for character macro space without blocking the rest of Apply. Preset drafts with targeting or other macro features may still need macro slots; their future positions remain reserved when space is limited.
 

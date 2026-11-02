@@ -1,5 +1,22 @@
 # Changelog
 
+## 1.0.0 - 2026-11-02
+
+- Always opens the Current layout with the miniature spellbook and preserves staged edits.
+- Adds Blizzard spellbook drag/drop and a Game spellbook opener.
+- Adds independent character-local replacement and swap confirmation settings.
+- Imports add presets without switching the selected draft or changing current settings.
+- Handles downloaded UTF-8 profile text, validates imports atomically and bounds exports.
+- Uses native actions for simple spells and ranks; reserves future spells without placeholder macros.
+- Creates new macros only in character slots. Legacy account-overflow options cannot create shared macros.
+- Adds a backed-up, confirmed reset to Blizzard's default character keybindings.
+- Improves Current display of supported third-party action-bar button bindings.
+- Adds behavior documentation, review evidence and regression scenarios.
+
+- New presets leave optional utility form cancellation off to keep the full Era class catalogs within character macro capacity; existing preferences remain unchanged.
+
+Prepared for Classic Era user testing. Automated Lua/API-mock tests and rendered UI geometry do not certify in-game protected execution, taint, casting or Bartender/Dominos compatibility. Conditional layouts can still exceed the character macro limit and will fail with a capacity explanation. Downloaded .hotswap files are imported by opening the text externally and pasting the code. No public upload is performed.
+
 ## 0.4.9 beta - 2026-11-02
 
 - Fixed Current layouts failing to apply because future abilities exhausted character macro slots.
@@ -11,12 +28,12 @@
 - Personal macros and unrelated controls are preserved.
 
 
-## 0.4.8 beta — 2026-11-02
+## 0.4.8 beta â€” 2026-11-02
 
 - Stage hover-bind replacements and supported preset swaps immediately without confirmation dialogs. Keep hover input active for successive edits. Ordinary click/drag editing retains its confirmation flow; Apply still installs the staged layout.
 
 
-## 0.4.7 beta — 2026-11-02
+## 0.4.7 beta â€” 2026-11-02
 
 - Make Current a full editable layout seeded only from live controls, with an independent spell catalog instead of the selected preset's replacements.
 - Allow unlearned spells, specific future ranks, missing items and emotes; reserve future actions with verified character macros. Preserve existing unrelated keys and native slots.
@@ -24,7 +41,7 @@
 - Keep pending Current edits across reloads until applied or discarded; retain readable future-action labels after Apply and learning. Named backups recreate owned Current macros safely, including name collisions.
 
 
-## 0.4.6 beta — 2026-11-02
+## 0.4.6 beta â€” 2026-11-02
 
 - Open Current bindings in edit mode with the spellbook visible. Stage key changes and learned-spell/item/macro replacements, then apply only those edits with a named backup. Discard pending edits without game writes.
 - Detect stale keys/slots before applying Current edits; retain pending edits after a failed installation and use the existing recovery worker.
@@ -32,7 +49,7 @@
 - Prompt to overwrite the selected preset or save under a new name when saving recommendations or applying changed drafts. Preserve preset IDs/shortcuts on overwrite and the original saved version on save-as-new.
 
 
-## 0.4.5 beta — 2026-11-02
+## 0.4.5 beta â€” 2026-11-02
 
 - Fix restored direct macro identities and preserve personal changes after failed form maintenance.
 - Correct draft editor state, imported shortcut validation, copied fixed ranks and recommendation preview filters.

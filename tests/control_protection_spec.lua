@@ -1,7 +1,7 @@
--- These fixtures exercise full catalogs/visible reservations with account overflow explicitly enabled.
+-- Full-catalog transaction fixtures explicitly use synthetic character capacity; capacity tests retain 30.
 local flags={"preserveMovement","preserveCamera","preserveChat","preserveInterface","preserveTargeting","preserveGameSettings"}
 local function equal(a,b,label) assert(a==b,(label or "value")..": expected "..tostring(b)..", got "..tostring(a)) end
-local function ready() TestAddon:Init(); TestAddon:GetSettings().allowAccountMacros=true; return TestAddon end
+local function ready() TestAddon:Init(); Mock:AllowFullCatalogMacros(); return TestAddon end
 local function apply(k) local ok,why=k:Apply(); assert(ok,why) end
 local function controls()
   local map={E="MOVEFORWARD",Q="OPENCHAT",F="TOGGLECHARACTER0",R="TARGETNEARESTENEMY",G="TURNORACTION",MOUSEWHEELUP="CAMERAZOOMIN",MOUSEWHEELDOWN="CAMERAZOOMOUT"}
@@ -15,7 +15,7 @@ function Tests.control_protection_is_opt_in_and_round_trips_per_preset()
   for _,flag in ipairs(flags) do k:GetSettings()[flag]=true end
   local payload=k:Export("Leveling")
   for _,flag in ipairs(flags) do equal(k.db.presets.Dungeon.settings[flag],false,"Independent preset "..flag) end
-  Mock:ResetWrites(); local ok,why=k:Import(payload); assert(ok,why)
+  Mock:ResetWrites(); local ok,why=k:Import(payload); assert(ok,why); assert(k.Presets:Select("Leveling (2)"))
   for _,flag in ipairs(flags) do equal(k:GetSettings()[flag],true,"Imported "..flag) end
   equal(#Mock.writes,0,"Importing protection preferences changed live controls")
 end
@@ -150,7 +150,7 @@ function Tests.control_protection_preset_hotkey_rejects_protected_controls_acros
   equal(#Mock.writes,0)
   local payload="KBO2\nc\tDRUID\nn\tImported protected\ns\tImported protected\tpreserveTargeting\tboolean\ttrue\nh\tImported protected\tF\na\tImported protected"
   ok,why=k:Import(payload); assert(ok,why)
-  k:GetSettings().allowAccountMacros=true -- Capacity is independent of shortcut validation.
+  Mock:AllowFullCatalogMacros() -- Capacity is independent of shortcut validation.
   local plan=k:Preview(); assert(#plan.errors==0,table.concat(plan.errors,"; "))
   equal(k.db.presets[k.db.activePreset].hotkey,nil)
   equal(#Mock.writes,0); equal(#k.Engine:ListBackups(),0); equal(GetBindingAction("F"),"ASSISTTARGET")

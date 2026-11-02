@@ -3,16 +3,9 @@ local function settingsUI()
     return k,k.UI.pages.Settings
 end
 
-function Tests.settings_ui_account_macro_overflow_is_opt_in_and_staged_per_preset()
+function Tests.settings_ui_generated_macros_are_character_only()
     local k,page=settingsUI(); page.sectionButtons["Action bars"]:Click()
-    assert(k:GetSettings().allowAccountMacros==false and not page.allowAccountMacros:GetChecked(),"Shared account macro slots were enabled by default")
-    assert(page.allowAccountMacros.tipDetail:find("character-specific",1,true) and page.allowAccountMacros.tipDetail:find("all characters",1,true),"Overflow setting does not explain its character/account scope")
-    Mock:ResetWrites(); local original=k:Export()
-    page.allowAccountMacros:Click()
-    assert(k:GetSettings().allowAccountMacros and page.allowAccountMacros:GetChecked() and k.dirty,"Account overflow was not staged in the current preset")
-    assert(k:Export()~=original and #Mock.writes==0,"Overflow preference was omitted from the preset or changed live game state")
-    page.allowAccountMacros:Click()
-    assert(k:GetSettings().allowAccountMacros==false and k:Export()==original,"Disabling overflow did not restore the preset preference")
+    assert(not page.allowAccountMacros,"Account overflow must not be offered")
 end
 
 function Tests.settings_ui_talent_choices_order_remove_reset_and_escape_are_staged_only()

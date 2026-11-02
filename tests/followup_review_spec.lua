@@ -1,5 +1,5 @@
 function Tests.followup_select_unchanged_preset_is_noop()
- local k=TestAddon; k:Init(); k:GetSettings().allowAccountMacros=true
+ local k=TestAddon; k:Init(); Mock:AllowFullCatalogMacros()
  assert(k.Presets:Activate('Leveling'))
  local count=#k.Engine:ListBackups()
  assert(k.Presets:Select('Leveling')); assert(not k.dirty)
@@ -48,7 +48,7 @@ function Tests.followup_hover_preserves_configured_rank()
 end
 
 function Tests.followup_named_restore_waits_for_explicit_confirmation()
- local k=TestAddon; k:Init(); k:GetSettings().allowAccountMacros=true; assert(k:Apply())
+ local k=TestAddon; k:Init(); Mock:AllowFullCatalogMacros(); assert(k:Apply())
  k.UI:Open(); k.UI:ShowPage('Safety'); Mock:ResetWrites()
  k.UI.pages.Safety.restoreSelected:Click()
  assert(k.UI.confirm:IsShown() and not k.Engine.busy and #Mock.writes==0)

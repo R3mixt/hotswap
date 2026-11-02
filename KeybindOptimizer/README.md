@@ -1,8 +1,10 @@
-# Hot Swap 0.4.9
+# Hot Swap 1.0.0
 
-A configurable World of Warcraft addon for stable class bindings, druid form pages, mouseover/focus macros, Alt self-cast, and selectable on-use items.
+A visual editor for your current World of Warcraft keybindings, native action slots, and saved presets.
 
-**Status: installable beta.** Version 0.4.9 opens Current bindings in edit mode with the spellbook open. Click to rebind, or drag any spell or item onto a key, including unlearned abilities or missing items. Apply changes backs up and installs only your edits; Discard edits removes pending changes. Prefilled drafts remain separate. Saving a recommendation or applying an edited draft prompts you to overwrite the selected preset or save as new. The scrollable Hover bind editor edits Current or preset drafts without casting. Generated native buttons retain readable action labels and explanatory trinket tooltips. Generated macros remain character-specific by default, with future spell positions reserved when space is limited. Account-wide overflow is an explicit preset option. Bindings and mouse controls outside the selected preset remain unchanged. The actual Lua modules are checked using Lua 5.1 and mocked WoW APIs; real-client behavior still needs a retest. Geometry previews approximate artwork and fonts and are not game screenshots.
+Version 1.0 opens Current with the spellbook, supports native spellbook drops, local replacement/swap confirmation switches, safe additive imports and backed-up default keybind restoration. New generated macros are character-specific; ordinary future spells reserve native positions without macros. This build is prepared for Classic Era user testing. Automated Lua tests and geometry review do not certify live protected execution.
+
+See the packaged `docs/behavior.md` for the complete behavior contract and user acceptance sequence.
 
 ## Install and open
 
@@ -34,7 +36,7 @@ Existing game bindings on keys assigned by the selected preset are **expected re
 
 Use the separate **Import / export** tab to export the selected preset or all presets. Choose **Select to copy**, press Ctrl+C, and share the text. To save an external file, paste it into a text editor and save it with a `.hotswap` extension. WoW addons cannot write arbitrary external files directly.
 
-To import someone else's settings, open their file, copy its text, paste it into the tab and choose **Import presets**. Imports add saved presets for review; they do not activate bindings. Existing names are preserved, with imported duplicates named `Name (2)`, `Name (3)`, and so on. Current exports include a class check; conflicting imported mode shortcuts are left unassigned. Exported data contains settings, not executable Lua, macros, backups or account credentials. The earlier KBO1 format remains importable.
+To import someone else's settings, open their file, copy its text, paste it into the tab and choose **Import presets**. Imports add saved presets for review; they preserve your selected preset and current settings and do not activate bindings. Existing names are preserved, with imported duplicates named `Name (2)`, `Name (3)`, and so on. Current exports include a class check; conflicting imported mode shortcuts are left unassigned. Exported data contains settings, not executable Lua, macros, backups or account credentials. The earlier KBO1 format remains importable.
 
 ## In-game interface
 
@@ -71,9 +73,9 @@ If automatic form maintenance fails, Hot Swap retains your personal bindings and
 
 Native buttons show readable action labels instead of internal macro IDs. T shows **Trinket 1** (upper slot 13), and Shift-T shows **Trinket 2** (lower slot 14). Empty-slot tooltips explain what belongs there; equipped-item tooltips retain Blizzard's item details. Macro names and bodies remain unchanged internally so existing bindings and backups stay valid.
 
-Generated macros use character-specific slots by default. **Allow account-wide macro overflow** permits additional macros in the shared account bank when character slots are full. This is a per-preset option, saved in exports and installed with **Apply & save**. Existing owned account macros can still be reused; they are not automatically moved into character slots. Personal macros are never overwritten to make room.
+New generated macros use character-specific slots only. The legacy account-overflow setting is accepted for import compatibility but cannot create account macros. Existing owned account macros can still be reused; they are not automatically moved into character slots. Personal macros are never overwritten to make room.
 
-When macro space is limited, Hot Swap first reserves future spell keys without creating a separate macro for every unlearned ability. Their icons and tooltips remain available in the editor unless you hide unavailable entries, while their native bar positions stay empty. Managed positions fill outside combat as spells are learned, subject to available macro space. Review explains the reservation count. This does not change your visibility preferences. A fully learned layout may still need more than 30 macros: free character slots or explicitly enable account-wide overflow if preflight reports insufficient capacity.
+When macro space is limited, Hot Swap first reserves future spell keys without creating a separate macro for every unlearned ability. Their icons and tooltips remain available in the editor unless you hide unavailable entries, while their native bar positions stay empty. Managed positions fill outside combat as spells are learned, subject to available macro space. Review explains the reservation count. This does not change your visibility preferences. A fully learned layout may still need more than 30 macros: free character slots or simplify conditional targeting if preflight reports insufficient capacity.
 
 The same section has character-local display controls: **Show macro names on action buttons**, **Show macro code in Hot Swap tooltips**, and **Show unavailable spells in the editor**. They apply immediately and do not travel in shared presets. Macro-name changes defer while in combat. Hiding editor entries does not delete their bindings. All options retain prior behavior until changed.
 
@@ -93,6 +95,8 @@ Classic Era omits unavailable default focus controls. Command support comes from
 
 New characters can inherit custom or unbound controls from WoW's saved account bindings. Hot Swap does not write bindings or open an input-capture overlay on a fresh character's login; an inherited missing control can therefore remain missing until you explicitly change the bindings or apply a saved preset. Apply & save saves the chosen layout for that character and leaves the account binding map unchanged. Hot Swap does not automatically repair account binding files.
 
+New presets default **Setup → Allow utility macros to leave form** off. Leave form manually when required, or opt in after checking macro capacity. Existing presets keep their previous setting.
+
 ## Core behavior
 
 - All nine Forever/Classic classes have curated profiles. The Druid layout is identical across specs; talent positions remain reserved when not learned.
@@ -102,7 +106,7 @@ New characters can inherit custom or unbound controls from WoW's saved account b
 - Runtime form indices are discovered. Form and combination macros receive bounded maintenance outside combat when learned abilities change. If stale form guards cannot be repaired, original recovery is attempted. Native bar paging remains owned by Blizzard.
 - Form selection uses a `noform` guard. Intentional Classic Era powershifting has a separate control; it is never triggered by repeatedly scrolling into the same form.
 - Helpful spells use Alt-self, friendly mouseover, then friendly target. The optional final self fallback is off by default. Spells that cannot target self are excluded. Focus and resurrection macros have explicit target conditions.
-- Simple learned spells use native spell actions. Targeting, exact ranks, forms and shared actions use stored macros when needed; future reservations can retain empty native slots to save macro space. Macros are deduplicated and checked against capacity and body-length limits. Personal macros are never overwritten to make room.
+- Simple learned spells use native spell actions. Conditional targeting, forms and combinations use stored macros when needed; future reservations retain empty native slots and activate outside combat when learned. Macros are deduplicated and checked against capacity and body-length limits. Personal macros are never overwritten to make room.
 - Macro contents and the resulting bindings are verified. Applying a changed layout keeps the original rollback baseline.
 
 ## Pets
@@ -160,7 +164,7 @@ Item spell information identifies candidates, not tactical suitability. Confirm 
 ## Recovery and removal
 
 - The **Backups** tab lists snapshots named Character-Class-YYYY-MM-DD HH:MM:SS. Each activation records bindings, original bar contents and visibility before its changes; restores record an undo snapshot. Same-second names receive a unique suffix. Account and character binding sets, self-cast settings and the previous Hot Swap layout are retained.
-- **Restore selected** restores a named snapshot. **Restore original setup** or `/hotswap restore` restores the original bindings and affected self-cast settings. Original restore removes generated macros only when their name and body still match the addon's ownership record. A macro you edited is preserved.
+- **Restore selected** restores a named snapshot. **Restore default keys** separately resets character bindings to client defaults, preserves action-bar contents and saves an undo backup. **Restore original setup** or `/hotswap restore` restores the original bindings and affected self-cast settings. Original restore removes generated macros only when their name and body still match the addon's ownership record. A macro you edited is preserved.
 - Backups are stored per character in SavedVariables. WoW writes them to disk on reload or logout. They are not silently pruned and are not included in shared exports.
 - Run Restore **before deleting or disabling the addon** to recover the pre-addon setup. Old custom-dock backups remain stored, but a snapshot requiring that retired dock cannot be activated directly. Restore the original setup, then use a native-bar preset. Saved presets remain available for editing.
 - If the addon cannot load, WoW's normal Key Bindings settings remain available through Escape. You can select your account bindings or reset the character bindings there.

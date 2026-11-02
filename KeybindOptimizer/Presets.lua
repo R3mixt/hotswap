@@ -482,7 +482,9 @@ function P:Export(name)
         if preset.hotkey then addLine(lines,"h",presetName,preset.hotkey) end
     end
     addLine(lines,"a",name or K.db.activePreset)
-    return table.concat(lines,"\n")
+    local result=table.concat(lines,"\n")
+    if #lines>50000 or #result>2000000 then return nil,"This collection is too large to share at once. Export selected presets separately (maximum 2 MB / 50,000 entries)." end
+    return result
 end
 local function setSetting(settings,key,typ,value)
     if K.legacySettings[key] then return K:ValidLegacySetting(key,typ,value) end
@@ -523,31 +525,58 @@ function P:MergeImport(incoming,active,sourceClass)
     if sourceClass and sourceClass~=class then return false,"This export is for "..sourceClass..". Import it on a "..sourceClass.." character; this character is "..class.."." end
     local names=sorted(incoming)
     if #names==0 then return false,"The export contains no presets." end
-    local mapped={}; local hotkeys={}; local proposed={}
-    for _,preset in pairs(K.db.presets) do if preset.hotkey then hotkeys[preset.hotkey]=true end end
-    local cleared=0
     for _,name in ipairs(names) do
-        local target=name; local suffix=2
-        while K.db.presets[target] do
-            local tail=" ("..suffix..")"; target=name:sub(1,48-#tail)..tail; suffix=suffix+1
+        if validName(name)~=name then return false,"Invalid preset name." end
+        local valid,why=validateSettings(incoming[name].settings)
+        if not valid then return false,why end
+    end
+    -- Validate hotkeys against an isolated draft. A planner/API exception must
+    -- not leave half an import installed or change the current editing state.
+    local originalDB=K.db
+    local previousPlan,previousValid,previousDirty=K.plan,K.previewValid,K.dirty
+    local staged={}; for key,value in pairs(originalDB) do staged[key]=value end
+    staged.presets=K.Copy(originalDB.presets)
+    staged.settings=staged.presets[staged.activePreset].settings
+    K.db=staged
+    local mapped,added,cleared={},{},0
+    local ok,why=pcall(function()
+        local hotkeys,proposed={},{}
+        for _,preset in pairs(staged.presets) do if preset.hotkey then hotkeys[preset.hotkey]=true end end
+        for _,name in ipairs(names) do
+            local target=name; local suffix=2
+            while staged.presets[target] do
+                local tail=" ("..suffix..")"; target=name:sub(1,48-#tail)..tail; suffix=suffix+1
+            end
+            local preset=K.Copy(incoming[name])
+            preset.id=self:NewID(); preset.sourceClass=sourceClass or class
+            if preset.hotkey and hotkeys[preset.hotkey] then preset.hotkey=nil; cleared=cleared+1 end
+            proposed[target]=preset.hotkey; preset.hotkey=nil
+            staged.presets[target]=preset; mapped[name]=target; added[#added+1]=target
         end
-        local preset=K.Copy(incoming[name])
-        preset.id=self:NewID(); preset.sourceClass=sourceClass or class
-        if preset.hotkey and hotkeys[preset.hotkey] then preset.hotkey=nil; cleared=cleared+1 end
-        proposed[target]=preset.hotkey; preset.hotkey=nil
-        K.db.presets[target]=preset; mapped[name]=target
+        for _,name in ipairs(added) do
+            local key=proposed[name]
+            if key then local valid=self:SetHotkey(name,key); if not valid then cleared=cleared+1 end end
+        end
+    end)
+    K.db=originalDB
+    K.plan,K.previewValid,K.dirty=previousPlan,previousValid,previousDirty
+    if not ok then return false,"Import could not be validated; no presets were added. "..tostring(why) end
+    local addedHotkey=false
+    for _,name in ipairs(added) do
+        originalDB.presets[name]=staged.presets[name]
+        if staged.presets[name].hotkey then addedHotkey=true end
     end
-    for _,name in ipairs(names) do
-        local target=mapped[name]; local key=proposed[target]
-        if key then local ok=self:SetHotkey(target,key); if not ok then cleared=cleared+1 end end
-    end
-    self:Select(mapped[active] or mapped[names[1]])
-    return true,"Imported "..#names.." preset(s). Editing "..K.db.activePreset.."; your active setup is unchanged."..(cleared>0 and (" "..cleared.." conflicting preset hotkey(s) were left unassigned.") or "")
+    -- Preset shortcuts participate in every plan, even while their draft is
+    -- inactive. A retained imported shortcut changes the reviewed plan.
+    if addedHotkey then K:InvalidatePreview(); K.dirty=self:HasUnappliedChanges() end
+    originalDB.nextPresetID=staged.nextPresetID
+    if K.QueueRefresh then K:QueueRefresh() end
+    return true,"Imported "..#names.." preset(s). Select "..(mapped[active] or added[1]).." in Presets to review. Your current settings and bindings are unchanged."..(cleared>0 and (" "..cleared.." conflicting preset hotkey(s) were left unassigned.") or ""),added
 end
 function P:Import(text)
     if busy() then return false,waitMessage end
     if type(text)~="string" or #text>2000000 then return false,"Invalid or oversized preset export (maximum 2 MB)." end
-    text=text:gsub("\r","")
+    text=text:gsub("^\239\187\191",""):gsub("\r",""):match("^%s*(.-)%s*$")
     if text:match("^([^\n]+)")~="KBO2" then return false,"This is not a Hot Swap preset export." end
     local presets,active,class={},nil,nil
     local count=0

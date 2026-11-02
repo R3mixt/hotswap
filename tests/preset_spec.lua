@@ -1,7 +1,7 @@
 local function presetInit(allowFixtureOverflow)
     TestAddon:Init()
     -- Only installation scenarios opt in for the all-talents Druid fixture.
-    if allowFixtureOverflow then TestAddon:GetSettings().allowAccountMacros=true end
+    if allowFixtureOverflow then Mock:AllowFullCatalogMacros() end
     Mock:ResetWrites()
     return TestAddon
 end
@@ -89,7 +89,8 @@ function Tests.preset_export_selected_and_import_merge_preserve_live_setup()
     assert(payload:match('^KBO2\n') and not payload:find('n\tDungeon\n',1,true))
     k.db.appliedPreset='Leveling'; k.db.enabled=true
     local ok,why=k:Import(payload); assert(ok,why)
-    assert(k.db.activePreset=='Raid healing (2)' and k.db.appliedPreset=='Leveling')
+    assert(k.db.activePreset=='Raid healing' and k.db.appliedPreset=='Leveling')
+    assert(k.Presets:Select('Raid healing (2)'))
     assert(k.db.settings.bindingOverrides['druid.rejuvenation']=='CTRL-SHIFT-F24')
     assert(k.db.presets['Raid healing (2)'].items.potion==456 and k.db.presets['Raid healing (2)'].equipment[13]==789)
     assert(k.db.presets['Raid healing'].id~=k.db.presets['Raid healing (2)'].id)
@@ -104,7 +105,8 @@ function Tests.legacy_import_migrates_to_full_modes_without_overwriting_current_
     local k=presetInit()
     local ok,why=k:Import('KBO1\ns\twheel\tboolean\tfalse\np\tPvP\tpotion\t456\na\tPvP')
     assert(ok,why)
-    assert(k.db.activePreset=='PvP (2)' and k.db.settings.wheel==false)
+    assert(k.db.activePreset=='Leveling' and k.db.settings.wheel==true)
+    assert(k.Presets:Select('PvP (2)')); assert(k.db.settings.wheel==false)
     assert(k.db.presets['PvP (2)'].items.potion==456)
     assert(k.db.presets.PvP.settings.wheel==true)
     assert(not k:Import('KBO1\nb\tmode.p1\tQ'))

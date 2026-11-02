@@ -40,7 +40,7 @@ end
 
 function Tests.native_bar_ui_closes_during_async_apply_and_staged_choices_survive_presets()
     local k,f=startBarUI(); Mock.async=true
-    k:GetSettings().allowAccountMacros=true -- Full Druid fixture needs both banks.
+    Mock:AllowFullCatalogMacros() -- Synthetic capacity isolates full Druid UI behavior from the real 30-slot limit.
     assert(k.UI:SetNativeBarPreference(2,true))
     assert(k.Presets:Create("Extra bars",true))
     assert(k:GetSettings().nativeBars[2]==true,"Duplicating a preset dropped its bar preference")
@@ -59,7 +59,7 @@ function Tests.native_bar_preferences_export_import_roundtrip_and_reject_malform
     assert(k:UpdateSetting("nativeBars",{[1]=true,[2]=false,[7]=true}))
     local exported=k:Export("Leveling")
     assert(exported:find("v\tLeveling\t2\tfalse",1,true),"Export dropped an explicit off choice")
-    assert(k:Import(exported))
+    assert(k:Import(exported)); assert(k.Presets:Select("Leveling (2)"))
     local bars=k:GetSettings().nativeBars
     assert(bars[1]==true and bars[2]==false and bars[7]==true and bars[3]==nil,"Bar preference roundtrip changed booleans or defaults")
     assert(#Mock.writes==0,"Import installed visibility preferences")

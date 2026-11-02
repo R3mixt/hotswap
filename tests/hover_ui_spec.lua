@@ -1,6 +1,6 @@
 local function hoverUI(allowFixtureOverflow)
     local k=TestAddon; k:Init()
-    if allowFixtureOverflow then k:GetSettings().allowAccountMacros=true end
+    if allowFixtureOverflow then Mock:AllowFullCatalogMacros() end
     k.UI:Open(); k.UI:SetBindingSource("draft"); k.UI:ShowPage("Bindings"); k.UI.pages.Bindings.hoverBind:Click()
     return k,k.UI.hoverBindings
 end

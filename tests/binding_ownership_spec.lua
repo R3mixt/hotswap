@@ -5,7 +5,7 @@ local function same(actual,expected,label)
 end
 local function ready()
   local k=TestAddon; k:Init()
-  k:GetSettings().allowAccountMacros=true -- The all-known Druid fixture tests ownership, not storage limits.
+  Mock:AllowFullCatalogMacros() -- The all-known Druid fixture tests ownership, not storage limits.
   return k
 end
 local function apply(k) local ok,why=k:Apply(); assert(ok,why) end

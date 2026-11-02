@@ -1,6 +1,6 @@
--- These fixtures exercise full catalogs/visible reservations with account overflow explicitly enabled.
+-- Full-catalog transaction fixtures explicitly use synthetic character capacity; capacity tests retain 30.
 local function nativeUI()
-    TestAddon:Init(); TestAddon:GetSettings().allowAccountMacros=true; Mock.async=true
+    TestAddon:Init(); Mock:AllowFullCatalogMacros(); Mock.async=true
     TestAddon.UI:Open(); TestAddon.UI:SetBindingSource("draft")
     return TestAddon
 end
@@ -304,7 +304,7 @@ function Tests.native_ui_apply_and_save_buttons_install_drafts_and_save_game_bin
         assert(page.detail.state:GetText():find("draft",1,true),"Selected preset was not identified as a draft")
     end
     selectDraft("Dungeon")
-    k:GetSettings().allowAccountMacros=true -- Explicit opt-in for this full Druid installation fixture.
+    Mock:AllowFullCatalogMacros() -- Explicit opt-in for this full Druid installation fixture.
     k.UI.apply:Click(); if k.UI.saveDialog and k.UI.saveDialog:IsShown() then k.UI.saveDialog.overwrite:Click() end
     assert(k.Engine.busy,"Footer Apply & save did not start installation")
     local ok,why=Mock:Drain(); assert(ok,why); Mock:Advance(0.2)
@@ -314,7 +314,7 @@ function Tests.native_ui_apply_and_save_buttons_install_drafts_and_save_game_bin
     for _,write in ipairs(Mock.writes) do if write[1]=="savebindings" then saved=true end end
     assert(saved,"Apply & save did not save the game's bindings")
     selectDraft("PvP")
-    k:GetSettings().allowAccountMacros=true
+    Mock:AllowFullCatalogMacros()
     page.usePreset:Click(); if k.UI.saveDialog and k.UI.saveDialog:IsShown() then k.UI.saveDialog.overwrite:Click() end
     assert(k.Engine.busy,"Preset Apply & save did not start installation")
     ok,why=Mock:Drain(); assert(ok,why); Mock:Advance(0.2)

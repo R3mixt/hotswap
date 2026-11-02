@@ -79,7 +79,7 @@ function V:ShowSection(page,name)
 end
 function V:SetLocalPreference(key,value)
     if K.Engine and K.Engine.busy then UI:UpdateBusyState(); return end
-    if key~="showMacroNames" and key~="showMacroCode" and key~="showUnavailableBindings" then return end
+    if key~="showMacroNames" and key~="showMacroCode" and key~="showUnavailableBindings" and key~="confirmReplacements" and key~="confirmSwaps" then return end
     preferences()[key]=value and true or false
     if key=="showMacroNames" and K.NativeBars and K.NativeBars.ApplyMacroTextPreference then K.NativeBars:ApplyMacroTextPreference() end
     if key=="showUnavailableBindings" then UI:CancelLibraryDrag(); UI.selectedAction=nil end
@@ -115,7 +115,7 @@ function V:Build(page,ui,w)
     w.label(bars,"Preset behavior",15):SetPoint("TOPLEFT",16,-16)
     option(page,bars,"hideUnavailableSpells","Hide unavailable spells on action bars","Leave unavailable spell slots empty on Blizzard's bars. Their keys and positions stay reserved.",14,-44)
     option(page,bars,"adaptTalents","Adapt to learned talents","Keep unavailable talents off Blizzard's bars while retaining their reserved keys.",14,-79)
-    option(page,bars,"allowAccountMacros","Allow account-wide macro overflow","Generated macros use character-specific slots by default. Enable only to allow additional account-wide slots shared by all characters. Existing personal macros are never overwritten.",14,-114)
+    w.label(bars,"Generated macros use character-specific slots only.",11,C.muted):SetPoint("TOPLEFT",18,-122)
     w.label(bars,"Display on this character",15):SetPoint("TOPLEFT",16,-167)
     option(page,bars,"showMacroNames","Show macro names on action buttons","Show or hide macro labels on Blizzard's original action buttons. The macro itself is unchanged.",14,-195,true)
     option(page,bars,"showMacroCode","Show macro code in Hot Swap tooltips","Show generated macro instructions in binding-detail tooltips. Spell and target descriptions stay visible.",14,-230,true)
@@ -127,9 +127,11 @@ function V:Build(page,ui,w)
     page.opacity=appearanceSlider(appearance,"Opacity",-56,"windowOpacity",0.4,1)
     page.scale=appearanceSlider(appearance,"Scale",-117,"windowScale",0.7,1.3)
     page.resetAppearance=w.button(appearance,"Reset appearance",158,function() ui:ResetAppearance() end)
-    page.resetAppearance:SetPoint("TOPLEFT",18,-197)
+    page.resetAppearance:SetPoint("TOPLEFT",18,-177)
+    option(page,appearance,"confirmReplacements","Confirm replacing a binding","Ask before a spellbook drop or key reassignment replaces an occupied key. Apply changes is still required.",14,-218,true)
+    option(page,appearance,"confirmSwaps","Confirm swapping bindings","Ask before exchanging two draft bindings. Apply & save is still required.",14,-253,true)
     local windowNote=w.label(appearance,"Changes apply immediately. The window fits the available screen space.\nUse /reload or log out to save preferences to disk.",11,C.muted)
-    windowNote:SetPoint("TOPLEFT",18,-254); windowNote:SetSize(760,34)
+    windowNote:SetPoint("TOPLEFT",18,-310); windowNote:SetSize(760,34)
     w.tooltip(page.scale,"Window scale","Choose your preferred size. Hot Swap reduces it when necessary to fit the window and spellbook on your screen.")
     local diagnostics=page.sections.Diagnostics
     w.label(diagnostics,"Diagnostic logging",15):SetPoint("TOPLEFT",16,-16)

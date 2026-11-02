@@ -1,10 +1,10 @@
 local addonName, K = ...
 _G.KeybindOptimizer = K
-K.name, K.version = addonName or "KeybindOptimizer", "0.4.9"
+K.name, K.version = addonName or "KeybindOptimizer", "1.0.0"
 K.defaults = {
     wheel = true, middle = true, ctrl = true,
     mouseButtons = { BUTTON4 = true, BUTTON5 = true },
-    selfFallback = false, cancelForUtility = true,
+    selfFallback = false, cancelForUtility = false,
     flavor = "auto", primarySchool = "frost", groundAtCursor=false,
     preserveMovement=false, preserveCamera=false, preserveChat=false,
     preserveInterface=false, preserveTargeting=false, preserveGameSettings=false,
@@ -40,7 +40,7 @@ function K:Init()
     self.db.preferences=type(self.db.preferences)=="table" and self.db.preferences or {}
     local preferences=self.db.preferences
     preferences.diagnostics=preferences.diagnostics==true
-    for _,key in ipairs({"showMacroNames","showMacroCode","showUnavailableBindings"}) do
+    for _,key in ipairs({"showMacroNames","showMacroCode","showUnavailableBindings","confirmReplacements","confirmSwaps"}) do
         if type(preferences[key])~="boolean" then preferences[key]=true end
     end
     for key,range in pairs({windowOpacity={0.4,1},windowScale={0.7,1.3}}) do
@@ -266,8 +266,10 @@ function K:ExportLegacy()
     return table.concat(lines, "\n")
 end
 function K:Import(text)
+    if type(text)~="string" or #text>2000000 then return false,"Invalid or oversized preset export (maximum 2 MB)." end
     if self.Engine and self.Engine.busy then return false,"Wait for the current operation to finish." end
-    if type(text)=="string" and text:gsub("\r",""):match("^([^\n]+)")=="KBO2" then return self.Presets:Import(text) end
+    if type(text)=="string" then text=text:gsub("^\239\187\191",""):gsub("\r",""):match("^%s*(.-)%s*$") end
+    if type(text)=="string" and text:match("^([^\n]+)")=="KBO2" then return self.Presets:Import(text) end
     if type(text) ~= "string" or #text > 100000 then return false, "Invalid or oversized profile." end
     text = text:gsub("\r", "")
     if text:match("^([^\n]+)") ~= "KBO1" then return false, "This is not a Hot Swap profile." end
@@ -289,15 +291,19 @@ function K:Import(text)
                     if not self:ValidLegacySetting(key,typ,value) then return false,"Invalid legacy setting: "..key end
                 elseif self.defaults[key] == nil and key ~= "mount" then return false, "Unknown setting: " .. tostring(key)
                 elseif typ == "boolean" and type(self.defaults[key]) == "boolean" and (value=="true" or value=="false") then settings[key] = value=="true"
-                elseif typ == "number" and (type(self.defaults[key])=="number" or key=="mount") and tonumber(value) then settings[key] = tonumber(value)
-                elseif typ == "string" and key=="mount" and value:match("^spell:%d+$") then settings[key]=value
+                elseif typ == "number" and (type(self.defaults[key])=="number" or key=="mount") and tonumber(value) then
+                    local n=tonumber(value)
+                    if n~=n or n==math.huge or n==-math.huge or (key=="mount" and (n<1 or n%1~=0)) then return false,"Invalid numeric setting." end
+                    settings[key] = n
+                elseif typ == "string" and key=="mount" and value:match("^spell:%d+$") and tonumber(value:sub(7))>0 then settings[key]=value
                 elseif typ == "string" and type(self.defaults[key])=="string" and #value <= 40 then settings[key] = value
                 else return false, "Invalid value for "..key end
             elseif tag == "m" and #fields==2 and key:match("^BUTTON%d+$") then
                 local n=tonumber(key:match("%d+")); if n<4 or n>31 then return false,"Invalid mouse button." end
                 settings.mouseButtons[key]=true
             elseif tag == "b" and #fields==3 and #key<=100 and #fields[3]<=40 and key:match("^[%w%._%-]+$") and not key:match("^mode%.") then
-                settings.bindingOverrides[key]=fields[3]
+                local binding=self.API:NormalizeKey(fields[3]); if not binding then return false,"Invalid binding on line "..count end
+                settings.bindingOverrides[key]=binding
             elseif (tag=="p" or tag=="e") and #fields==4 and presets[key] then
                 local id=tonumber(fields[4])
                 if tag=="p" and fields[3]=="mount" and fields[4]:match("^spell:%d+$") and tonumber(fields[4]:sub(7))>0 then id=fields[4]

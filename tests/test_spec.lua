@@ -1,8 +1,8 @@
--- These fixtures exercise full catalogs/visible reservations with account overflow explicitly enabled.
+-- Full-catalog transaction fixtures explicitly use synthetic character capacity; capacity tests retain 30.
 -- Assertions exercise real modules. Added as public module APIs stabilize.
 Tests={}
 local function init()
-  TestAddon:Init(); TestAddon:GetSettings().allowAccountMacros=true
+  TestAddon:Init(); Mock:AllowFullCatalogMacros()
   return TestAddon
 end
 local function contains(s,needle) return type(s)=="string" and s:find(needle,1,true)~=nil end
@@ -214,7 +214,7 @@ function Tests.macro_budget_deduplicates_and_counts_both_banks()
   local plan={settings={allowAccountMacros=true},actions={{known=true,body="/use 13"},{known=true,body="/use 13"},{known=true,body="/use 14"},{known=false,body="/use 15"}}}
   local needed,available=k.Macros:Budget(plan)
   equal(needed,2,"distinct macros")
-  equal(available,149,"free macro slots")
+  equal(available,select(4,k.Macros:Budget(plan)),"Only character capacity is available")
   local name=k.Macros:Name("/use 13")
   CreateMacro(name,1,"/use 13",true)
   k.db.ownedMacros[name]="/use 13"
@@ -349,7 +349,7 @@ function Tests.custom_collisions_and_combat_alt_bindings_are_rejected()
 end
 
 function Tests.full_macro_banks_fail_preflight_without_mutation()
-  local k=init()
+  local k=init(); MAX_CHARACTER_MACROS=30; Constants.MacroConsts.MAX_CHARACTER_MACROS=30
   for i=1,150 do Mock.macros[i]={name="Existing"..i,icon=1,body="/say "..i} end
   Mock:ResetWrites()
   local plan=k:Preview()
@@ -370,6 +370,9 @@ function Tests.successful_import_roundtrip_stages_only()
   Mock:ResetWrites()
   local ok,err=k:Import(exported)
   assert(ok,err)
+  equal(k.db.activePreset,"PvP","Import changed selected preset")
+  equal(k:GetSettings().wheel,true,"Import changed current settings")
+  assert(k.Presets:Select("PvP (2)"))
   equal(k:GetSettings().wheel,false,"import wheel")
   assert(k:GetSettings().mouseButtons.BUTTON8,"import observed mouse buttons")
   equal(k:GetSettings().bindingOverrides["druid.wrath.caster"],"SHIFT-H","import binding")
@@ -445,7 +448,7 @@ function Tests.invalid_plan_apply_is_a_no_op()
 end
 
 function Tests.full_macro_capacity_apply_is_a_no_op()
-  local k=init()
+  local k=init(); MAX_CHARACTER_MACROS=30; Constants.MacroConsts.MAX_CHARACTER_MACROS=30
   for i=1,150 do Mock.macros[i]={name="Existing"..i,icon=1,body="/say "..i} end
   Mock:ResetWrites()
   assert(not k:Apply(),"Full macro banks applied")
@@ -616,7 +619,7 @@ function Tests.cvar_write_rejection_is_not_silently_reported_as_success()
 end
 
 function Tests.era_emergency_heal_combo_respects_form_cancellation_setting()
-  local k=init()
+  local k=init(); k:GetSettings().cancelForUtility=true
   k.playerClass="DRUID"; k:GetSettings().flavor="era"
   Mock:Learn(17116,"Nature's Swiftness")
   local action={known=true,spellName="Nature's Swiftness",label="Emergency heal",combo={17116,5185},cancelForm=true,targeting="self"}
@@ -1083,9 +1086,8 @@ function Tests.unlearned_spell_metadata_keeps_real_icon_and_localized_tooltip_id
   equal(applied.key,"U","An unlearned spell cannot be bound in advance")
   equal(applied.known,false,"Applying an advance binding learned the spell")
   local kind,index=GetActionInfo(applied.nativeSlot)
-  equal(kind,"macro","Advance binding did not reserve an original action slot")
-  local _,_,body=GetMacroInfo(index)
-  assert(contains(body,"Gezielter Schuss"),"Future spell placeholder is not localized")
+  equal(kind,nil,"Advance binding should reserve an empty original action slot")
+  equal(applied.displayName,"Gezielter Schuss","Future spell editor label is not localized")
   assert(not k.API:IsKnown(19434),"Creating a future-spell macro must not imply learned")
   local key=k.UI.pages.Bindings.keyboard.keys.U
   key:GetScript("OnEnter")(key)
