@@ -702,6 +702,11 @@ function E:ApplyCurrentEdits(refreshEdits)
             local name=command:match("^MACRO (.+)$"); if name then cleanup[name]=nil end
         end
         if K.AvailabilityEngine then K.AvailabilityEngine:QueueCleanup(cleanup) end
+        -- An explicit primary-button edit supersedes legacy mouse recovery.
+        -- Keep this marker unchanged for automatic refreshes or failed jobs.
+        if not refreshEdits and K.db.appliedPlan and (edits.keys.BUTTON1~=nil or edits.keys.BUTTON2~=nil) then
+            K.db.appliedPlan.mouseBindingsVersion=1
+        end
         job.entry.status="applied"; K.db.lastBindingBackupID=job.entry.id
         local reserved=0
         for _,map in ipairs({saved.keys,saved.slots}) do for _,entry in pairs(map) do if entry.pending and not entry.detached then reserved=reserved+1 end end end

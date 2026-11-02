@@ -8,6 +8,12 @@ local UI, W = K.UI, K.UI.widgets
 local button, label, box, scroll, edit = W.button, W.label, W.box, W.scroll, W.edit
 local tooltip, truncate, color, listRow = W.tooltip, W.truncate, W.color, W.listRow
 local C, keyName, actionPageNames = W.colors, W.keyName, W.actionPageNames
+local function libraryNote()
+    if UI.libraryTab=="movement" or UI.libraryTab=="camera" then
+        return "Drag a control onto a key. To unbind: Current,\nselect its key, Clear key, then Apply changes."
+    end
+    return "Drag an icon onto a key, or click an ability and then a key."
+end
 local function settings() return K:GetSettings() end
 
 -- A talent group is an ordered draft choice for one shared utility position.
@@ -204,7 +210,7 @@ end
 function UI:CancelLibraryDrag()
     self.libraryDrag=nil; self.libraryEntry=nil; self.libraryTargetKey=nil
     if self.libraryGhost then self.libraryGhost:Hide() end
-    if self.library then self.library.note:SetText("Drag an icon onto a key, or click an ability and then a key.") end
+    if self.library then self.library.note:SetText(libraryNote()) end
 end
 function UI:StartLibraryDrag(entry)
     if K.Engine and K.Engine.busy then return end
@@ -369,22 +375,25 @@ function UI:BuildLibrary()
     self:AttachTestMouse(f)
     f.CloseButton:SetScript("OnClick",function() UI.libraryOpen=false; UI:CancelLibraryDrag(); f:Hide(); UI:FitWindows() end)
     f.tabs={}
-    for i,tab in ipairs({{"spells","Spells"},{"items","Items"},{"game","Game"},{"chat","Chat"},{"emotes","Emotes"},{"macros","Macros"}}) do
+    for i,tab in ipairs({{"spells","Spells"},{"items","Items"},{"game","Game"},{"movement","Movement"},{"camera","Camera"},{"chat","Chat"},{"emotes","Emotes"},{"macros","Macros"}}) do
         local name=tab[1]
         local b=button(f,tab[2],91,function()
             local target=UI.libraryTargetKey
-            UI.libraryTab=name; UI.libraryCategory=nil; UI:CancelLibraryDrag(); UI.libraryTargetKey=target; f.search:SetText(""); UI:RenderLibrary()
+            UI.libraryTab=name; UI.libraryCategory=nil; UI:CancelLibraryDrag(); UI.libraryTargetKey=target; f.search:SetText("")
+            f.list.slider:SetValue(0); UI:RenderLibrary()
         end)
-        b:SetHeight(24); b:SetPoint("TOPLEFT",12+((i-1)%3)*97,i<=3 and -34 or -62)
+        b:SetHeight(24); b:SetPoint("TOPLEFT",12+((i-1)%3)*97,-34-math.floor((i-1)/3)*28)
         f.tabs[name]=b
-        if name=="game" then tooltip(b,"Game controls","Bindable movement, camera, targeting and interface commands from this client. Choose a category or search, then drag a command onto a key.") end
+        if name=="game" then tooltip(b,"Other game controls","Targeting, interface and other commands from this client. Movement and Camera have their own sections.")
+        elseif name=="movement" then tooltip(b,"Movement controls","Move, strafe, turn, jump and auto-run controls supported by this client. Drag a control onto a key. To leave it unbound, select its key in Current, choose Clear key, then Apply changes.")
+        elseif name=="camera" then tooltip(b,"Camera controls","Mouse camera, zoom and camera-view controls supported by this client. Drag a control onto a key. To leave it unbound, select its key in Current, choose Clear key, then Apply changes.") end
     end
     f.category=button(f,"All categories",151,function(self)
         local opts={{value=false,label="All categories"}}
         for _,name in ipairs(K.Library and K.Library:Categories(UI.libraryTab or "spells",UI.bindingSource=="current") or {}) do opts[#opts+1]={value=name,label=name} end
         UI:Menu(self,opts,UI.libraryCategory,function(value) UI.libraryCategory=value or nil; UI:CancelLibraryDrag(); UI:RenderLibrary() end)
-    end); f.category:SetPoint("TOPLEFT",12,-97)
-    f.ranks=CreateFrame("CheckButton",nil,f,"UICheckButtonTemplate"); f.ranks:SetSize(24,24); f.ranks:SetPoint("TOPLEFT",167,-98)
+    end); f.category:SetPoint("TOPLEFT",12,-125)
+    f.ranks=CreateFrame("CheckButton",nil,f,"UICheckButtonTemplate"); f.ranks:SetSize(24,24); f.ranks:SetPoint("TOPLEFT",167,-126)
     K.Themes:Skin(f.ranks,"check")
     if f.ranks.text then f.ranks.text:Hide() end
     f.rankLabel=label(f.ranks,"Show ranks",10,C.text); f.rankLabel:SetPoint("LEFT",25,0)
@@ -398,13 +407,13 @@ function UI:BuildLibrary()
             K.Items:Invalidate(); UI.libraryCategory=nil; UI.libraryOpen=true
             return true
         end)
-    end); f.addItem:SetPoint("TOPLEFT",168,-97)
-    local shell,search=edit(f,286,28); shell:SetPoint("TOPLEFT",12,-132); f.search=search
+    end); f.addItem:SetPoint("TOPLEFT",168,-125)
+    local shell,search=edit(f,286,28); shell:SetPoint("TOPLEFT",12,-160); f.search=search
     search:SetScript("OnTextChanged",function(_,user) if user then UI:CancelLibraryDrag(); UI:RenderLibrary() end end)
     tooltip(shell,"Search the spellbook","Find an ability, command, emote or macro.")
-    f.list=scroll(f); f.list:SetPoint("TOPLEFT",12,-169); f.list:SetPoint("BOTTOMRIGHT",-12,94)
+    f.list=scroll(f); f.list:SetPoint("TOPLEFT",12,-197); f.list:SetPoint("BOTTOMRIGHT",-12,94)
     f.list.slider:HookScript("OnValueChanged",function() if not UI.libraryRendering then UI:RenderLibraryRows() end end)
-    f.note=label(f,"Drag an icon onto a key, or click an ability and then a key.",10,C.muted)
+    f.note=label(f,libraryNote(),10,C.muted)
     f.note:SetPoint("BOTTOMLEFT",12,46); f.note:SetWidth(285); f.note:SetHeight(36)
     f.nativeBook=button(f,"Game spellbook",150,function()
         if InCombatLockdown and InCombatLockdown() then UI:Notice("Leave combat before opening the game spellbook here.",true); return end
@@ -423,6 +432,7 @@ function UI:RenderLibrary()
     if not f or not f:IsShown() then return end
     self.libraryRendering=true
     local tab=self.libraryTab or "spells"
+    if not self.libraryEntry and not self.libraryDrag then f.note:SetText(libraryNote()) end
     for name,b in pairs(f.tabs) do color(b.text,name==tab and C.accent or C.muted) end
     f.category.text:SetText(self.libraryCategory or "All categories"); truncate(f.category.text,133)
     f.addItem:SetShown(tab=="items" and self.bindingSource=="current")

@@ -89,7 +89,12 @@ function Tests.library_localizes_emotes_and_excludes_unfingerprinted_macro_comma
     local bindings=GetBinding; local number=GetNumBindings
     GetNumBindings=function() return 2 end
     GetBinding=function(i) return i==1 and 'MACRO UserMacro' or 'CLICK Evil:LeftButton','GENERAL' end
-    k.Library.commandCache=nil; assert(not next(k.Library:Commands()))
+    k.Library.commandCache=nil
+    local commands=k.Library:Commands()
+    assert(not commands['MACRO UserMacro'] and not commands['CLICK Evil:LeftButton'],'Macro/frame names leaked into native game controls')
+    for command in pairs(commands) do
+        assert(k.API.HiddenMouseCommands[command],'Non-native command was accepted from the filtered registry')
+    end
     GetBinding,GetNumBindings,GetLocale=bindings,number,locale
 end
 

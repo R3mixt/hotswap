@@ -27,10 +27,12 @@ pwsh -NoProfile -File ui-qa/render.ps1 -Pages modern-current
 
 `capture.py` first records the existing page/dialog QA cases, then captures
 Classic and Modern with the same sample current keybindings, presets, Window
-settings, and draft spellbook. The showcase current layout includes spells,
-movement controls, and mouse bindings rather than an empty keyboard.
+settings, draft spellbook, and separate Movement and Camera menus. The showcase
+current layout includes spells, movement controls and mouse bindings rather than
+an empty keyboard. The control-menu previews select a bound movement or zoom key
+so the **Clear key** action and unbinding instructions are visible.
 
-Raw JSON and PNG files are written under `ui-qa/` and ignored by Git. The eight
+Raw JSON and PNG files are written under `ui-qa/` and ignored by Git. The twelve
 theme screenshots and `theme-comparison.png` are also saved to
 [`review/themes/`](../review/themes/) for documentation and review.
 

@@ -50,7 +50,7 @@ function Draw-QABevel($graphics, $rect, $top, $bottom, $edge) {
 if (-not $Pages) {
     $Pages = @('setup','presets','bindings','bindings-shift','bindings-cat','bindings-test','items','safety','share','library-spells','library-ranks','library-items','library-macros','action-bars','settings','settings-controls','settings-bars','settings-window','settings-diagnostics','diagnostic-log','operation-error','talent-choices','talent-own','hover-bind','bindings-current','bindings-recommendation','save-preset','current-hover')
     foreach ($theme in @('classic','modern')) {
-        foreach ($view in @('current','presets','settings','spellbook')) {
+        foreach ($view in @('current','presets','settings','spellbook','movement','camera')) {
             if (Test-Path -LiteralPath (Join-Path $PSScriptRoot "$theme-$view.json")) { $Pages += "$theme-$view" }
         }
     }

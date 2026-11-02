@@ -12,7 +12,13 @@ Drag a spell from the miniature spellbook or Blizzard's spellbook to a keyboard 
 
 **Settings → Window** has independent **Confirm replacing a binding** and **Confirm swapping bindings** switches. Both start enabled and remain local to the character. Replacement acceptance rechecks that the reviewed destination has not changed. Disabling them skips those editing prompts; it does not bypass validation or the confirmation required for a recovery/reset operation.
 
-The miniature spellbook's **Game** section (Game controls) includes movement, turning, camera, targeting and interface commands exposed by the running client. Search and categories narrow the list. Protected control categories in Settings can reserve existing bindings when applying a preset. A protected key may need to be released before assigning another action.
+The miniature spellbook has separate **Movement** and **Camera** sections. Movement includes forward/backward, strafe, turn, jump and other movement commands supported by the running client. Camera includes zoom, saved views and the native combined selection/camera and turn/interact mouse controls. **Game** contains the remaining targeting and interface commands. Search and categories narrow each section; controls remain available in these lists even when they have no assigned key.
+
+To leave a control unbound, select **Bindings → Current**, select its bound keyboard key or mouse control, and choose **Clear key**. Confirm the edit, then use **Apply changes** outside combat. The same command is available from the binding-detail panel in List view. Clearing affects that key only; clear each alias if you want the command to have no bindings at all. Apply creates a recovery backup. The unbound state persists across reload and automatic maintenance. To restore it, choose the command from Movement or Camera and assign it to a key, or restore a backup.
+
+Current permits explicit clearing and reassignment of camera/movement commands on the primary mouse buttons. Spell, item and arbitrary macro placement on those buttons remains restricted, and Escape stays reserved. Disabling a combined mouse control also removes its game-world selection or interaction behavior until rebound; the clear confirmation explains this.
+
+**Settings → Controls → Keep current movement** and **Keep camera and selection** govern preset application, including preserving deliberately unbound controls. They do not prevent explicit Current edits. If those options are off, explicitly applying a preset can install that preset's movement/camera assignments again. A protected preset key must be released before assigning another action to it.
 
 ## Spells, macros and automatic maintenance
 
@@ -48,7 +54,7 @@ Hot Swap uses the native action slots and binding commands where possible. Suppo
 2. Drag a learned spell from each spellbook onto an empty key and an occupied key. Test both confirmation switches, cancel, apply, and discard. Try Shift/Ctrl and a form-specific action.
 3. Reserve an unlearned spell, apply, learn it, and verify it activates without a placeholder macro. Repeat with combat deferral, a higher rank and an explicit lower rank.
 4. Import a downloaded `.hotswap` code while a local draft exists. Confirm the draft and preferences remain, duplicate names survive, and imported bindings install only after explicit apply.
-5. Bind movement and camera commands through Game controls. Check mouse buttons/wheel, chat, Escape, search typing and Hover bind; closing and entering combat must release editor capture.
+5. Bind commands through the separate Movement and Camera sections. Clear keyboard, wheel and primary mouse bindings in Current, apply, and reload; verify the cleared keys stay empty and other aliases remain. Restore the controls from the spellbook or a backup. Check chat, Escape, search typing and Hover bind; closing and entering combat must release editor capture.
 6. Restore defaults, inspect the named backup, then restore that backup. Confirm other characters/account bindings and current bar contents are unchanged by the default reset.
 7. With diagnostics enabled, exercise apply/restore and reload. Inspect error Details if any operation fails. Verify saved presets and current edits survive reload.
 8. Repeat relevant checks with Bartender and Dominos individually, including form changes and actual combat use. Record client/addon versions and the exact failing key if a conflict occurs.

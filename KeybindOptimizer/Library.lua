@@ -22,11 +22,21 @@ function L:Commands()
     local locale=GetLocale and GetLocale() or "enUS"
     if self.commandCache and self.commandSource==commands and self.commandLocale==locale then return self.commandCache end
     local result={}
+    local function add(command,info)
+        local group=K.Protection:Group(command,commands)
+        local tab=(group=="movement" or group=="camera") and group or ((group=="chat" or chat(command)) and "chat" or "game")
+        local category=info and info.category
+        result[command]={label=K.API:BindingLabel(command),category=category and (_G[category] or category) or (tab=="camera" and "Camera controls" or tab=="movement" and "Movement controls" or "Game controls"),tab=tab}
+    end
     for command,info in pairs(commands) do
-        local category=info.category
         if command and command~="" and not command:match("^HEADER") and not command:match("^MACRO ") and not command:match("^CLICK ") then
-            result[command]={label=K.API:BindingLabel(command),category=category and (_G[category] or category) or "Game controls",tab=chat(command) and "chat" or "game"}
+            add(command,info)
         end
+    end
+    -- The client deliberately hides its primary mouse camera commands from
+    -- GetBinding. Keep the API's verified whitelist available even if unbound.
+    for command in pairs(K.API.HiddenMouseCommands or {}) do
+        if not result[command] and K.API:IsBindingCommandSupported(command,commands) then add(command) end
     end
     self.commandCache,self.commandSource,self.commandLocale=result,commands,locale
     return result
@@ -177,7 +187,7 @@ function L:List(options)
                 entries[#entries+1]={id="item."..id,itemID=id,label=item.name or "Item "..id,icon=item.icon,known=not item.missing,category="Saved items",descriptor={kind="item",itemID=id}}
             end end
         end
-    elseif tab=="game" or tab=="chat" then
+    elseif tab=="game" or tab=="chat" or tab=="movement" or tab=="camera" then
         for command,info in pairs(self:Commands()) do if info.tab==tab then entries[#entries+1]={id="command."..command,label=info.label,category=info.category,known=true,descriptor={kind="system",command=command,name=info.label}} end end
     elseif tab=="emotes" then
         for token,command in pairs(self:Emotes()) do entries[#entries+1]={id="emote."..token,label=command,category="Emotes",known=true,icon="Interface\\Icons\\INV_Misc_Note_01",descriptor={kind="emote",emote=token}} end

@@ -19,6 +19,7 @@ Version **1.0.0** is prepared for Classic Era / Hardcore user testing. Forever i
 - Creates character-specific macros only where conditional behavior requires them.
 - Imports copy/paste profiles as additional presets without replacing your current settings.
 - Offers independent replacement/swap confirmations, control protection and default-key restoration.
+- Provides separate Movement and Camera spellbook sections; Current controls can be reassigned or explicitly left unbound.
 
 ## Screenshots
 
@@ -58,6 +59,18 @@ Familiar Warcraft styling, warm borders and gold highlights.
 ![Modern theme: draft keyboard bindings and spellbook with learned and unlearned spell icons](review/themes/modern-spellbook.png)
 
 ![Classic theme: the same draft keyboard bindings and spellbook](review/themes/classic-spellbook.png)
+
+### Movement and camera controls
+
+Separate sections make strafe, turn, zoom and other controls easy to find. In **Current**, choose **Clear key** to stage an unbound control, then **Apply changes** to save it.
+
+![Modern theme: Movement spellbook section](review/themes/modern-movement.png)
+
+![Classic theme: Movement spellbook section](review/themes/classic-movement.png)
+
+![Modern theme: Camera spellbook section](review/themes/modern-camera.png)
+
+![Classic theme: Camera spellbook section](review/themes/classic-camera.png)
 
 </details>
 

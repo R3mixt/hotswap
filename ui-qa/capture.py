@@ -92,6 +92,9 @@ function CreateFrame(kind,name,parent,template)
    f.TitleText:SetPoint('TOPLEFT',f,'TOPLEFT',12,-5);f.TitleText:SetPoint('TOPRIGHT',f,'TOPRIGHT',-32,-5);f.TitleText:SetHeight(20)
    f.CloseButton:SetPoint('TOPRIGHT',f,'TOPRIGHT',-4,-4)
    f.Inset:SetPoint('TOPLEFT',f,'TOPLEFT',4,-24);f.Inset:SetPoint('BOTTOMRIGHT',f,'BOTTOMRIGHT',-4,4)
+   -- Classic Era's XML uses parent BACKGROUND/BORDER textures here. The test
+   -- mock exposes a child frame for them; do not let it cover parent labels.
+   f.Inset.qaParentArtwork=true
  end
  local oldFont=f.GetFontString
  function f:GetFontString()
@@ -118,6 +121,16 @@ for key,entry in icon_manifest['entities'].items():
 lua.globals().PreviewIcons=icons
 lua.execute(r'''
 Mock.build='1.15.9'; Mock.buildNumber='70576'
+-- The real client provides these localized binding labels and headers. Keep
+-- the sample registry's native command IDs while rendering readable English.
+BINDING_HEADER_MOVEMENT='Movement controls'; BINDING_HEADER_CAMERA='Camera controls'
+local controlLabels={MOVEANDSTEER='Move and steer',MOVEFORWARD='Move forward',MOVEBACKWARD='Move backward',TURNLEFT='Turn left',TURNRIGHT='Turn right',STRAFELEFT='Strafe left',STRAFERIGHT='Strafe right',JUMP='Jump',SITORSTAND='Sit / stand',TOGGLESHEATH='Sheathe / unsheathe',TOGGLEAUTORUN='Toggle auto-run',STARTAUTORUN='Start auto-run',STOPAUTORUN='Stop auto-run',PITCHUP='Pitch up',PITCHDOWN='Pitch down',TOGGLERUN='Toggle run / walk',FOLLOWTARGET='Follow target',NEXTVIEW='Next camera view',PREVVIEW='Previous camera view',CAMERAZOOMIN='Zoom in',CAMERAZOOMOUT='Zoom out',FLIPCAMERAYAW='Flip camera',CAMERAORSELECTORMOVE='Select / camera',TURNORACTION='Turn / interact'}
+for command,name in pairs(controlLabels) do _G['BINDING_NAME_'..command]=name end
+for n=1,5 do
+    _G['BINDING_NAME_SETVIEW'..n]='Camera view '..n
+    _G['BINDING_NAME_SAVEVIEW'..n]='Save camera view '..n
+    _G['BINDING_NAME_RESETVIEW'..n]='Reset camera view '..n
+end
 -- Resolve art for both learned and unlearned spells, without changing learning.
 for key,entry in pairs(PreviewIcons) do
     if entry.kind=='spell' then
@@ -179,6 +192,8 @@ for theme in ('classic','modern'):
         ('Presets',f'{theme}-presets',None,None),
         ('Settings',f'{theme}-settings',None,None),
         ('Bindings',f'{theme}-spellbook','caster',''),
+        ('Bindings',f'{theme}-movement',None,''),
+        ('Bindings',f'{theme}-camera',None,''),
     ])
 if namespace.Themes:
     cases.extend(showcase_cases)
@@ -186,7 +201,8 @@ uncached_icons=set()
 for page,output_name,form,layer in cases:
     showcase=output_name.startswith(('classic-','modern-'))
     theme=output_name.split('-',1)[0] if showcase else 'classic'
-    filename={'current':'bindings-current','settings':'settings-window','spellbook':'library-spells'}.get(output_name.split('-',1)[-1],output_name.split('-',1)[-1]) if showcase else output_name
+    showcase_view=output_name.split('-',1)[-1] if showcase else None
+    filename={'current':'bindings-current','settings':'settings-window','spellbook':'library-spells','movement':'bindings-current','camera':'bindings-current'}.get(showcase_view,showcase_view) if showcase else output_name
     if showcase:
         # Populate a representative current layout from actual Blizzard binding
         # commands and spell IDs. None of this sample data reaches SavedVariables.
@@ -201,7 +217,7 @@ for slot,id in ipairs(spells) do
 end
 Mock.actions[11]={'spell',768}; Mock.bindings.Q='ACTIONBUTTON11'
 Mock.actions[12]={'spell',783}; Mock.bindings.E='ACTIONBUTTON12'
-K.UI.libraryCategory=nil; K.UI.libraryQuery=''; K.UI.libraryRanks=false
+K.UI.libraryTab='spells'; K.UI.libraryCategory=nil; K.UI.libraryQuery=''; K.UI.libraryRanks=false
 ''')
         namespace.Themes.Set(namespace.Themes,theme)
     lua.execute('for _,name in ipairs({"nativeBarsDialog","diagnosticLogDialog","operationErrorDialog","talentDialog","saveDialog"}) do local f=K.UI[name]; if f then f:Hide() end end')
@@ -244,7 +260,11 @@ K.UI.libraryCategory=nil; K.UI.libraryQuery=''; K.UI.libraryRanks=false
         lua.globals().K.UI.libraryTab='spells' if filename=='library-ranks' else filename[8:]
         lua.globals().K.UI.libraryRanks=filename=='library-ranks'
         lua.globals().K.UI.SyncLibrary(lua.globals().K.UI)
-    if showcase and filename=='bindings-current':
+    if showcase and showcase_view in ('movement','camera'):
+        lua.globals().K.UI.library.tabs[showcase_view].Click(lua.globals().K.UI.library.tabs[showcase_view])
+        lua.globals().PreviewControlKey='W' if showcase_view=='movement' else 'MOUSEWHEELUP'
+        lua.execute('local cap=K.UI.pages.Bindings.keyboard.keys[PreviewControlKey]; if cap and cap.action then K.UI.selectedAction=cap.action; K.UI:BindingDetail(cap.action) end')
+    elif showcase and filename=='bindings-current':
         lua.execute('local cap=K.UI.pages.Bindings.keyboard.keys["1"]; if cap and cap.action then K.UI.selectedAction=cap.action; K.UI:BindingDetail(cap.action) end')
     nodes={}
     for _,f in lua.globals().QA.items():
@@ -264,6 +284,7 @@ K.UI.libraryCategory=nil; K.UI.libraryQuery=''; K.UI.libraryRanks=false
         if f.backdrop:n['backdrop']={k:v for k,v in f.backdrop.items() if k in ('bgFile','edgeFile','edgeSize')}
         n['layer']=f.layer or ('OVERLAY' if f.kind=='FontString' else 'ARTWORK')
         n['sublevel']=f.sublevel if isinstance(f.sublevel,(int,float)) else 0
+        n['parentArtwork']=bool(f.qaParentArtwork)
         n['sliderOwner']=ident(f.sliderOwner)
         n['orientation']=f.orientation
         n['value']=f.value if isinstance(f.value,(int,float)) else 0
@@ -329,6 +350,8 @@ K.UI.libraryCategory=nil; K.UI.libraryQuery=''; K.UI.libraryRanks=false
     def draw_order(row):
         i,n=row
         region=n['kind'] in ('FontString','Texture')
+        if n['parentArtwork'] and n['parent']:
+            return (strata(i),depth(n['parent']),draw_layers['BORDER'],-1,i)
         # Frame artwork is behind its regions. Region draw layers matter:
         # a Modern background texture can be created after a title FontString.
         return (strata(i),depth(n['parent']) if region and n['parent'] else depth(i),draw_layers.get(n['layer'],2) if region else -1,n['sublevel'],i)

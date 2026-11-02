@@ -599,7 +599,15 @@ function UI:AssignBinding(action, key)
         local other=normalized and K.CurrentBindings:EditingView().byKey[normalized]
         if other and other.key~=action.key and not immediate and self:ShouldConfirmBinding("replace") then
             self:EndCapture()
-            self:Confirm("Replace "..keyName(normalized).."?","Move "..(action.label or action.command).." here and replace "..other.label.."? Apply changes installs this edit.",stage)
+            self:Confirm("Replace "..keyName(normalized).."?","Move "..(action.label or action.command).." here and replace "..other.label.."? Apply changes installs this edit.",function()
+                local unchanged=K.CurrentBindings:ValidateSource(other)
+                if not unchanged then
+                    self.currentBindingPlan=nil; self:Refresh()
+                    self:Notice("This destination changed while you were reviewing it. Choose the key again.",true)
+                    return false
+                end
+                return stage()
+            end)
             return false
         end
         return stage()
@@ -696,12 +704,13 @@ function UI:CaptureInput(key)
         self:Refresh()
         return
     end
-    if key == "BUTTON1" or key == "BUTTON2" then
-        self.captureHint:SetText("Left and right mouse clicks stay available for movement and targeting.")
+    local a = self.captureAction
+    local currentAction=a and (a.currentBinding or a)
+    if (key == "BUTTON1" or key == "BUTTON2") and not (self.bindingSource=="current" and self.captureMode=="key" and currentAction and K.CurrentBindings:IsControlCommand(currentAction.command)) then
+        self.captureHint:SetText("Only movement and camera controls can use the primary mouse buttons.")
         return
     end
     local full = modifiers(key)
-    local a = self.captureAction
     if self.captureMode == "preset" then
         if full:find("ALT%-") then self.captureHint:SetText("Alt stays reserved for self-cast. Use a free key, Shift, or Ctrl."); return end
         local ok, why = self:Call(K.Presets, "SetHotkey", a.presetName, full)
@@ -715,6 +724,26 @@ function UI:CaptureInput(key)
         return
     end
     self:AssignBinding(a, full)
+end
+function UI:PromptClearCurrent(action)
+    if self.bindingSource~="current" or not action then return false end
+    if K.Engine and K.Engine.busy then self:UpdateBusyState(); return false end
+    action=copy(action.currentBinding or action)
+    local editable,why=K.CurrentBindings:CanClearKey(action)
+    if not editable then self:Notice(why,true); return false end
+    self:EndCapture()
+    local detail="Clear "..keyName(action.key).." from "..tostring(action.label or action.command).."? Other keys for this action and its action-bar slot stay unchanged. Apply changes installs this edit."
+    if action.key:match("BUTTON[12]$") then
+        if action.command=="CAMERAORSELECTORMOVE" then detail=detail.." This mouse button will no longer select targets in the world or control the camera."
+        elseif action.command=="TURNORACTION" then detail=detail.." This mouse button will no longer turn your character or interact with targets in the world."
+        else detail=detail.." This mouse button will no longer perform its current camera or movement control." end
+    end
+    self:Confirm("Clear this key?",detail,function()
+        local ok,message=UI:Call(K.CurrentBindings,"ClearKey",action)
+        UI.currentBindingPlan=nil; UI:Refresh()
+        UI:Notice(message,not ok)
+    end)
+    return true
 end
 function UI:BeginActionCapture(action)
     if not action then return end
@@ -752,6 +781,8 @@ function UI:BeginCapture(mode, action)
         note:SetWidth(730)
         local cancel = button(f, "Cancel", 120, function() UI:EndCapture(); UI:Refresh() end)
         cancel:SetPoint("BOTTOMRIGHT", -40, 40)
+        f.clear=button(f,"Clear key",120,function() UI:PromptClearCurrent(UI.captureAction) end)
+        f.clear:SetPoint("RIGHT",cancel,"LEFT",-12,0)
         f.targetLabel=label(f,"Targeting",12,C.text); f.targetLabel:SetPoint("TOPLEFT",64,-329)
         f.targetMode=button(f,"Default",190,function(self) UI:OpenTargetMenu(self) end)
         f.targetMode:SetPoint("TOPLEFT",155,-320)
@@ -784,8 +815,13 @@ function UI:BeginCapture(mode, action)
     self.captureTitle:SetText(mode == "mouse" and "Record your mouse buttons" or (mode == "preset" and "Hot Swap key for " or "Edit ") .. tostring(action.label or action.id))
     self.captureHint:SetText(mode == "mouse" and "Press each side button once." or "Press the new key, mouse button, or wheel direction. Hold Shift or Ctrl if needed.")
     local linked=mode=="key" and #self:LinkedBindings(action)>1
-    self.captureNote:SetText(mode == "mouse" and "Recorded buttons are kept. Escape or Done finishes. Apply & save installs your changes." or (linked and "Escape cancels. This action-bar position changes in every form. Apply & save installs it." or "Escape cancels this key change. Apply & save installs your changes."))
+    local current=mode=="key" and self.bindingSource=="current"
+    self.captureNote:SetText(current and "Escape cancels this key change. Apply changes installs your edits." or mode == "mouse" and "Recorded buttons are kept. Escape or Done finishes. Apply & save installs your changes." or (linked and "Escape cancels. This action-bar position changes in every form. Apply & save installs it." or "Escape cancels this key change. Apply & save installs your changes."))
     self.captureDone.text:SetText(mode == "mouse" and "Done" or (mode=="key" and "Done" or "Cancel"))
+    local currentAction=action and (action.currentBinding or action)
+    local canClear=current and K.CurrentBindings:CanClearKey(currentAction) or false
+    self.capture.clear:SetShown(canClear)
+    if canClear then self.captureNote:SetText("Clear key removes only this assignment. Escape cancels this key change. Apply changes installs your edits.") end
     self.capture.talents:SetShown(mode=="key" and self.CanEditTalentChoices and self:CanEditTalentChoices(action) or false)
     self:RenderCaptureTarget()
     if self.capture.targetMode:IsShown() then self.captureHint:SetText("Press a new key to rebind, or choose Targeting below. Hold Shift or Ctrl for a modified key.") end
@@ -1580,9 +1616,7 @@ function UI:BuildBindings(page)
     detail.reset = button(detail, "Reset key", 94, function()
         if not UI.selectedAction then return end
         if UI.bindingSource=="current" then
-            UI:Confirm("Clear this key?","Remove this key assignment from your Current layout. Other keys and the action-bar slot stay unchanged until you apply your edits.",function()
-                UI:Call(K.CurrentBindings,"ClearKey",UI.selectedAction); UI.currentBindingPlan=nil; UI:Refresh()
-            end); return
+            UI:PromptClearCurrent(UI.selectedAction); return
         end
         if UI.bindingSource~="draft" then return end
         if UI.selectedAction.presetName then UI:Call(K.Presets,"ClearHotkey",UI.selectedAction.presetName); UI:Refresh(); return end
@@ -1723,7 +1757,7 @@ function UI:BindingDetail(a)
     local pinned=false
     for _,action in ipairs(linked) do if (settings().bindingOverrides or {})[action.id]~=nil then pinned=true; break end end
     local editable=self.bindingSource~="recommendation"
-    d.reset:SetEnabled(editable and not a.preserved and (a.current or a.presetName~=nil or pinned))
+    d.reset:SetEnabled(editable and not a.preserved and (a.current and K.CurrentBindings:CanClearKey(a) or not a.current and (a.presetName~=nil or pinned)))
     d.note:SetText(a.current and "Apply changes installs only your edits. Drag from the spellbook to replace an action." or not editable and (self.bindingSource=="current" and "Current character bindings are read-only. Choose Preset draft to edit." or "Recommendation preview only. Save a preset to edit this layout.") or #linked>1 and "This action-bar position changes in every form." or "Apply & save installs your changes.")
     d.reset.text:SetText((a.current or a.presetName) and "Clear key" or "Reset key")
     d.rebind:SetEnabled(editable and not a.preserved)

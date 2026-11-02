@@ -285,11 +285,53 @@ function C:StageKey(key,command,entry)
  if e.expectedKeys[key]==nil then e.expectedKeys[key]=GetBindingAction(key) or "" end
  e.keys[key]=command or false; e.entries[key]=entry and K.Copy(entry) or nil
 end
+function C:IsControlCommand(command)
+ local commands=K.API:GetBindingCommands()
+ local group=K.Protection:Group(command,commands)
+ return (group=="movement" or group=="camera") and K.API:IsBindingCommandSupported(command,commands) or false
+end
+function C:CanClearKey(action)
+ local key=action and K.API:NormalizeKey(action.key)
+ if not key or key=="ESCAPE" then return false,"Keep Escape available for the game menu." end
+ if key:match("BUTTON[12]$") and not self:IsControlCommand(action.command) then
+  return false,"Only movement and camera controls can be edited on the primary mouse buttons."
+ end
+ return true
+end
+-- Every unavailable reservation has command=false, so compare its saved
+-- payload as well before removing or moving the reviewed action.
+local function samePendingEntry(a,b)
+ if a==b then return true end
+ if type(a)~="table" or type(b)~="table" then return false end
+ for key,value in pairs(a) do if not samePendingEntry(value,b[key]) then return false end end
+ for key in pairs(b) do if a[key]==nil then return false end end
+ return true
+end
+function C:ValidateSource(action)
+ local key=K.API:NormalizeKey(action.key)
+ local e=self.edits
+ local live=GetBindingAction(key) or ""
+ local command=e and e.keys[key]
+ if command==nil then command=live end
+ local pending=not action.liveSlot and action.currentEntry and action.currentEntry.pending
+ local entry
+ if e and e.keys[key]~=nil then entry=e.entries and e.entries[key]
+ elseif K.db.currentLayout and K.db.currentLayout.keys then entry=K.db.currentLayout.keys[key] end
+ if (pending and command~=false and command~="") or (not pending and command~=action.command)
+  or (pending and not samePendingEntry(action.currentEntry,entry))
+  or (e and e.expectedKeys[key]~=nil and e.expectedKeys[key]~=live) then
+  self:Invalidate()
+  return false,"This binding changed. Review Current again before editing it."
+ end
+ return true
+end
 function C:Rebind(action,key)
  key=K.API:NormalizeKey(key)
- if not key or key=="ESCAPE" or key:match("BUTTON[12]$") then return false,"Choose a valid key other than Escape or the primary mouse buttons." end
+ if not key or key=="ESCAPE" then return false,"Choose a valid key other than Escape." end
  if not action or not action.key then return false,"Choose a current binding." end
- if action.key=="ESCAPE" or action.key:match("BUTTON[12]$") then return false,"Keep Escape and primary mouse controls on their current keys." end
+ local editable,why=self:CanClearKey(action); if not editable then return false,why end
+ if key:match("BUTTON[12]$") and not self:IsControlCommand(action.command) then return false,"Only movement and camera controls can use the primary mouse buttons." end
+ local current,reason=self:ValidateSource(action); if not current then return false,reason end
  if action.key==key then return true end
  local command=action.command
  if action.currentEntry and action.currentEntry.pending and not action.liveSlot then
@@ -302,13 +344,15 @@ function C:Rebind(action,key)
  return true,"Binding moved in your Current layout. Apply changes installs it."
 end
 function C:ClearKey(action)
- if not action or not action.key or action.key=="ESCAPE" or action.key:match("BUTTON[12]$") then return false,"Keep Escape and primary mouse controls." end
- self:StageKey(action.key,false)
+ local editable,why=self:CanClearKey(action); if not editable then return false,why end
+ local current,reason=self:ValidateSource(action); if not current then return false,reason end
+ local key=K.API:NormalizeKey(action.key)
+ self:StageKey(key,false)
  return true,"Key cleared in your Current layout. Apply changes installs it."
 end
 function C:StageEntry(entry,key)
  key=K.API:NormalizeKey(key)
- if not key or key=="ESCAPE" or key:match("BUTTON[12]$") then return false,"Choose a valid destination key." end
+ if not key or key=="ESCAPE" then return false,"Choose a valid destination key other than Escape." end
  local d=entry and entry.descriptor
  local data={label=entry and (entry.label or entry.name),icon=entry and entry.icon,sourceID=entry and (entry.actionID or entry.id)}
  local spellID=entry and entry.spellID or d and d.spellID
@@ -335,6 +379,9 @@ function C:StageEntry(entry,key)
  elseif d and d.kind=="emote" and K.Library:Emotes()[d.emote] then
   data.body=K.Library:Emotes()[d.emote]; data.command="MACRO "..K.Macros:Name(data.body)
  else return false,"Choose a spell, item, local macro or supported game command." end
+ if key:match("BUTTON[12]$") and not self:IsControlCommand(data.command) then
+  return false,"Only movement and camera controls can use the primary mouse buttons."
+ end
  data=self:ResolveEntry(data)
  local e=self:Edits(); self:Build(); local live=self:EditingView().byKey[key]
  if (data.content or data.pending or data.body) and live and live.liveSlot then

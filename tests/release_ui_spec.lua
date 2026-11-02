@@ -78,5 +78,6 @@ function Tests.release_ui_game_spellbook_button_opens_and_restores_mouse_access(
     ToggleSpellBook=function(bank) assert(bank=='spell'); SpellBookFrame=CreateFrame('Frame'); SpellBookFrame:Show() end
     ui.library.nativeBook:Click()
     assert(SpellBookFrame:IsShown() and not ui.testMouseShield:IsShown())
-    assert(ui.library.tabs.game.tipDetail:find('movement, camera',1,true))
+    assert(ui.library.tabs.movement and ui.library.tabs.camera,'Movement and Camera need separate spellbook menus')
+    assert(ui.library.tabs.movement.tipDetail and ui.library.tabs.camera.tipDetail,'Control menus need explanatory tooltips')
 end
