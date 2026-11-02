@@ -1,4 +1,9 @@
-"""Render geometry emitted by actual UI.lua. Mock data; never an in-game screenshot."""
+"""Capture the actual addon widget tree with deterministic offline sample data.
+
+Run ``python ui-qa/capture.py`` then ``pwsh -File ui-qa/render.ps1``.
+The JSON is geometry and styling from Lua, not a hand-built UI mockup. Blizzard
+artwork and client rendering remain approximations in the PNG renderer.
+"""
 from pathlib import Path
 import json, math, sys
 ROOT = Path(__file__).resolve().parent.parent
@@ -12,6 +17,13 @@ local anchor={TOPLEFT={0,1},TOP={.5,1},TOPRIGHT={1,1},LEFT={0,.5},CENTER={.5,.5}
 local function geom(f,depth)
  depth=(depth or 0)+1;if depth>30 then error('mock geometry cycle') end
  if not f or f==UIParent then return 0,0,1920,1080 end
+ if f.sliderOwner then
+   local owner=f.sliderOwner;local x,y,w,h=geom(owner,depth);local lo,hi=owner:GetMinMaxValues()
+   local ratio=hi>lo and math.max(0,math.min(1,(owner:GetValue()-lo)/(hi-lo))) or 0
+   local tw,th=f.width or 9,f.height or 18
+   if owner.orientation=='VERTICAL' then return x+(w-tw)/2,y+(1-ratio)*(h-th),tw,th end
+   return x+ratio*(w-tw),y+(h-th)/2,tw,th
+ end
  if f.all then return geom(f.all,depth) end
  local w,h=f.width,f.height
  if f.kind=='FontString' then w=w or (#tostring(f.text)*(f.fontsize or 12)*.66+16);h=h or (f.fontsize or 12)*1.4 end
@@ -32,7 +44,7 @@ function CreateFrame(kind,name,parent,template)
    else rel=self.parent or UIParent;rp=point;x=0;y=0 end
    self.points[#self.points+1]={point=point,rel=rel,rp=rp,x=x,y=y}
  end
- function f:ClearAllPoints() self.points={} end
+ function f:ClearAllPoints() self.points={}; self.all=nil end
  function f:SetAllPoints(other) self.all=other or self.parent end
  function f:SetWidth(v) self.width=v end
  function f:SetHeight(v) self.height=v end
@@ -41,24 +53,43 @@ function CreateFrame(kind,name,parent,template)
  function f:GetWidth() local _,_,w=geom(self);return w end
  function f:GetHeight() local _,_,_,h=geom(self);return h end
  function f:SetBackdropColor(...) self.fill={...} end
+ function f:GetBackdropColor() return unpack(self.fill or {1,1,1,1}) end
  function f:SetBackdropBorderColor(...) self.border={...} end
- function f:SetColorTexture(...) self.fill={...} end
+ function f:GetBackdropBorderColor() return unpack(self.border or {1,1,1,1}) end
+ function f:SetColorTexture(...) self.fill={...};self.texture=nil end
+ function f:SetTexture(value) self.texture=value;self.fill=nil end
  function f:SetTextColor(...) self.color={...} end
- function f:SetFont(_,size) self.fontsize=size end
+ function f:GetTextColor() return unpack(self.color or {1,1,1,1}) end
+ function f:GetVertexColor() return unpack(self.vertexColor or {1,1,1,1}) end
+ function f:SetOrientation(value) self.orientation=value end
+ function f:SetFont(path,size,flags) self.fontsize=size; self.fontpath=path; self.font={path,size,flags or ''} end
  function f:SetWordWrap(v) self.wrap=v end
  function f:SetJustifyH(v) self.justify=v end
  function f:SetJustifyV(v) self.justifyV=v end
  function f:CreateFontString(name,layer,font)
    local fs=CreateFrame('FontString',name,self);fs.fontObject=font
+   fs.layer=layer or 'OVERLAY'
    fs.fontsize=font and font:find('Large') and 16 or font and font:find('Small') and 10 or 12
    return fs
  end
- function f:CreateTexture() return CreateFrame('Texture',nil,self) end
- function f:GetThumbTexture() if not self.thumb then self.thumb=CreateFrame('Texture',nil,self) end;return self.thumb end
+ function f:CreateTexture(name,layer,template,sublevel)
+   local texture=CreateFrame('Texture',name,self);texture.layer=layer or 'ARTWORK';texture.sublevel=sublevel or 0;return texture
+ end
+ function f:GetThumbTexture()
+   if not self.thumb then self.thumb=CreateFrame('Texture',nil,self);self.thumb.sliderOwner=self;self.thumb.layer='OVERLAY';self.thumb:SetSize(9,18) end
+   return self.thumb
+ end
  function f:SetScrollChild(child) self.scrollChild=child; child.scrollHost=self end
  function f:GetStringHeight() return (self.fontsize or 12)*math.max(1,math.ceil(#tostring(self.text)/(math.max(10,(self.width or 400)/((self.fontsize or 12)*0.53))))) end
  if template=='UIPanelCloseButton' then f:SetSize(24,24) end
  if template=='UICheckButtonTemplate' then f:SetSize(26,26) end
+ -- Minimal XML geometry for built-in template children. Runtime code may
+ -- override these anchors, exactly as it does with the client's template.
+ if template=='BasicFrameTemplateWithInset' then
+   f.TitleText:SetPoint('TOPLEFT',f,'TOPLEFT',12,-5);f.TitleText:SetPoint('TOPRIGHT',f,'TOPRIGHT',-32,-5);f.TitleText:SetHeight(20)
+   f.CloseButton:SetPoint('TOPRIGHT',f,'TOPRIGHT',-4,-4)
+   f.Inset:SetPoint('TOPLEFT',f,'TOPLEFT',4,-24);f.Inset:SetPoint('BOTTOMRIGHT',f,'BOTTOMRIGHT',-4,4)
+ end
  local oldFont=f.GetFontString
  function f:GetFontString()
    local fs=oldFont(self)
@@ -103,7 +134,37 @@ cases.extend([('Settings','settings-controls',None,None),('Settings','settings-b
 cases.append(('Bindings','hover-bind','caster',''))
 cases.append(('Bindings','save-preset','caster',''))
 cases.extend([('Bindings','bindings-current',None,''),('Bindings','current-hover',None,''),('Bindings','bindings-recommendation','caster','')])
-for page,filename,form,layer in cases:
+showcase_cases=[]
+for theme in ('classic','modern'):
+    showcase_cases.extend([
+        ('Bindings',f'{theme}-current',None,''),
+        ('Presets',f'{theme}-presets',None,None),
+        ('Settings',f'{theme}-settings',None,None),
+        ('Bindings',f'{theme}-spellbook','caster',''),
+    ])
+if namespace.Themes:
+    cases.extend(showcase_cases)
+for page,output_name,form,layer in cases:
+    showcase=output_name.startswith(('classic-','modern-'))
+    theme=output_name.split('-',1)[0] if showcase else 'classic'
+    filename={'current':'bindings-current','settings':'settings-window','spellbook':'library-spells'}.get(output_name.split('-',1)[-1],output_name.split('-',1)[-1]) if showcase else output_name
+    if showcase:
+        # Populate a representative current layout from actual Blizzard binding
+        # commands and spell IDs. None of this sample data reaches SavedVariables.
+        lua.execute(r'''
+K.UI:ClearOperationError(); K.Engine.lastJob=nil
+K.UI.selectedAction=nil; K.UI.selectedKey=nil
+Mock.bindings.W='MOVEFORWARD'; Mock.bindings.A='STRAFELEFT'; Mock.bindings.S='MOVEBACKWARD'; Mock.bindings.D='STRAFERIGHT'; Mock.bindings.SPACE='JUMP'
+local spells={5177,8921,2912,19970,2637,1058,8936,5185,1126,467}
+for slot,id in ipairs(spells) do
+    Mock.actions[slot]={'spell',id}
+    Mock.bindings[slot==10 and '0' or tostring(slot)]='ACTIONBUTTON'..slot
+end
+Mock.actions[11]={'spell',768}; Mock.bindings.Q='ACTIONBUTTON11'
+Mock.actions[12]={'spell',783}; Mock.bindings.E='ACTIONBUTTON12'
+K.UI.libraryCategory=nil; K.UI.libraryQuery=''; K.UI.libraryRanks=false
+''')
+        namespace.Themes.Set(namespace.Themes,theme)
     lua.execute('for _,name in ipairs({"nativeBarsDialog","diagnosticLogDialog","operationErrorDialog","talentDialog","saveDialog"}) do local f=K.UI[name]; if f then f:Hide() end end')
     if filename.startswith('settings-') or filename.startswith('talent-'):
         lua.execute('K.UI:ClearOperationError()')
@@ -144,13 +205,22 @@ for page,filename,form,layer in cases:
         lua.globals().K.UI.libraryTab='spells' if filename=='library-ranks' else filename[8:]
         lua.globals().K.UI.libraryRanks=filename=='library-ranks'
         lua.globals().K.UI.SyncLibrary(lua.globals().K.UI)
+    if showcase and filename=='bindings-current':
+        lua.execute('local cap=K.UI.pages.Bindings.keyboard.keys["1"]; if cap and cap.action then K.UI.selectedAction=cap.action; K.UI:BindingDetail(cap.action) end')
     nodes={}
     for _,f in lua.globals().QA.items():
         def ident(value):
             if value is None:return None
             return int(value['qid']) if value['qid'] else 0
-        n={'id':int(f.qid),'kind':f.kind,'strata':f.strata,'parent':ident(f.parent),'all':ident(f.all),'scrollHost':ident(f.scrollHost),'shown':bool(f.shown),'w':f.width,'h':f.height,'text':str(f.GetText(f) or ''),'font':f.fontsize or 12,'wrap':f.wrap is not False,'justify':f.justify or 'LEFT','points':[], 'template':f.template, 'texture':f.texture if isinstance(f.texture,str) else None,'selected':bool(f.selected),'checked':bool(f.checked),'enabled':f.enabled is not False,'keycap':bool(f.base)}
+        n={'id':int(f.qid),'kind':f.kind,'strata':f.strata,'parent':ident(f.parent),'all':ident(f.all),'scrollHost':ident(f.scrollHost),'shown':bool(f.shown),'alpha':f.alpha if isinstance(f.alpha,(int,float)) else 1,'w':f.width,'h':f.height,'text':str(f.GetText(f) or ''),'font':f.fontsize or 12,'fontpath':f.fontpath,'wrap':f.wrap is not False,'justify':f.justify or 'LEFT','justifyV':f.justifyV or 'TOP','points':[], 'template':f.template, 'texture':f.texture if isinstance(f.texture,str) else None,'selected':bool(f.selected),'checked':bool(f.checked),'enabled':f.enabled is not False,'keycap':bool(f.base),'theme':theme,'themeRole':f.hotSwapThemeRole}
         if f.backdrop:n['backdrop']={k:v for k,v in f.backdrop.items() if k in ('bgFile','edgeFile','edgeSize')}
+        n['layer']=f.layer or ('OVERLAY' if f.kind=='FontString' else 'ARTWORK')
+        n['sublevel']=f.sublevel if isinstance(f.sublevel,(int,float)) else 0
+        n['sliderOwner']=ident(f.sliderOwner)
+        n['orientation']=f.orientation
+        n['value']=f.value if isinstance(f.value,(int,float)) else 0
+        n['minimum']=f.minimum if isinstance(f.minimum,(int,float)) else 0
+        n['maximum']=f.maximum if isinstance(f.maximum,(int,float)) else 1
         parent=f.parent
         # Native button state textures are displayed conditionally by the client.
         if parent:
@@ -158,7 +228,7 @@ for page,filename,form,layer in cases:
                 region=parent[key]
                 if region and region.qid==f.qid:
                     n['shown']=key=='checkedTexture' and bool(parent.checked)
-        for name in ('fill','border','color'):
+        for name in ('fill','border','color','vertexColor'):
             val=f[name];n[name]=list(val.values()) if val else None
         for _,p in f.points.items():n['points'].append([p.point,ident(p.rel),p.rp,p.x,p.y])
         nodes[n['id']]=n
@@ -168,11 +238,19 @@ for page,filename,form,layer in cases:
         if i is None:return cache[0]
         n=nodes[i];stack=(stack or [])+[i]
         if len(stack)>30:raise RuntimeError('anchor cycle '+str(stack))
+        if n['sliderOwner'] is not None:
+            owner=nodes[n['sliderOwner']];x,y,w,h=bounds(n['sliderOwner'],stack)
+            span=owner['maximum']-owner['minimum']
+            ratio=max(0,min(1,(owner['value']-owner['minimum'])/span)) if span>0 else 0
+            tw,th=n['w'] or 9,n['h'] or 18
+            cache[i]=(x+(w-tw)/2,y+(1-ratio)*(h-th),tw,th) if owner['orientation']=='VERTICAL' else (x+ratio*(w-tw),y+(h-th)/2,tw,th)
+            return cache[i]
         if n['all'] is not None: cache[i]=bounds(n['all'],stack);return cache[i]
         w=n['w'];h=n['h']
         if n['kind']=='FontString':
             w=w or len(n['text'])*n['font']*.66+16
-            h=h or n['font']*1.4*max(1,math.ceil(len(n['text'])*n['font']*.53/max(1,w)))
+            lines=max(1,math.ceil(len(n['text'])*n['font']*.53/max(1,w))) if n['wrap'] else 1
+            h=h or n['font']*1.4*lines
         ps=[]
         for a,rel,rp,x,y in n['points']:
             rx,ry,rw,rh=bounds(rel,stack);ra,rb=anchors[rp];ax,ay=anchors[a]
@@ -187,7 +265,7 @@ for page,filename,form,layer in cases:
                 if abs(p[1]-q[1])>0.1:h=(p[3]-q[3])/(p[1]-q[1])
         w=w or 1;h=h or 1;p=ps[0];cache[i]=(p[2]-p[0]*w,p[3]-p[1]*h,w,h);return cache[i]
     def visible(i):
-        return i is None or i==0 or (nodes[i]['shown'] and visible(nodes[i]['parent']))
+        return i is None or i==0 or (nodes[i]['shown'] and nodes[i]['alpha']>0 and visible(nodes[i]['parent']))
     frame_id=int(lua.globals().K.UI.frame.qid);fx,fy,fw,fh=bounds(frame_id)
     if filename.startswith('library-') or filename=='bindings-current':fw+=320
     result=[]
@@ -199,7 +277,14 @@ for page,filename,form,layer in cases:
     def strata(i):
         n=nodes[i]
         return strata_order.get(n['strata'],2) if n['strata'] else (strata(n['parent']) if n['parent'] else 2)
-    ordered=sorted(nodes.items(),key=lambda row:(strata(row[0]),depth(row[0]),row[0]))
+    draw_layers={'BACKGROUND':0,'BORDER':1,'ARTWORK':2,'OVERLAY':3,'HIGHLIGHT':4}
+    def draw_order(row):
+        i,n=row
+        region=n['kind'] in ('FontString','Texture')
+        # Frame artwork is behind its regions. Region draw layers matter:
+        # a Modern background texture can be created after a title FontString.
+        return (strata(i),depth(n['parent']) if region and n['parent'] else depth(i),draw_layers.get(n['layer'],2) if region else -1,n['sublevel'],i)
+    ordered=sorted(nodes.items(),key=draw_order)
     for i,n in ordered:
         if not visible(i):continue
         x,y,w,h=bounds(i)
@@ -212,6 +297,6 @@ for page,filename,form,layer in cases:
             ancestor=nodes.get(ancestor['parent'])
         n.update(x=x-fx,y=fy+fh-y-h,w=w,h=h,clip=[clip[0]-fx,fy+fh-clip[1]-clip[3],clip[2],clip[3]])
         result.append(n)
-    (ROOT/'ui-qa'/f'{filename}.json').write_text(json.dumps(result),encoding='utf-8')
-    print(filename, 'captured',len(result),'visible native UI objects')
+    (ROOT/'ui-qa'/f'{output_name}.json').write_text(json.dumps(result),encoding='utf-8')
+    print(output_name, 'captured',len(result),'visible native UI objects')
 print('Actual UI.lua instantiated successfully under Lua 5.1. Mock geometry only; no game-client claim.')

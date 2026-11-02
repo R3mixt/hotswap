@@ -40,7 +40,7 @@ To import someone else's settings, open their file, copy its text, paste it into
 
 ## In-game interface
 
-The seven tabs are **Setup**, **Presets**, **Bindings**, **Items**, **Backups**, **Import / export**, and **Settings**. The interface uses the game's own frame, button, checkbox, scrollbar and action-slot artwork, game fonts, gold headings and native tooltips. Advanced options stay collapsed until needed. Combat actions use Blizzard's original bars and their own cooldowns, tooltips and hotkey labels.
+The seven tabs are **Setup**, **Presets**, **Bindings**, **Items**, **Backups**, **Import / export**, and **Settings**. The default **Classic** theme uses familiar Warcraft textures, warm borders and gold headings. The optional **Modern** theme uses flat slate panels, cool accents and sans-serif typography. Choose either in **Settings → Window → Theme**. Advanced options stay collapsed until needed. Combat actions use Blizzard's original bars and their own cooldowns, tooltips and hotkey labels.
 
 All artwork is referenced from the installed game; there is no browser, web UI, bundled replacement font, or external skin dependency. Geometry previews use approximate artwork and fonts, so the exact client rendering still needs an in-game check.
 
@@ -83,7 +83,7 @@ The same section has character-local display controls: **Show macro names on act
 
 The choice is per binding and saved with each preset, so independent and shared keys can coexist. Import/export preserves both. Fixed-rank or replacement edits are separate choices; Default targeting supports alternatives with different target capabilities. **Apply & save** installs your choices. Learning or removing a talent updates its managed action outside combat without changing keys. Unlearned talent buttons contain no cast or form-cancellation command.
 
-**Settings → Window** controls this character's window opacity (40–100%) and preferred scale (70–130%). Changes take effect immediately. The window reduces its effective scale when necessary to fit the screen and spellbook. **Reset appearance** restores the defaults. These preferences stay local when importing or switching binding presets.
+**Settings → Window** controls this character's theme (**Classic** or **Modern**), window opacity (40–100%) and preferred scale (70–130%). Changes take effect immediately, including the spellbook and open editors. The window reduces its effective scale when necessary to fit the screen and spellbook. **Reset appearance** restores Classic, full opacity and 100% preferred scale. These preferences stay local when importing or switching binding presets, and changing a theme preserves pending binding edits. Use `/reload` or log out normally to save them to disk.
 
 **Settings → Diagnostics → Enable diagnostic logging** is off by default. Turn it on before reproducing a problem. It keeps the latest 200 Hot Swap entries, including setup phases, failures, key/command, backup identifier, rollback outcome and bounded stack traces when available. It captures uncaught errors that identify Hot Swap; it is not a general other-addon error collector and never replaces the game's existing error presentation. Logs do not contain raw preset exports or macro bodies from context fields and are never uploaded automatically.
 

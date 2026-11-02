@@ -21,6 +21,7 @@ Hot Swap first displays the bindings currently installed in the game. Recommenda
 | Planner | Resolve knowledge, reserve future positions, cover learned actions and validate the plan |
 | Engine | Bounded apply, recovery, rollback and maintenance jobs; macro ownership |
 | Presets | Complete drafts, activation shortcuts, backups and data-only transfer |
+| Themes | Character-local Classic/Modern palettes and reversible widget skins; no game binding writes |
 | UI / LibraryUI / HoverBindingsUI / ItemsUI / SettingsUI | Main configuration, spellbook/target and hover-binding editors, item choices, local appearance/log controls |
 | Launcher | Native settings and Escape-menu integration |
 
@@ -83,7 +84,7 @@ Run `python tests/run_tests.py` after installing requirements-dev.txt. Tests exe
 
 ## Local diagnostics and preferences
 
-`db.preferences` holds diagnostics (default false), windowOpacity and windowScale independently of preset data. Import/export, switching and recovery do not overwrite it. Effective scale fits the viewport without changing the stored preference. `db.diagnostics` holds at most 200 records, each with a 3000-character message, timestamp, severity/event and a whitelist of short primitive context fields. There are no raw macro/preset dumps or network operations.
+`db.preferences` holds diagnostics (default false), windowOpacity, windowScale and theme (default `classic`) independently of preset data. Import/export, switching and recovery do not overwrite it. Effective scale fits the viewport without changing the stored preference. Themes updates stable color tokens and registered widget skins in place; it restores native decoration opacity and fonts when returning to Classic, preserves drafts and never changes Blizzard's action bars. `db.diagnostics` holds at most 200 records, each with a 3000-character message, timestamp, severity/event and a whitelist of short primitive context fields. There are no raw macro/preset dumps or network operations.
 
 Engine logs transitions rather than every mutation. Scoped protected calls capture a bounded stack only while diagnostics are enabled. Logger failures cannot interrupt a transaction. The opt-in global wrapper only records errors identifying Hot Swap and always forwards to the previous handler. Disabling restores that handler only while Hot Swap is still the outermost wrapper; an intervening addon's chain keeps an inactive pass-through wrapper. SavedVariables persist on normal reload/logout.
 

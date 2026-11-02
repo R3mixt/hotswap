@@ -4,35 +4,20 @@ local _, K = ...
 K.UI = K.UI or {}
 local UI = K.UI
 local specialFrame
-local C = {
-    bg = {0.055, 0.047, 0.035, 0.99}, panel = {0.10, 0.085, 0.065, 1},
-    field = {0.08, 0.07, 0.055, 1}, edge = {0.58, 0.51, 0.37, 1},
-    text = {0.95, 0.91, 0.82, 1}, muted = {0.68, 0.65, 0.58, 1},
-    accent = {1, 0.82, 0, 1}, warning = {1, 0.72, 0.25, 1},
-    error = {1, 0.43, 0.43, 1}, white = {1, 1, 1, 1},
-}
+local T = K.Themes
+local C = T.Colors
 local unpack = unpack or table.unpack
 local APPLY_LABEL="Apply & save"
 local APPLY_DETAIL="Back up your current setup, update this preset's assigned keys, macros and action bars, then save the game's bindings. Unrelated bindings and mouse controls stay unchanged. Changed drafts prompt you to overwrite the selected preset or save a new one."
-local function color(fs, c) fs:SetTextColor(unpack(c or C.text)) end
+local function color(fs, c) T:TextColor(fs, c or C.text) end
 local function box(kind, parent, fill, name)
     local f = CreateFrame(kind or "Frame", name, parent, BackdropTemplateMixin and "BackdropTemplate" or nil)
-    if f.SetBackdrop then
-        f:SetBackdrop({bgFile = "Interface\\DialogFrame\\UI-DialogBox-Background", edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border", tile = true, tileSize = 32, edgeSize = 12, insets = {left=3, right=3, top=3, bottom=3}})
-        -- The supplied Blizzard background is already dark and textured.
-        f:SetBackdropColor(1, 1, 1, (fill or C.panel)[4] or 1)
-        f:SetBackdropBorderColor(unpack(C.edge))
-    else
-        local bg = f:CreateTexture(nil, "BACKGROUND")
-        bg:SetAllPoints()
-        bg:SetColorTexture(unpack(fill or C.panel))
-        f.bg = bg
-    end
+    T:Skin(f, "box", fill or C.panel)
     return f
 end
 local function label(parent, value, size, tone)
     local fs = parent:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
-    fs:SetFont(STANDARD_TEXT_FONT or "Fonts\\FRIZQT__.TTF", size or 12, "")
+    T:Font(fs, size or 12, tone or ((size or 12) >= 15 and C.accent or C.text))
     fs:SetText(value or "")
     fs:SetJustifyH("LEFT")
     fs:SetJustifyV("TOP")
@@ -46,6 +31,7 @@ end
 local function tooltip(f, title, detail, spellID, locked, itemID)
     f.tipTitle, f.tipDetail, f.tipSpellID, f.tipLocked, f.tipItemID = title, detail, spellID, locked, itemID
     f:SetScript("OnEnter", function(self)
+        local skin=T.widgets[self]; if skin then skin.hovered=true; T:Style(self) end
         if not GameTooltip then return end
         GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
         local native
@@ -61,7 +47,7 @@ local function tooltip(f, title, detail, spellID, locked, itemID)
         if self.tipDetail and self.tipDetail ~= "" then GameTooltip:AddLine(self.tipDetail, 0.7, 0.78, 0.81, true) end
         GameTooltip:Show()
     end)
-    f:SetScript("OnLeave", function() if GameTooltip then GameTooltip:Hide() end end)
+    f:SetScript("OnLeave", function(self) local skin=T.widgets[self]; if skin then skin.hovered=false; skin.pressed=false; T:Style(self) end; if GameTooltip then GameTooltip:Hide() end end)
 end
 local function button(parent, text, width, fn, primary)
     local f = CreateFrame("Button", nil, parent, "UIPanelButtonTemplate")
@@ -70,24 +56,27 @@ local function button(parent, text, width, fn, primary)
     f.text = f:GetFontString()
     if f.text then color(f.text, primary and C.accent or C.text) end
     f:SetScript("OnClick", fn)
+    T:Skin(f, "button", nil, primary)
+    if f.text then T:Font(f.text, 12, primary and C.accent or C.text) end
     return f
 end
 local function selectTab(tab, selected)
     if selected and PanelTemplates_SelectTab then PanelTemplates_SelectTab(tab)
     elseif not selected and PanelTemplates_DeselectTab then PanelTemplates_DeselectTab(tab) end
     if tab.text then color(tab.text, selected and C.accent or C.text) end
+    T:SelectTab(tab, selected)
 end
 local function listRow(parent)
     local row = CreateFrame("Button", nil, parent)
     local background = row:CreateTexture(nil, "BACKGROUND")
     background:SetAllPoints()
-    background:SetColorTexture(0.08, 0.07, 0.05, 0.45)
+    T:Texture(background, C.row)
     row:SetHighlightTexture("Interface\\QuestFrame\\UI-QuestTitleHighlight", "ADD")
+    if row:GetHighlightTexture() then T:Texture(row:GetHighlightTexture(),C.hover,"Interface\\QuestFrame\\UI-QuestTitleHighlight","ADD") end
     row.selection = row:CreateTexture(nil, "ARTWORK")
     row.selection:SetAllPoints()
     row.selection:SetTexture("Interface\\QuestFrame\\UI-QuestTitleHighlight")
-    row.selection:SetVertexColor(1, 0.82, 0.35, 0.35)
-    row.selection:SetBlendMode("ADD")
+    T:Texture(row.selection, C.selection, "Interface\\QuestFrame\\UI-QuestTitleHighlight", "ADD")
     row.selection:Hide()
     return row
 end
@@ -106,6 +95,7 @@ local function edit(parent, width, height, multiline)
     e:SetScript("OnEditFocusGained", function() if UI.UpdateBindingTester then UI:UpdateBindingTester() end end)
     e:SetScript("OnEditFocusLost", function() if UI.UpdateBindingTester then UI:UpdateBindingTester() end end)
     shell.edit = e
+    T:Skin(e, "edit"); T:Font(e, 12, C.text)
     return shell, e
 end
 local function scroll(parent)
@@ -126,9 +116,10 @@ local function scroll(parent)
     slider:SetThumbTexture("Interface\\Buttons\\UI-ScrollBar-Knob")
     local thumb = slider:GetThumbTexture()
     thumb:SetSize(16, 24)
+    T:Texture(thumb,C.accent,"Interface\\Buttons\\UI-ScrollBar-Knob")
     local track = slider:CreateTexture(nil, "BACKGROUND")
     track:SetAllPoints()
-    track:SetTexture("Interface\\DialogFrame\\UI-DialogBox-Background")
+    T:Texture(track, C.field, "Interface\\DialogFrame\\UI-DialogBox-Background")
     slider:SetScript("OnValueChanged", function(_, value) sf:SetVerticalScroll(value) end)
     sf:EnableMouseWheel(true)
     sf:SetScript("OnMouseWheel", function(_, delta)
@@ -238,14 +229,14 @@ function UI:OpenOperationError()
         if f.SetIgnoreParentAlpha then f:SetIgnoreParentAlpha(true) end
         f.opaqueBackground=f:CreateTexture(nil,"BACKGROUND",nil,-8)
         f.opaqueBackground:SetAllPoints(f)
-        f.opaqueBackground:SetColorTexture(C.bg[1],C.bg[2],C.bg[3],1)
+        T:Texture(f.opaqueBackground,C.opaque)
         label(f,"Setup could not finish",22):SetPoint("TOPLEFT",40,-40)
         f.summary=label(f,"",14,C.error); f.summary:SetPoint("TOPLEFT",40,-80); f.summary:SetWidth(770); f.summary:SetHeight(42)
         f.explanation=label(f,"",12,C.muted); f.explanation:SetPoint("TOPLEFT",40,-130); f.explanation:SetWidth(770); f.explanation:SetHeight(64)
         label(f,"Details to copy",12):SetPoint("TOPLEFT",40,-207)
         local shell=box("Frame",f,C.field); shell:SetPoint("TOPLEFT",40,-232); shell:SetPoint("BOTTOMRIGHT",-40,110)
         local sf=CreateFrame("ScrollFrame",nil,shell,"UIPanelScrollFrameTemplate"); sf:SetPoint("TOPLEFT",10,-10); sf:SetPoint("BOTTOMRIGHT",-29,10)
-        local text=CreateFrame("EditBox",nil,sf); text:SetMultiLine(true); text:SetAutoFocus(false); text:SetFontObject(ChatFontNormal or GameFontHighlight)
+        local text=CreateFrame("EditBox",nil,sf); text:SetMultiLine(true); text:SetAutoFocus(false); text:SetFontObject(ChatFontNormal or GameFontHighlight); T:Font(text,12,C.text)
         text:SetSize(700,180); text:SetMaxLetters(2000000); sf:SetScrollChild(text); f.text=text
         self:ConfigureCopyScroll(text,sf)
         text:SetScript("OnEscapePressed",function() f:Hide() end)
@@ -332,7 +323,7 @@ function UI:UpdateBusyState()
         for _,name in ipairs({"Setup","Presets","Bindings","Items","Safety","Share","Settings"}) do
             local page=pages[name]
             if page then
-                for _,control in ipairs({"recommendations","source","nativeBars","new","duplicate","rename","delete","usePreset","hotkey","gearCapture","gearEquip","restoreSelected","original","import","opacity","scale","resetAppearance","diagnostics","viewLog","clearLog","hoverBind"}) do disable(page[control]) end
+                for _,control in ipairs({"recommendations","source","nativeBars","new","duplicate","rename","delete","usePreset","hotkey","gearCapture","gearEquip","restoreSelected","original","import","opacity","scale","theme","resetAppearance","diagnostics","viewLog","clearLog","hoverBind"}) do disable(page[control]) end
                 if page.detail then for _,control in ipairs({"rebind","change","reset","clearKey","talents"}) do disable(page.detail[control]) end end
                 for _,row in ipairs(page.checks or {}) do disable(row); disable(row.checkbox) end
                 for _,row in ipairs(page.list and page.list.rows or {}) do disable(row); disable(row.key) end
@@ -363,7 +354,7 @@ function UI:UpdateBusyState()
         f.message:SetWidth(700); f.message:SetHeight(48); f.message:SetJustifyH("CENTER")
         local track=box("Frame",f,C.field); track:SetPoint("TOP",0,-253); track:SetSize(520,20)
         f.fill=track:CreateTexture(nil,"ARTWORK"); f.fill:SetPoint("TOPLEFT",4,-4); f.fill:SetPoint("BOTTOMLEFT",4,4)
-        f.fill:SetColorTexture(0.72,0.53,0.16,1)
+        T:Texture(f.fill,C.progress)
         f.step=label(f,"",10,C.muted); f.step:SetPoint("TOP",0,-282); f.step:SetWidth(700); f.step:SetJustifyH("CENTER")
         f.note=label(f,"You can close this window. The update continues in the background.",11,C.muted)
         f.note:SetPoint("TOP",0,-318); f.note:SetWidth(700); f.note:SetJustifyH("CENTER")
@@ -453,6 +444,7 @@ local function check(parent, text, hint, key, y)
     local square = CreateFrame("CheckButton", nil, row, "UICheckButtonTemplate")
     square:SetSize(26, 26)
     square:SetPoint("TOPLEFT", -3, 3)
+    T:Skin(square,"check")
     if square.text and type(square.text.Hide) == "function" then square.text:Hide() end
     local mark = square:GetCheckedTexture()
     local name = label(row, text, 12)
@@ -828,6 +820,7 @@ function UI:RenderNativeBars()
         if not row then
             row=listRow(f); row:SetSize(760,44)
             row.check=CreateFrame("CheckButton",nil,row,"UICheckButtonTemplate")
+            T:Skin(row.check,"check")
             row.check:SetSize(26,26); row.check:SetPoint("LEFT",6,0)
             if row.check.text then row.check.text:Hide() end
             row.name=label(row,"",12); row.name:SetPoint("TOPLEFT",43,-6)
@@ -1124,11 +1117,12 @@ local function makeKey(parent, base, caption, x, y, width, height, mouse)
     b:SetPoint("TOPLEFT", x, -y)
     local bg = b:CreateTexture(nil, "BACKGROUND")
     bg:SetAllPoints()
-    bg:SetColorTexture(0.035, 0.03, 0.022, 0.95)
+    T:Texture(bg,C.key)
     b:SetHighlightTexture("Interface\\Buttons\\ButtonHilight-Square", "ADD")
+    if b:GetHighlightTexture() then T:Texture(b:GetHighlightTexture(),C.hover,"Interface\\Buttons\\ButtonHilight-Square","ADD") end
     b.pressGlow=b:CreateTexture(nil,"OVERLAY")
     b.pressGlow:SetPoint("TOPLEFT",3,-3); b.pressGlow:SetPoint("BOTTOMRIGHT",-3,3)
-    b.pressGlow:SetColorTexture(1,0.82,0.1,0.32); b.pressGlow:Hide()
+    T:Texture(b.pressGlow,C.pressed); b.pressGlow:Hide()
     b.icon = b:CreateTexture(nil, "ARTWORK")
     local iconSize = mouse and 22 or (height < 30 and 10 or 18)
     b.icon:SetSize(iconSize, iconSize)
@@ -1269,9 +1263,9 @@ function UI:IndexKeyboard(reuseIcons)
             local compact=height<30
             cap.icon:SetSize(compact and 18 or 22,compact and 18 or 22)
             cap.caption:ClearAllPoints(); cap.caption:SetPoint("TOPLEFT",36,compact and -3 or -7)
-            cap.caption:SetFont(STANDARD_TEXT_FONT or "Fonts\\FRIZQT__.TTF",compact and 9 or 10,""); cap.caption:SetHeight(compact and 10 or 12)
+            T:Font(cap.caption,compact and 9 or 10); cap.caption:SetHeight(compact and 10 or 12)
             cap.tag:ClearAllPoints(); cap.tag:SetPoint("BOTTOMLEFT",36,compact and 3 or 6)
-            cap.tag:SetFont(STANDARD_TEXT_FONT or "Fonts\\FRIZQT__.TTF",compact and 8 or 9,""); cap.tag:SetHeight(compact and 10 or 12)
+            T:Font(cap.tag,compact and 8 or 9); cap.tag:SetHeight(compact and 10 or 12)
             cap.caption:SetText(keyName(base))
             cap:Show()
             page.keyboard.keys[base]=cap
@@ -1535,6 +1529,7 @@ function UI:BuildBindings(page)
     page.form:SetPoint("TOPLEFT", 0, -37)
     tooltip(page.form,"Action page preview","Choose which action page to inspect. This does not change your character's form. Travel and Aquatic use Base; Prowl uses Cat.")
     page.follow=CreateFrame("CheckButton",nil,page,"UICheckButtonTemplate")
+    T:Skin(page.follow,"check")
     page.follow:SetSize(24,24); page.follow:SetPoint("TOPLEFT",181,-38)
     if page.follow.text and page.follow.text.Hide then page.follow.text:Hide() end
     local followLabel=label(page.follow,"Follow form",10,C.text); followLabel:SetPoint("LEFT",26,0); followLabel:SetWidth(80)
@@ -1789,7 +1784,7 @@ function UI:BuildShare(page)
     page.clear=button(page,"Clear",80,function() page.transfer:SetText(""); page.transfer:ClearFocus(); UI.shareResult=nil; UI:RenderShare() end); page.clear:SetPoint("TOPRIGHT",0,-55)
     local shell=box("Frame",page,C.field); shell:SetPoint("TOPLEFT",0,-96); shell:SetPoint("BOTTOMRIGHT",0,108)
     local sf=CreateFrame("ScrollFrame",nil,shell,"UIPanelScrollFrameTemplate"); sf:SetPoint("TOPLEFT",10,-10); sf:SetPoint("BOTTOMRIGHT",-29,10)
-    local e=CreateFrame("EditBox",nil,sf); e:SetMultiLine(true); e:SetAutoFocus(false); e:SetFontObject(ChatFontNormal or GameFontHighlight)
+    local e=CreateFrame("EditBox",nil,sf); e:SetMultiLine(true); e:SetAutoFocus(false); e:SetFontObject(ChatFontNormal or GameFontHighlight); T:Font(e,12,C.text)
     e:SetSize(700,100); e:SetMaxLetters(2000000); sf:SetScrollChild(e); page.transfer=e
     self:ConfigureCopyScroll(e,sf)
     e:SetScript("OnEscapePressed",function(self) self:ClearFocus() end)
@@ -2097,7 +2092,9 @@ function UI:ShowPage(name)
 end
 function UI:Create()
     if self.frame then return end
+    T:UpdateColors()
     local f = CreateFrame("Frame", "KeybindOptimizerWindow", UIParent, "BasicFrameTemplateWithInset")
+    T:Skin(f,"frame")
     f:SetSize(860, 620)
     f:SetPoint("CENTER")
     f:SetFrameStrata("HIGH")
@@ -2130,6 +2127,7 @@ function UI:Create()
     title:ClearAllPoints()
     title:SetPoint("TOP", 0, -5)
     title:SetText("Hot Swap")
+    T:Font(title,14,C.accent)
     color(title, C.accent)
     self.subtitle = label(f, "Consistent controls. Deliberate changes.", 11, C.muted)
     self.subtitle:SetPoint("TOPLEFT", 22, -28)
@@ -2140,6 +2138,7 @@ function UI:Create()
     close:ClearAllPoints()
     close:SetPoint("TOPRIGHT", 0, 0)
     close:SetScript("OnClick", function() f:Hide() end)
+    T:Skin(close,"close")
     self.closeButton = close
     local inset = f.Inset or f.InsetBg
     if inset then
@@ -2157,6 +2156,7 @@ function UI:Create()
         b:SetID(i)
         b:SetText(id == "Safety" and "Backups" or (id=="Share" and "Import / export" or id))
         b.text = b:GetFontString()
+        T:Skin(b,"tab"); if b.text then T:Font(b.text,12,C.text) end
         local tabWidth = id == "Share" and 145 or 110
         b:SetSize(tabWidth, 32)
         -- Modern tabs resize themselves on show and display changes. Keep the

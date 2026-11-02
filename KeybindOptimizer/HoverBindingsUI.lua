@@ -169,7 +169,7 @@ function UI:OpenHoverBindings()
         f=W.box("Frame",self.frame,C.bg,"KeybindOptimizerHoverBindings")
         f:SetAllPoints(self.frame); f:SetFrameStrata("DIALOG"); f:SetFrameLevel(self.frame:GetFrameLevel()+55); f:EnableMouse(true); f:EnableMouseWheel(true)
         if f.SetIgnoreParentAlpha then f:SetIgnoreParentAlpha(true) end
-        local backing=f:CreateTexture(nil,"BACKGROUND",nil,-8); backing:SetAllPoints(); backing:SetColorTexture(C.bg[1],C.bg[2],C.bg[3],1)
+        local backing=f:CreateTexture(nil,"BACKGROUND",nil,-8); backing:SetAllPoints(); K.Themes:Texture(backing,C.opaque)
         W.label(f,"Hover bind",22):SetPoint("TOPLEFT",32,-31)
         f.subtitle=W.label(f,"",11,C.muted); f.subtitle:SetPoint("TOPLEFT",32,-65); W.truncate(f.subtitle,790)
         local instructions=W.label(f,"Hover an ability, then press a key. Use modifiers for additional keys. No casting.\nWheel over an ability binds it. Scroll over blank space or use the scrollbar to browse.",11,C.text)

@@ -39,6 +39,7 @@ function K:Init()
     -- Device-local preferences never travel with a shared binding preset.
     self.db.preferences=type(self.db.preferences)=="table" and self.db.preferences or {}
     local preferences=self.db.preferences
+    if preferences.theme~="classic" and preferences.theme~="modern" then preferences.theme="classic" end
     preferences.diagnostics=preferences.diagnostics==true
     for _,key in ipairs({"showMacroNames","showMacroCode","showUnavailableBindings","confirmReplacements","confirmSwaps"}) do
         if type(preferences[key])~="boolean" then preferences[key]=true end

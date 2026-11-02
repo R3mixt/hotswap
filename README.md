@@ -24,6 +24,14 @@ Version **1.0.0** is prepared for Classic Era / Hardcore user testing. Forever i
 
 *Layout preview generated from the actual Lua UI with sample data and substitute artwork. This is not an in-game screenshot.*
 
+### Theme previews (development)
+
+Choose **Classic** or **Modern** under **Settings → Window → Theme**. Classic remains the default. The choice applies immediately, stays local to your character, and preserves pending binding edits.
+
+![Modern theme offline preview](review/themes/modern-current.png)
+
+*Rendered from the actual addon UI without running WoW. Sample bindings, approximate icons and fonts. See the [theme guide](docs/themes.md), [Classic comparison](review/themes/classic-current.png), and [preview generation instructions](ui-qa/README.md). This feature is in development after the 1.0 release.*
+
 ## Install
 
 1. Download the installable addon ZIP from CurseForge, or get a verified build from a successful [GitHub Actions run](https://github.com/R3mixt/hotswap/actions/workflows/validate.yml).

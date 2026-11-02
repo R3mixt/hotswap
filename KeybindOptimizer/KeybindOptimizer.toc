@@ -23,6 +23,7 @@ Engine.lua
 AvailabilityEngine.lua
 Presets.lua
 CurrentBindings.lua
+Themes.lua
 ItemsUI.lua
 UI.lua
 LibraryUI.lua

@@ -114,6 +114,9 @@ end}
 function CreateFrame(kind,name,parent,template)
   local f=setmetatable({kind=kind,name=name,parent=parent,template=template,scripts={},events={},attributes={},shown=true,text="",checked=false},FrameMeta)
   Mock.frames[#Mock.frames+1]=f
+  if parent and (kind=="Texture" or kind=="FontString") then
+    parent.regions=parent.regions or {}; parent.regions[#parent.regions+1]=f
+  end
   if name then _G[name]=f end
   if template and template:find("BasicFrameTemplateWithInset",1,true) then
     f.TitleText=CreateFrame("FontString",nil,f)
@@ -184,9 +187,14 @@ function FrameMethods:SetTexture(value) self.texture=value end
 function FrameMethods:GetTexture() return self.texture end
 function FrameMethods:SetDesaturated(value) self.desaturated=value end
 function FrameMethods:SetVertexColor(...) self.vertexColor={...} end
+function FrameMethods:GetVertexColor() return unpack(self.vertexColor or {1,1,1,1}) end
 function FrameMethods:SetTextColor(...) self.textColor={...} end
+function FrameMethods:GetTextColor() return unpack(self.textColor or {1,1,1,1}) end
 function FrameMethods:SetColorTexture(...) self.colorTexture={...} end
 function FrameMethods:SetBackdropBorderColor(...) self.borderColor={...} end
+function FrameMethods:GetBackdropBorderColor() return unpack(self.borderColor or {1,1,1,1}) end
+function FrameMethods:SetBackdropColor(...) self.backdropColor={...} end
+function FrameMethods:GetBackdropColor() return unpack(self.backdropColor or {1,1,1,1}) end
 function FrameMethods:SetAllPoints(target) self.allPoints=target or self.parent end
 function FrameMethods:ClearAllPoints() self.point=nil; self.allPoints=nil end
 function FrameMethods:SetAtlas(value) self.atlas=value end
@@ -207,6 +215,10 @@ function FrameMethods:SetNormalFontObject(value) self.normalFontObject=value end
 function FrameMethods:SetHighlightFontObject(value) self.highlightFontObject=value end
 function FrameMethods:SetDisabledFontObject(value) self.disabledFontObject=value end
 function FrameMethods:SetBackdrop(value) self.backdrop=value end
+function FrameMethods:GetBackdrop() return self.backdrop end
+function FrameMethods:GetRegions()
+  return unpack(self.regions or {})
+end
 function FrameMethods:SetFontObject(value) self.fontObject=value end
 function FrameMethods:SetFont(path,size,flags) self.font={path,size,flags} end
 function FrameMethods:GetFont() return unpack(self.font or {STANDARD_TEXT_FONT,12,""}) end
@@ -216,10 +228,15 @@ function FrameMethods:SetMinMaxValues(a,b) self.minimum=a; self.maximum=b end
 function FrameMethods:GetMinMaxValues() return self.minimum or 0,self.maximum or 100 end
 function FrameMethods:CreateFontString(name) return CreateFrame("FontString",name,self) end
 function FrameMethods:CreateTexture(name) return CreateFrame("Texture",name,self) end
-function FrameMethods:SetEnabled(v) self.enabled=v end
+function FrameMethods:SetEnabled(v)
+  local enabled=v and true or false; local changed=self:IsEnabled()~=enabled
+  self.enabled=enabled
+  local script=enabled and self.scripts.OnEnable or self.scripts.OnDisable
+  if changed and script then script(self) end
+end
 function FrameMethods:IsEnabled() return self.enabled~=false end
-function FrameMethods:Enable() self.enabled=true end
-function FrameMethods:Disable() self.enabled=false end
+function FrameMethods:Enable() self:SetEnabled(true) end
+function FrameMethods:Disable() self:SetEnabled(false) end
 function FrameMethods:SetValue(v)
   local lo,hi=self:GetMinMaxValues(); v=math.max(lo,math.min(hi,v))
   local changed=self.value~=v; self.value=v

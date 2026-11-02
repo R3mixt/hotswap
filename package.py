@@ -25,7 +25,7 @@ TOC = "KeybindOptimizer.toc"
 MODULES = (
     "Core.lua", "Diagnostics.lua", "API.lua", "Protection.lua", "Profiles.lua", "Macros.lua", "Items.lua",
     "LibraryData.lua", "Availability.lua", "TalentBindings.lua", "Library.lua", "NativeBars.lua", "Planner.lua",
-    "Engine.lua", "AvailabilityEngine.lua", "Presets.lua", "CurrentBindings.lua", "ItemsUI.lua", "UI.lua", "LibraryUI.lua",
+    "Engine.lua", "AvailabilityEngine.lua", "Presets.lua", "CurrentBindings.lua", "Themes.lua", "ItemsUI.lua", "UI.lua", "LibraryUI.lua",
     "HoverBindingsUI.lua", "SettingsUI.lua", "Launcher.lua",
 )
 RUNTIME_FILES = (TOC, *MODULES, "README.md")
@@ -35,7 +35,7 @@ SOURCE_FILES = (
     "publishing/upload_curseforge.py", "publishing/curseforge.json",
     ".gitattributes", "build_library_data.py", "catalog-classification-input.json",
     "classification-source.json", "talent-classification-source.json",
-    "forever-talent-classification-source.json", "ui-qa/capture.py", "ui-qa/render.ps1",
+    "forever-talent-classification-source.json", "ui-qa/capture.py", "ui-qa/render.ps1", "ui-qa/README.md",
     "publishing/project.json", "publishing/curseforge-description.md", "publishing/changelog-1.0.0.txt",
     "publishing/logo.svg", "publishing/logo.png", "publishing/build-logo.ps1",
 )

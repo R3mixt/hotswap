@@ -6,6 +6,7 @@
 - [Behavior contract](behavior.md): exact 1.0 behavior and in-game acceptance steps.
 - [Compatibility checklist](compatibility.md): client-specific checks and known boundaries.
 - [Changelog](../CHANGELOG.md): changes by version.
+- [Themes and offline previews](themes.md): appearance settings and screenshots generated without WoW.
 
 ## Developers and reviewers
 

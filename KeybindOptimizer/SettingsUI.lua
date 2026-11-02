@@ -34,9 +34,14 @@ function UI:SetAppearance(key,value)
     return true
 end
 function UI:ResetAppearance()
+    if K.Engine and K.Engine.busy then self:UpdateBusyState(); return false,"Wait for the current update to finish." end
     local p=preferences(); p.windowOpacity,p.windowScale=1,1
+    K.Themes:Set("classic")
     self:FitWindows()
     if self.pages and self.pages.Settings then V:Render(self.pages.Settings,self,W) end
+end
+function UI:SetTheme(id)
+    return K.Themes:Set(id)
 end
 
 local function appearanceSlider(parent,title,y,key,low,high)
@@ -46,6 +51,7 @@ local function appearanceSlider(parent,title,y,key,low,high)
     slider:SetMinMaxValues(low,high); slider:SetValueStep(0.05)
     if slider.SetObeyStepOnDrag then slider:SetObeyStepOnDrag(true) end
     for _,part in ipairs({"Low","High","Text"}) do if slider[part] then slider[part]:Hide() end end
+    K.Themes:Skin(slider,"slider")
     slider.valueLabel=W.label(parent,"",12,C.accent); slider.valueLabel:SetPoint("LEFT",slider,"RIGHT",19,0); slider.valueLabel:SetWidth(76)
     slider:SetScript("OnValueChanged",function(_,value) if not V.rendering then UI:SetAppearance(key,value) end end)
     return slider
@@ -62,6 +68,7 @@ local function option(page,parent,key,title,detail,x,y,localPreference)
     local check=CreateFrame("CheckButton",nil,parent,"UICheckButtonTemplate")
     check:SetPoint("TOPLEFT",x,y); check:SetSize(26,26)
     if check.text then check.text:Hide() end
+    K.Themes:Skin(check,"check")
     W.label(check,title,12,C.text):SetPoint("LEFT",29,0)
     W.tooltip(check,title,detail)
     check.settingKey,check.localPreference=key,localPreference
@@ -128,6 +135,18 @@ function V:Build(page,ui,w)
     page.scale=appearanceSlider(appearance,"Scale",-117,"windowScale",0.7,1.3)
     page.resetAppearance=w.button(appearance,"Reset appearance",158,function() ui:ResetAppearance() end)
     page.resetAppearance:SetPoint("TOPLEFT",18,-177)
+    w.label(appearance,"Theme",11,C.text):SetPoint("TOPLEFT",414,-56)
+    page.theme=w.button(appearance,"",326,function(self)
+        ui:Menu(self,{{value="classic",label="Classic"},{value="modern",label="Modern"}},K.Themes:GetID(),function(id)
+            local ok,why=ui:SetTheme(id)
+            if not ok then ui:Notice(why or "Could not change the theme.",true) end
+        end)
+    end)
+    page.theme:SetPoint("TOPLEFT",414,-79)
+    page.themeDetail=w.label(appearance,"",12,C.muted)
+    page.themeDetail:SetPoint("TOPLEFT",414,-121); page.themeDetail:SetSize(326,65)
+    w.tooltip(page.theme,"Window theme","Classic keeps the familiar Warcraft textures. Modern uses flat slate panels and a cool accent. Applies immediately to Hot Swap only; bindings and shared presets stay unchanged.")
+    w.tooltip(page.resetAppearance,"Reset appearance","Restore the Classic theme, full opacity and 100% preferred scale. Binding confirmations and preset settings stay unchanged.")
     option(page,appearance,"confirmReplacements","Confirm replacing a binding","Ask before a spellbook drop or key reassignment replaces an occupied key. Apply changes is still required.",14,-218,true)
     option(page,appearance,"confirmSwaps","Confirm swapping bindings","Ask before exchanging two draft bindings. Apply & save is still required.",14,-253,true)
     local windowNote=w.label(appearance,"Changes apply immediately. The window fits the available screen space.\nUse /reload or log out to save preferences to disk.",11,C.muted)
@@ -138,6 +157,7 @@ function V:Build(page,ui,w)
     page.diagnostics=CreateFrame("CheckButton",nil,diagnostics,"UICheckButtonTemplate")
     page.diagnostics:SetPoint("TOPLEFT",14,-48); page.diagnostics:SetSize(26,26)
     if page.diagnostics.text then page.diagnostics.text:Hide() end
+    K.Themes:Skin(page.diagnostics,"check")
     w.label(page.diagnostics,"Enable diagnostic logging",12,C.text):SetPoint("LEFT",29,0)
     page.diagnostics:SetScript("OnClick",function(self)
         local ok,why=K.Diagnostics:SetEnabled(self:GetChecked() and true or false)
@@ -158,6 +178,11 @@ end
 function V:Render(page)
     if not page then return end
     local p=preferences(); self.rendering=true
+    if page.theme then
+        local modern=K.Themes:GetID()=="modern"
+        page.theme:SetText(modern and "Modern" or "Classic")
+        page.themeDetail:SetText(modern and "Flat slate panels, crisp typography and a cool blue accent." or "Familiar Warcraft textures, warm borders and gold highlights.")
+    end
     for _,entry in ipairs({{page.opacity,p.windowOpacity,0.4,1},{page.scale,p.windowScale,0.7,1.3}}) do
         local value=clamp(entry[2],entry[3],entry[4]) or 1
         entry[1]:SetValue(value); entry[1].valueLabel:SetText(math.floor(value*100+0.5).."%")
@@ -192,6 +217,7 @@ function V:OpenLog()
         local shell=W.box("Frame",f,C.field); shell:SetPoint("TOPLEFT",40,-117); shell:SetPoint("BOTTOMRIGHT",-40,100)
         local scroll=CreateFrame("ScrollFrame",nil,shell,"UIPanelScrollFrameTemplate"); scroll:SetPoint("TOPLEFT",10,-10); scroll:SetPoint("BOTTOMRIGHT",-29,10)
         local text=CreateFrame("EditBox",nil,scroll); text:SetMultiLine(true); text:SetAutoFocus(false); text:SetFontObject(ChatFontNormal or GameFontHighlight)
+        K.Themes:Font(text,12,C.text)
         text:SetSize(700,300); text:SetMaxLetters(2000000); scroll:SetScrollChild(text); f.text=text
         UI:ConfigureCopyScroll(text,scroll)
         text:SetScript("OnEscapePressed",function() f:Hide() end)
