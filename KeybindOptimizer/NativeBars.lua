@@ -79,6 +79,22 @@ function N:PendingItemBody(action)
  return "#showtooltip "..condition..tostring(item)
 end
 function N:MakeMacro(action,settings,force)
+ if action.nativeHidden then
+  -- Native positions stay reserved but empty. Overflow has no native slot,
+  -- so reserve its key with a harmless shared macro instead of exposing an
+  -- unrelated previous binding while the intended ability is unavailable.
+  action.body=action.nativeOverflow and "#showtooltip" or nil
+  action.nativeMacro=action.nativeOverflow and true or nil
+  action.nativePending=nil; action.macroName=nil; action.macroIndex=nil
+  return true
+ end
+ if action.talentChoices and not action.known then
+  -- A choice list is resolved from learned spells outside combat. A partial
+  -- or unknown choice must not execute a stale cast/cancelform fallback.
+  action.nativeMacro=true; action.nativePending=true
+  action.body="#showtooltip "..tostring(action.displayName or action.name or action.label or "")
+  return true
+ end
  if action.kind=="macroref" then
   if action.nativeBlockAlt then
    return false,"This macro shares a main-bar position with an Alt self-cast spell. Put the macro on a shared utility key to preserve its text and safe self-casting."
@@ -123,7 +139,11 @@ function N:Prepare(plan)
  local main,extra={},{}
  local druid=plan.class=="DRUID"
  for _,a in ipairs(plan.actions or {}) do
-  a.nativeSlot=nil; a.nativeCommand=nil
+  a.nativeSlot=nil; a.nativeCommand=nil; a.nativeOverflow=nil
+  if K.Availability then
+   K.Availability:Annotate(a,plan.class,plan.flavor or (plan.settings and plan.settings.flavor))
+   a.nativeHidden=K.Availability:IsHidden(a,plan.settings) or nil
+  else a.nativeHidden=nil end
   if a.kind=="system" then
    if a.key then layout.keys[a.key]={command=a.command} end
   elseif a.key and a.form~="prowl" then
@@ -149,7 +169,7 @@ function N:Prepare(plan)
   local hasSelf=false
   for _,a in ipairs(group.actions) do if a.selfKey then hasSelf=true; layout.keys[a.selfKey]={command=command} end end
   for _,a in ipairs(group.actions) do
-   a.nativeBlockAlt=hasSelf and not a.selfKey or nil
+   a.nativeBlockAlt=(hasSelf and not a.selfKey) or (a.talentHasHelpful and not (a.targeting=="help" and not a.noSelf)) or nil
    local ok,why=self:MakeMacro(a,plan.settings,a.nativeBlockAlt); if not ok then return nil,why end
    local page=druid and formPages[a.form] or 1
    ok,why=place(a,page,index,command); if not ok then return nil,why end
@@ -172,6 +192,8 @@ function N:Prepare(plan)
  for index,a in ipairs(extra) do
   local bank=math.floor((index-1)/12)+1; local button=(index-1)%12+1
   local bar=available[bank]
+  a.nativeOverflow=not bar or nil
+  a.nativeBlockAlt=(a.talentHasHelpful and not (a.targeting=="help" and not a.noSelf)) or nil
   local ok,why=self:MakeMacro(a,plan.settings,not bar); if not ok then return nil,why end
   local binding
   if bar then
@@ -333,7 +355,7 @@ function N:WriteSlot(index,data)
  if not sameContent(readSlot(index),data) then error("Action-bar verification failed at slot "..index) end
 end
 local function contentFor(a)
- if not a then return false end
+ if not a or a.nativeHidden then return false end
  if a.kind=="macroref" then
   local index=GetMacroIndexByName(a.macroName or "")
   local name,icon,body=GetMacroInfo(index or 0)
@@ -350,6 +372,59 @@ local function contentFor(a)
  end
  if a.known and a.spellID then return {kind="spell",id=a.spellID} end
  return false
+end
+-- These narrow helpers let bounded maintenance compare the installed slot to
+-- its previous owned content before learning/respec changes replace anything.
+function N:ContentFor(action) return contentFor(action) end
+function N:ReadSlot(index) return readSlot(index) end
+function N:SameContent(a,b) return sameContent(a,b) end
+local macroButtonPrefixes={"ActionButton","MultiBarBottomLeftButton","MultiBarBottomRightButton","MultiBarRightButton","MultiBarLeftButton","MultiBar5Button","MultiBar6Button","MultiBar7Button"}
+local function setMacroText(button)
+ if combat() then N.pendingMacroText=true; return end
+ local name=button and button.Name
+ if not name and button and button.GetName then
+  local global=button:GetName(); name=global and _G[global.."Name"]
+ end
+ if not name or type(name.SetAlpha)~="function" then return end
+ local shown=not K.db or not K.db.preferences or K.db.preferences.showMacroNames~=false
+ N.macroNameAlpha=N.macroNameAlpha or setmetatable({},{__mode="k"})
+ if not shown then
+  if N.macroNameAlpha[name]==nil then N.macroNameAlpha[name]=name.GetAlpha and name:GetAlpha() or 1 end
+  name:SetAlpha(0)
+ elseif N.macroNameAlpha[name]~=nil then
+  name:SetAlpha(N.macroNameAlpha[name]); N.macroNameAlpha[name]=nil
+ end
+end
+function N:ApplyMacroTextPreference()
+ -- Blizzard's original button.Name fontstring is cosmetic and separate from
+ -- HotKey/Count. Never rename macros, replace button methods, or hide protected
+ -- buttons. A secure post-hook reapplies the choice after native page updates.
+ if not self.macroTextEvents and CreateFrame then
+  self.macroTextEvents=CreateFrame("Frame")
+  self.macroTextEvents:RegisterEvent("PLAYER_REGEN_ENABLED")
+  self.macroTextEvents:RegisterEvent("ADDON_LOADED")
+  self.macroTextEvents:SetScript("OnEvent",function() N:ApplyMacroTextPreference() end)
+ end
+ if combat() then self.pendingMacroText=true; return false end
+ self.pendingMacroText=nil
+ self.macroTextHooks=self.macroTextHooks or setmetatable({},{__mode="k"})
+ for _,prefix in ipairs(macroButtonPrefixes) do for index=1,12 do
+  local button=_G[prefix..index]
+  if button then
+   if not self.macroTextHooks[button] and hooksecurefunc then
+    -- Mixins are copied onto existing instances, so hook the actual button's
+    -- Update method rather than a mixin table that only affects future buttons.
+    if type(button.Update)=="function" then hooksecurefunc(button,"Update",setMacroText)
+    elseif button.HookScript then button:HookScript("OnShow",setMacroText) end
+    self.macroTextHooks[button]=true
+   end
+   setMacroText(button)
+  end
+ end end
+ if not self.legacyMacroTextHook and type(ActionButton_Update)=="function" and hooksecurefunc then
+  hooksecurefunc("ActionButton_Update",setMacroText); self.legacyMacroTextHook=true
+ end
+ return true
 end
 local function refreshBars()
  if combat() then return end

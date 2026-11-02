@@ -2,8 +2,46 @@ local function settingsUI()
     local k=TestAddon; k:Init(); k.UI:Open(); k.UI.nav.Settings:Click()
     return k,k.UI.pages.Settings
 end
+
+function Tests.settings_ui_talent_choices_order_remove_reset_and_escape_are_staged_only()
+    local k=settingsUI(); k.UI:ShowPage("Bindings")
+    local primary
+    for _,action in ipairs(k.UI.plan.actions) do if action.id=="druid.form_moonkin" then primary=action end end
+    assert(primary and k.UI:CanEditTalentChoices(primary),"Moonkin utility has no talent-choice editor")
+    k:GetSettings().actionOverrides[primary.id]={spellID=24858}
+    assert(not k.UI:CanEditTalentChoices(primary),"A fixed-rank binding exposed incompatible talent choices")
+    k:GetSettings().actionOverrides[primary.id]={replacement={kind="spell",spellID=24858}}
+    assert(not k.UI:CanEditTalentChoices(primary),"A replaced action exposed incompatible talent choices")
+    k:GetSettings().actionOverrides[primary.id]=nil
+    k.UI.selectedAction=primary; k.UI:BindingDetail(primary); Mock:ResetWrites()
+    k.UI.pages.Bindings.detail.talents:Click()
+    local f=k.UI.talentDialog
+    assert(f and f:IsShown() and f.rows[1].choiceID==primary.id,"Talent choices did not open on the selected key")
+    assert(not f.rows[1].remove:IsEnabled(),"The last talent choice could be removed")
+    f.add:Click()
+    local option
+    for _,row in ipairs(k.UI.menu.panel.rows) do if row.text:GetText()=="Nature's Swiftness" then option=row end end
+    assert(option,"Nature's Swiftness missing from eligible talent choices")
+    option:Click()
+    local choices=k.TalentBindings:GetChoices(primary.id)
+    assert(#choices==2 and choices[1]==primary.id and choices[2]=="druid.natures_swiftness","Adding a talent did not preserve its ordered choices")
+    f.rows[2].up:Click()
+    choices=k.TalentBindings:GetChoices(primary.id)
+    assert(choices[1]=="druid.natures_swiftness" and choices[2]==primary.id,"Talent choice order did not change")
+    f.rows[2].remove:Click()
+    choices=k.TalentBindings:GetChoices(primary.id)
+    assert(#choices==1 and choices[1]=="druid.natures_swiftness","Primary choice could not be removed")
+    f.reset:Click()
+    choices=k.TalentBindings:GetChoices(primary.id)
+    assert(#choices==1 and choices[1]==primary.id,"Reset did not restore the original primary choice")
+    assert(not k:GetSettings().talentAlternatives[primary.id],"Reset retained a configured group that would block future rank or replacement edits")
+    assert(#Mock.writes==0 and k.dirty,"Talent choices applied game changes before Apply & save")
+    Mock:KeyDown("ESCAPE"); Mock:Advance(0.1)
+    assert(not f:IsShown() and k.UI.frame:IsShown(),"Talent-choice Escape closed the whole addon")
+end
 function Tests.settings_ui_appearance_is_local_immediate_and_fits_the_keyboard_with_spellbook()
     local k,page=settingsUI(); Mock:ResetWrites()
+    page.sectionButtons.Window:Click()
     local exported=k:Export(); local dirty=k.dirty
     assert(k.UI.activePage=="Settings" and k.UI.nav.Settings:GetText()=="Settings","Settings has no usable main tab")
     for _,tab in pairs(k.UI.nav) do
@@ -28,6 +66,7 @@ end
 
 function Tests.settings_ui_diagnostics_default_off_copy_and_clear_have_explicit_controls()
     local k,page=settingsUI(); Mock:ResetWrites()
+    page.sectionButtons.Diagnostics:Click()
     local exported=k:Export()
     assert(not page.diagnostics:GetChecked() and not k.Diagnostics:IsEnabled(),"Diagnostic logging was enabled by default")
     k.Diagnostics:Record("error","fixture","Should not be recorded")
@@ -61,6 +100,7 @@ end
 
 function Tests.settings_ui_caught_exceptions_log_once_only_when_enabled_and_keep_the_original_notice()
     local k,page=settingsUI(); local traces=0
+    page.sectionButtons.Diagnostics:Click()
     debugstack=function() traces=traces+1; return "UI.lua:272: operation\nDomain.lua:12: rejected" end
     local owner={Fail=function() error("Original UI failure",0) end,Validate=function() return false,"Invalid setting" end}
     k.UI:Call(owner,"Fail","PRIVATE ARGUMENT",{private=true})
@@ -79,4 +119,68 @@ function Tests.settings_ui_caught_exceptions_log_once_only_when_enabled_and_keep
     k.Diagnostics.Record=function() error("Logger failure") end
     k.UI:Call(owner,"Fail")
     assert(k.UI.notice=="Original UI failure","Logging failure obscured the original UI error")
+end
+
+function Tests.settings_ui_control_protections_stage_per_preset_and_spells_only_protects_all_categories()
+    Mock.bindings.W="MOVEFORWARD"
+    local k,page=settingsUI(); Mock:ResetWrites()
+    local keys={"preserveMovement","preserveCamera","preserveChat","preserveInterface","preserveTargeting","preserveGameSettings"}
+    assert(page.sections.Controls:IsVisible() and not page.sections.Window:IsVisible(),"Settings did not open its Controls section")
+    for _,key in ipairs(keys) do assert(k:GetSettings()[key]==false and not page[key]:GetChecked(),"New protection silently changed an existing preset") end
+    local original=k:Export()
+    page.preserveMovement:Click()
+    assert(k:GetSettings().preserveMovement and k.dirty,"Control checkbox was not staged in this preset")
+    assert(k:Export()~=original,"Preset export omitted the protection preference")
+    page.spellsOnly:Click()
+    for _,key in ipairs(keys) do assert(k:GetSettings()[key] and page[key]:GetChecked(),"Spells only missed "..key) end
+    assert(#Mock.writes==0,"Protection settings edited live bindings before Apply")
+    k.UI:ShowPage("Bindings")
+    local cap=k.UI.pages.Bindings.keyboard.keys.W
+    assert(cap.action and cap.action.preserved,"Protected game control disappeared from the keyboard")
+    cap:Click()
+    assert(not k.UI.capture or not k.UI.capture:IsShown(),"Protected control entered key capture")
+    assert(not k.UI.pages.Bindings.detail.rebind:IsEnabled(),"Protected control retained a rebind button")
+    local candidate
+    for _,action in ipairs(k.UI.plan.actions) do if action.id=="druid.rejuvenation" then candidate=action end end
+    assert(candidate and not k.UI:AssignBinding(candidate,"W"),"A spell could replace protected movement")
+    assert(not k.UI:AssignBinding(candidate,"F"),"A spell could replace a protected key outside the fixed movement reservations")
+    k.UI.libraryEntry={id=candidate.id,actionID=candidate.id,label=candidate.label}
+    assert(not k.UI:DropLibraryEntry("F"),"Spellbook drop could replace a protected targeting control")
+    assert(Mock.bindings.W=="MOVEFORWARD" and #Mock.writes==0,"Editing the preview changed protected controls")
+end
+
+function Tests.settings_ui_local_macro_and_spell_visibility_preserve_presets_and_reserved_keys()
+    Mock:SetDefaultDruid()
+    local learned={}
+    for _,spell in ipairs(Mock.spells) do if spell.id~=24858 and spell.id~=5176 and spell.id~=5177 then learned[#learned+1]=spell end end
+    Mock.spells=learned
+    local k,page=settingsUI(); page.sectionButtons["Action bars"]:Click(); Mock:ResetWrites()
+    local original=k:Export(); local refreshes=0
+    k.NativeBars.ApplyMacroTextPreference=function() refreshes=refreshes+1 end
+    page.showMacroNames:Click(); page.showMacroCode:Click()
+    assert(k.db.preferences.showMacroNames==false and refreshes==1,"Macro-label preference did not refresh native labels")
+    assert(k.db.preferences.showMacroCode==false,"Macro-code preference was not stored locally")
+    assert(k.UI:MacroDetail({body="/cast PRIVATE",source="Curated",id="fixture"})=="Curated","Hidden macro code remained in tooltip content")
+    k.UI:ShowPage("Bindings")
+    local primary=k.UI.pages.Bindings.keyboard.keys["1"]
+    assert(primary.action and primary.action.known==false and primary.locked,"Unlearned primary fixture was not reserved")
+    local position=primary.action.key
+    local talent
+    for _,action in ipairs(k.UI.plan.actions) do if action.id=="druid.form_moonkin" then talent=action end end
+    assert(talent and k.UI:SpellAvailability(talent)=="talent","Unknown talent was not distinguished from normal unlearned abilities")
+    k.UI.pinnedLayer="CTRL-"; k.UI:RenderKeyboard()
+    local talentCap=k.UI.pages.Bindings.keyboard.keys.MOUSEWHEELUP
+    assert(talentCap.lockBadge:GetText()=="T" and talentCap.lockBadge:IsShown(),"Talent reservation did not get its distinct badge")
+    k.UI.pinnedLayer=""; k.UI:RenderKeyboard()
+    k.UI:ShowPage("Settings"); page.showUnavailableBindings:Click(); k.UI:ShowPage("Bindings")
+    primary=k.UI.pages.Bindings.keyboard.keys["1"]
+    assert(primary.action.key==position and primary.tag:GetText()=="Reserved" and not primary.icon:IsShown(),"Hiding unavailable abilities moved or exposed their reserved key")
+    primary:Click(); assert(not k.UI.capture or not k.UI.capture:IsShown(),"A hidden reserved slot entered an unexpected rebind")
+    for _,entry in ipairs(k.UI.library.entries) do assert(not k.UI:IsEditorHidden(entry),"Spellbook ignored unavailable filtering") end
+    k.UI.bindingView="list"; k.UI:RenderBindings()
+    for _,row in ipairs(k.UI.pages.Bindings.list.rows) do if row:IsShown() then assert(not k.UI:IsEditorHidden(row.action),"Binding list ignored unavailable filtering") end end
+    assert(k:Export()==original,"Local display preferences changed the shared preset")
+    k.UI:ShowPage("Settings"); page.hideUnavailableSpells:Click(); page.adaptTalents:Click()
+    assert(k:GetSettings().hideUnavailableSpells and k:GetSettings().adaptTalents and k.dirty,"Native bar options were not staged")
+    assert(#Mock.writes==0,"Visibility edits changed live bars before Apply")
 end

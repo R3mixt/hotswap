@@ -8,8 +8,8 @@ Status: prepared locally; the author dashboard was opened, but its project-creat
 - `publishing/curseforge-description.md`: player-facing description.
 - `publishing/logo.png`: original project logo; `logo.svg` is its editable source.
 - `CHANGELOG.md`: release notes.
-- `dist/HotSwap-0.3.3.zip`: game installation ZIP produced by `python package.py`.
-- `dist/HotSwap-0.3.3-source.zip`: separate development archive; do not use as the primary game-install file.
+- `dist/HotSwap-0.4.0.zip`: game installation ZIP produced by `python package.py`.
+- `dist/HotSwap-0.4.0-source.zip`: separate development archive; do not use as the primary game-install file.
 - SHA-256 manifests: verify the file you upload matches the reviewed build.
 
 The default license is All Rights Reserved with permission for personal gameplay. It does not grant others permission to republish modified copies. A broader open-source license can be chosen deliberately later.

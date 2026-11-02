@@ -51,3 +51,17 @@ Independent review found that old backups lack hidden mouse state and cannot rep
 Regression coverage exercises default and custom mouse controls, additional hidden aliases, failed reads, closed-window Apply, selective updates, displaced/manual keys, dual-set recovery and rollback. Live-client retesting is still required for real camera/target/interact input delivery.
 
 Final 0.3.3 review also injected a personal mouse edit after recovery backup. Both successful repair and later-failure rollback preserve that edit without rewriting the original backup. The final integrated validation result is recorded in the generated release validation report.
+
+## 0.4.0 follow-up — 1 November 2026
+
+Control protections now classify actual current commands and reserve their keys before spell allocation, including hidden mouse aliases and Alt-self collisions. Independent review found and fixed a linked-page allocation defect: a protected Alt alias on a healing page must rehome the entire native position across Cat/Bear/Base/Moonkin. Protected explicit spell pins and global preset shortcuts stop in preview. Dynamic macro/frame names containing CAMERA or CHAT are not classified as native controls. Unreadable registry state fails closed.
+
+Availability and ordered talent choices are separate from UI rendering and protected mutations. Shared choices resolve only from learned spells, retain a stable destination, preserve other keys, and reserve Alt consistently across helpful/non-helpful alternatives. Explicit reset, rank/replacement edits and copying the displayed alternate were reviewed together to prevent stale target/rank metadata. Typed exports validate order, class identity, limits and target capability.
+
+The new availability worker uses the installed plan, verifies owned slot/key content before each write, retains manual-edit detachment across events and rollback, and guards binding-set changes. Failure injection covers slot placement/cursor cleanup, overflow saves, manual edits during jobs and rollback. Obsolete generated macros are removed by a separate one-per-frame idle worker only after successful commit and only when no native slot or binding references them. Named backups recreate missing owned macros by exact body when needed.
+
+Settings has four native subsections. Geometry previews for Controls, Action bars, Window, Diagnostics and Talent choices were inspected; a clipped multiline window note was fixed. Cosmetic macro visibility changes only original fontstrings and defers in combat. Local display preferences do not travel in presets. Availability badges and hidden editor entries retain physical key positions.
+
+The release packaging step reruns the integrated Lua 5.1 suite and records its exact result. Source review, failure injection and geometry previews are complete; real-client protected execution, font rendering, event timing, camera input and talent-respec behavior still require the acceptance checks in compatibility.md.
+
+Final integrated validation: **331/331 scenarios passed** using the actual Lua 5.1 modules and mocked WoW APIs. The package contains 21 runtime modules; ZIP integrity and explicit manifest checks passed.

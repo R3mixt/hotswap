@@ -1,8 +1,8 @@
-# Hot Swap 0.3.3
+# Hot Swap 0.4.0
 
 A configurable World of Warcraft addon for stable class bindings, druid form pages, mouseover/focus macros, Alt self-cast, and selectable on-use items.
 
-**Status: installable beta.** Version 0.3.3 preserves bindings and mouse controls that the selected preset does not assign. It retains command validation, diagnostic logging, window settings, Blizzard's original action bars, a miniature spellbook editor, and bounded setup/recovery jobs. The actual Lua modules are checked using Lua 5.1 and mocked WoW APIs; real-client behavior still needs a retest. Geometry previews approximate artwork and fonts and are not game screenshots.
+**Status: installable beta.** Version 0.4.0 adds protected game-control categories, macro display preferences, unavailable-spell visibility, and ordered talent choices on shared keys. Bindings and mouse controls outside the selected preset remain unchanged. It retains command validation, diagnostic logging, window settings, Blizzard's original action bars, a miniature spellbook editor, and bounded setup/recovery jobs. The actual Lua modules are checked using Lua 5.1 and mocked WoW APIs; real-client behavior still needs a retest. Geometry previews approximate artwork and fonts and are not game screenshots.
 
 ## Install and open
 
@@ -12,7 +12,7 @@ A configurable World of Warcraft addon for stable class bindings, druid form pag
 4. Open **Hot Swap** from the Escape menu or **Options → AddOns → Hot Swap → Open Hot Swap**. `/hotswap` also works. Select the client automatically or explicitly, record your side buttons, and choose whether to use the wheel and middle click.
 5. Click **Optimize** to create and use a new recommended preset with your selected mouse controls and items. The original preset remains saved. On **Presets**, you can also create or duplicate any custom mode, edit **Bindings**, **Setup**, and **Items**, then choose **Apply & save** outside combat.
 
-Opening the window or selecting a preset does not change live bindings. **Apply & save** records a named backup first, creates the needed macros, populates the original action bars, enables required extra bars, updates the keys explicitly assigned by the preset, sets self-cast options and saves character bindings. Unrelated bindings and mouse controls remain unchanged. No outside application, subscription, or library is required to run the addon.
+Opening the window or selecting a preset does not change live bindings. **Apply & save** records a named backup first, creates the needed macros, populates the original action bars, enables required extra bars, updates the keys explicitly assigned by the preset, sets self-cast options unless protected, and saves character bindings. Unrelated bindings and mouse controls remain unchanged. No outside application, subscription, or library is required to run the addon.
 
 When a new layout stops using a key previously assigned by Hot Swap, the addon restores that key's earlier binding only if its current binding still matches Hot Swap's last assignment. If you changed the key yourself afterward, that change is preserved. An explicitly assigned key in the new preset still takes precedence; Review lists those expected replacements.
 
@@ -50,7 +50,7 @@ Open **Spellbook** beside the keyboard to browse spells by specialization / skil
 
 The binding editor offers supported targeting modes, such as target, mouseover, focus and self, with a small badge and tooltip. Helpful spells preserve Alt-self precedence where allowed. Existing macro references preserve their text; missing or changed macros are reported for review instead of silently recreated. Targeting controls do not rewrite arbitrary user macro text.
 
-Unlearned spells use the current client's spell database for their real icon and native tooltip, with amber unavailable styling. You can rebind them before learning them; display metadata never makes an unlearned action castable. A spell absent from this client's database retains a named placeholder rather than borrowing a different expansion's spell. Empty item slots identify the missing selection separately from unlearned spells.
+Unlearned spells use the current client's spell database for their real icon and native tooltip. Amber **L** marks ordinary unlearned spells; blue **T** marks a talent ability that is not learned. You can rebind them before learning them; display metadata never makes an unlearned action castable. A spell absent from this client's database retains a named placeholder rather than borrowing a different expansion's spell. Empty item slots identify the missing selection separately from unlearned spells.
 
 Escape ends mouse recording or closes an action picker first, keeping the main window open. A subsequent Escape closes the main window. Opening the settings category or game-menu shortcut never applies a layout automatically.
 
@@ -58,9 +58,17 @@ The interface reuses its preview between relevant changes, updates only the visi
 
 ## Settings and troubleshooting
 
-**Settings** controls this character's window opacity (40–100%) and preferred scale (70–130%). Changes take effect immediately. The window reduces its effective scale when necessary to fit the screen and spellbook. **Reset appearance** restores the defaults. These preferences stay local when importing or switching binding presets.
+**Settings → Controls** lets each preset preserve movement, camera/selection, chat, targeting, other interface controls, and casting settings. **Spells only** checks all six. Checked categories keep their existing keys, including custom remaps; automatic spell assignments choose another free key. A manually pinned spell on a protected key must be changed before Apply. Unrelated keys are preserved regardless of these checkboxes. Protection takes effect with **Apply & save** and travels with preset exports.
 
-**Enable diagnostic logging** is off by default. Turn it on before reproducing a problem. It keeps the latest 200 Hot Swap entries, including setup phases, failures, key/command, backup identifier, rollback outcome and bounded stack traces when available. It captures uncaught errors that identify Hot Swap; it is not a general other-addon error collector and never replaces the game's existing error presentation. Logs do not contain raw preset exports or macro bodies from context fields and are never uploaded automatically.
+**Settings → Action bars** provides two preset options: **Hide unavailable spells on action bars** leaves unknown spell slots empty, and **Adapt to learned talents** does this for talent abilities only. Slots and keys stay reserved. Learning or resetting talents refreshes the applied layout outside combat, without applying draft edits or overwriting personal bar changes. Blizzard's **Always Show Action Bars** setting may still show empty button borders; Hot Swap does not hide protected native button frames.
+
+The same section has character-local display controls: **Show macro names on action buttons**, **Show macro code in Hot Swap tooltips**, and **Show unavailable spells in the editor**. They apply immediately and do not travel in shared presets. Macro-name changes defer while in combat. Hiding editor entries does not delete their bindings. All options retain prior behavior until changed.
+
+To share a key between talents, select a shared utility binding in **Bindings** and open **Talent choices**. Add and order up to eight choices; the first learned ability wins. For example, a key can offer Moonkin Form, then Nature's Swiftness. If neither is learned, it stays inactive. Changes follow actual learned spells, not a guessed specialization. Other keys remain unchanged, including any separate binding for a chosen ability. Choices are saved per preset and included in imports/exports. Fixed-rank or replacement edits are separate choices; use Default targeting when alternatives have different target capabilities. **Apply & save** installs the list; later talent changes update owned positions outside combat.
+
+**Settings → Window** controls this character's window opacity (40–100%) and preferred scale (70–130%). Changes take effect immediately. The window reduces its effective scale when necessary to fit the screen and spellbook. **Reset appearance** restores the defaults. These preferences stay local when importing or switching binding presets.
+
+**Settings → Diagnostics → Enable diagnostic logging** is off by default. Turn it on before reproducing a problem. It keeps the latest 200 Hot Swap entries, including setup phases, failures, key/command, backup identifier, rollback outcome and bounded stack traces when available. It captures uncaught errors that identify Hot Swap; it is not a general other-addon error collector and never replaces the game's existing error presentation. Logs do not contain raw preset exports or macro bodies from context fields and are never uploaded automatically.
 
 Use **View / copy log → Select text → Ctrl+C** to share the output or paste it into an external text file. After reproducing, `/reload` or log out so WoW writes the log into this character's `SavedVariables/KeybindOptimizer.lua` file. The file also contains personal presets and backups; share the copied diagnostic text when you only want to share diagnostics. Disabling logging preserves existing entries; **Clear log** removes them.
 

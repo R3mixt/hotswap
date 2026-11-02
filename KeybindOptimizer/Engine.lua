@@ -520,7 +520,7 @@ function E:ValidatePlanCommands(plan,layout,presetState)
     end
     return true
 end
-function E:MergeBindings(current,planned,previousPlan,baseline)
+function E:MergeBindings(current,planned,previousPlan,baseline,protectedKeys)
     local result,ownership=K.Copy(current),{}
     local previous=previousPlan and previousPlan.bindingOwnership
     if not previous then
@@ -535,7 +535,7 @@ function E:MergeBindings(current,planned,previousPlan,baseline)
         end
     end
     for key,entry in pairs(previous) do
-        if planned[key]==nil and current[key]==entry.command then result[key]=entry.previous or nil end
+        if planned[key]==nil and not (protectedKeys and protectedKeys[key]) and current[key]==entry.command then result[key]=entry.previous or nil end
     end
     for key,command in pairs(planned) do
         local old=previous[key]
@@ -552,6 +552,12 @@ function E:Apply(plan)
     if not plan or #(plan.errors or {})>0 then return self:Reject(plan and plan.errors[1] or "Create a preview first.") end
     local layout,why=nativePrepare(plan); if not layout then return self:Reject(why) end
     local valid,problem=self:ValidatePlanCommands(plan,layout); if not valid then return self:Reject(problem) end
+    local protected,_,protectionError=K.Protection:Build(plan.settings)
+    if not protected then return self:Reject(protectionError) end
+    for key in pairs(layout.keys or {}) do
+        if protected[key] then return self:Reject("The protected control on "..key.." changed. Review the layout before applying.") end
+    end
+    plan.protectedKeys=protected
     local needed,available=K.Macros:Budget(plan)
     if needed>available then return self:Reject("Not enough free macro slots. No changes were made.") end
     local job={kind="apply",plan=plan,previous=runtimeState(),created={}}
@@ -567,11 +573,15 @@ function E:Apply(plan)
     addStep(job.steps,function()
         local bindings,err=K.NativeBars:BindingMap(plan)
         if not bindings then error(err or "Could not prepare native bindings.") end
-        local expected,ownership=E:MergeBindings(job.currentBindings,bindings,job.previous.enabled and job.previous.appliedPlan,job.previous.baseline)
+        local protected,_,problem=K.Protection:Build(plan.settings)
+        if not protected then error(problem) end
+        for key in pairs(bindings) do if protected[key] then error("A protected control changed on "..key..". Review the layout.") end end
+        local expected,ownership=E:MergeBindings(job.currentBindings,bindings,job.previous.enabled and job.previous.appliedPlan,job.previous.baseline,protected)
         plan.bindingOwnership=ownership; job.expected=expected
         insertSteps(job,bindingSteps(job,expected))
     end,"Preparing replacement bindings",true,false)
     addStep(job.steps,function()
+        if plan.settings.preserveGameSettings then return end
         if SetModifiedClick then SetModifiedClick("SELFCAST","ALT"); SetModifiedClick("FOCUSCAST","NONE") end
         if job.before.cvars.autoSelfCast~=nil then setCVar("autoSelfCast","0") end
         if GetModifiedClick and (GetModifiedClick("SELFCAST")~="ALT" or GetModifiedClick("FOCUSCAST")~="NONE") then error("The client rejected self-cast settings.") end
@@ -724,6 +734,7 @@ function E:Activate(plan)
     return self:RepairLearnedActions(plan)
 end
 function E:RepairLearnedActions(plan,itemsOnly)
+    if not itemsOnly and K.AvailabilityEngine and K.AvailabilityEngine:Handles(plan) then return K.AvailabilityEngine:Repair(plan) end
     if self.busy then return "pending","Form maintenance is already queued." end
     if inCombat() then return false,"Form maintenance waits until combat ends." end
     local forms=itemsOnly and {} or K.API:GetForms(); local changes={}; local book
@@ -821,3 +832,6 @@ function E:RepairLearnedActions(plan,itemsOnly)
     return self:StartJob(job)
 end
 function E:RepairItemActions(plan) return self:RepairLearnedActions(plan,true) end
+-- The availability worker uses the same bounded runner and macro ownership
+-- operations, without access to full binding replacement or preset mutation.
+E.AvailabilityRuntime={addStep=addStep,macroSteps=macroSteps}

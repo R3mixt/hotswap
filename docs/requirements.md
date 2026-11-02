@@ -1,4 +1,4 @@
-# Requirement map — 0.3.3 beta
+# Requirement map — 0.4.0 beta
 
 The final release targets WoW Forever. Classic Era / Hardcore is the temporary development target. Retail is not a supported release target. Automated tests use Lua 5.1 with mocked game APIs; a passing suite does not certify protected execution inside either client.
 
@@ -13,6 +13,10 @@ The final release targets WoW Forever. Classic Era / Hardcore is the temporary d
 | Complete preset modes | Create, duplicate, rename, delete, edit and activate complete layouts on Presets tab | No fixed preset count; individual layouts and import payloads have defensive size bounds |
 | Preset shortcuts | A global activation key per named preset | Out of combat; all saved modes participate in shortcut conflict checks |
 | Preserve unrelated controls | Apply updates only keys explicitly assigned by the selected preset; unrelated bindings and mouse controls remain unchanged | An explicit new assignment takes precedence on that key |
+| Protect game controls | Preset checkboxes for movement, camera, chat, targeting, interface and casting settings; Spells only enables all | Protects current custom keys; pinned conflicts block Apply rather than overriding the control |
+| Macro display | Separate native macro-name and tooltip-code switches | Character-local; cosmetic native fontstrings only, deferred during combat |
+| Unavailable abilities | L/T badges, native tooltips, editor filter and optional empty native positions | Native empty-grid borders follow Blizzard settings; keys remain reserved |
+| Talent-aware shared keys | Explicit ordered class talent choices; first learned wins | Outside combat; no rotation decisions or guessed dominant specialization; separate existing keys remain |
 | Release previous Hot Swap keys | A key no longer used by the addon regains its prior binding only while its current command still matches Hot Swap's last assignment | Later manual changes are preserved |
 | Apply and recover safely | Bounded apply/rollback jobs, progress, named backups and original recovery | Combat pauses an active job; recovery errors retain the backup |
 | Named backups | Character-class-date-time names; bindings, native bars, visibility, settings and owned macro data | WoW persists SavedVariables on reload/logout |
@@ -38,7 +42,7 @@ The final release targets WoW Forever. Classic Era / Hardcore is the temporary d
 | Settings/menu entry points | AddOns settings category, Escape menu and `/hotswap` | Separate client menu adapters |
 | Escape during recording | Cancels capture before closing the main window | Modal tests pass; client retest required |
 | Avoid script timeout | Bounded jobs, cached previews/catalogs and coalesced events | Individual game API calls cannot be interrupted; client retest required |
-| Learned-action maintenance | Owned form/item macros refresh outside combat without key churn | New learned-family coverage can require reviewed Apply |
+| Learned-action maintenance | Owned form/item macros and enabled availability/talent choices refresh outside combat without key churn | New uncatalogued families still need reviewed Apply; manual slot/key edits are preserved |
 | Expert research | Dated primary-source report distinguishes evidence from proposals | Complete 20-player keymap census remains incomplete |
 | Maintainability | Separate client API, data, planning, native bars, transactions, presets and UI | Architecture and review records describe invariants and live checks |
 | Distribution | Portable build, validation workflow, release notes and CurseForge materials | Public availability requires author sign-in, upload and moderation |

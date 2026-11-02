@@ -1089,7 +1089,7 @@ function Tests.unlearned_spell_metadata_keeps_real_icon_and_localized_tooltip_id
   local key=k.UI.pages.Bindings.keyboard.keys.U
   key:GetScript("OnEnter")(key)
   equal(GameTooltip.spellID,19434,"Reserved action dock lacks the native spell tooltip")
-  assert(contains(table.concat(GameTooltip.lines or {}," "),"Not learned"),"Reserved action dock tooltip omits availability")
+  assert(contains(table.concat(GameTooltip.lines or {}," "),"Talent not learned") and key.lockBadge:GetText()=="T","Reserved talent tooltip or badge omits its availability")
 end
 
 function Tests.display_metadata_resolves_name_only_catalog_and_rejects_reused_spell_ids()

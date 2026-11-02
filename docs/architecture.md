@@ -8,6 +8,9 @@ Hot Swap prepares a binding layout, then installs it onto Blizzard's original ba
 | --- | --- |
 | Core | SavedVariables migration, settings, events and public entry points |
 | Diagnostics | Opt-in bounded per-character error/operation records and copyable export; preserves prior error handler |
+| Protection | Classify game controls and reserve existing keys for checked categories |
+| Availability / TalentBindings | Learned/talent presentation and validated ordered shared-key choices |
+| AvailabilityEngine | Bounded owned-slot refresh using the installed layout, separate from draft edits |
 | API | Client feature detection, localized spell/item metadata and game API wrappers |
 | Profiles / LibraryData | Stable class IDs, recommended keys and display-only specialization/talent metadata |
 | Macros | Supported target, form, rank and item macro bodies |
@@ -68,3 +71,13 @@ Run `python tests/run_tests.py` after installing requirements-dev.txt. Tests exe
 Engine logs transitions rather than every mutation. Scoped protected calls capture a bounded stack only while diagnostics are enabled. Logger failures cannot interrupt a transaction. The opt-in global wrapper only records errors identifying Hot Swap and always forwards to the previous handler. Disabling restores that handler only while Hot Swap is still the outermost wrapper; an intervening addon's chain keeps an inactive pass-through wrapper. SavedVariables persist on normal reload/logout.
 
 Client command capabilities are cached separately from assigned keys and invalidated by UPDATE_BINDINGS. Apply forces a fresh registry read before mutation. The Engine only permits generated preset CLICK commands after validating their stable identity; imported macro references follow the fingerprint-verified macro path. Restoring a baseline preserves arbitrary original commands. Restoring an enabled named backup checks saved preset identities, including modes that recovery will resurrect, without changing current state before backup.
+
+## Control and spell-availability options
+
+Protection classifies the currently bound command, not a hard-coded default key. It reads the visible registry and hidden mouse aliases, reserves selected categories before allocation, and is checked again before installation. Previously managed keys that become protected are retained and released from addon ownership. Casting protection suppresses only casting modifier/CVar changes; explicit action-bar visibility remains part of the spell layout.
+
+`talentAlternatives[actionID]` is an ordered list of at most eight catalog IDs. Validation rejects foreign classes, duplicate/invalid entries, fixed-rank/replacement conflicts and target modes unsupported by any alternative. The primary may be reordered or removed. The first learned source supplies the ability while the destination ID/key/page stays stable. Any helpful choice reserves its Alt-self alias for the entire list; non-helpful selections block that alias. Other bindings remain independent. Transfer uses typed `t` records and never imports macro code.
+
+`hideUnavailableSpells` leaves unknown native placements empty; `adaptTalents` limits that behavior to catalog talent abilities. Hidden overflow reserves its key with an inert shared macro, since there is no native empty slot to bind. The game still owns frame/grid visibility. Availability maintenance uses applied settings, verifies ownership before touching slots/keys, and preserves personal changes. It runs through the existing bounded worker and waits out combat. No selection or protected configuration happens during combat.
+
+Local `showMacroNames`, `showMacroCode` and `showUnavailableBindings` preferences default true and stay outside presets. Native macro labels use only original button fontstring alpha with post-update hooks; disabling labels never hides a secure action button. Settings is split into four native subsections while the main tab count stays unchanged.

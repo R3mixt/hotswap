@@ -50,21 +50,89 @@ local function appearanceSlider(parent,title,y,key,low,high)
     slider:SetScript("OnValueChanged",function(_,value) if not V.rendering then UI:SetAppearance(key,value) end end)
     return slider
 end
+local protectionOptions={
+    {"preserveMovement","Keep current movement","Keep your movement and auto-run keys."},
+    {"preserveCamera","Keep camera and selection","Keep mouse camera, selection and zoom controls."},
+    {"preserveChat","Keep current chat controls","Keep chat entry, replies and chat commands."},
+    {"preserveInterface","Keep other game controls","Keep bags, character panels, menus and other interface keys."},
+    {"preserveTargeting","Keep current targeting","Keep target-selection and focus controls."},
+    {"preserveGameSettings","Keep casting settings","Keep the current self-cast and related casting settings."},
+}
+local function option(page,parent,key,title,detail,x,y,localPreference)
+    local check=CreateFrame("CheckButton",nil,parent,"UICheckButtonTemplate")
+    check:SetPoint("TOPLEFT",x,y); check:SetSize(26,26)
+    if check.text then check.text:Hide() end
+    W.label(check,title,12,C.text):SetPoint("LEFT",29,0)
+    W.tooltip(check,title,detail)
+    check.settingKey,check.localPreference=key,localPreference
+    check:SetScript("OnClick",function(self)
+        if localPreference then V:SetLocalPreference(key,self:GetChecked() and true or false)
+        else UI:Stage(key,self:GetChecked() and true or false) end
+    end)
+    page[key]=check; page.checks[#page.checks+1]=check
+    return check
+end
+function V:ShowSection(page,name)
+    self.section=name
+    for id,frame in pairs(page.sections) do frame:SetShown(id==name); W.color(page.sectionButtons[id].text,id==name and C.accent or C.muted) end
+    page.scope:SetText((name=="Controls" or name=="Action bars") and ("Editing preset: "..tostring(K.db.activePreset or "")..". Preset options take effect with Apply & save.") or "For this character only. These preferences are not included in shared presets.")
+end
+function V:SetLocalPreference(key,value)
+    if K.Engine and K.Engine.busy then UI:UpdateBusyState(); return end
+    if key~="showMacroNames" and key~="showMacroCode" and key~="showUnavailableBindings" then return end
+    preferences()[key]=value and true or false
+    if key=="showMacroNames" and K.NativeBars and K.NativeBars.ApplyMacroTextPreference then K.NativeBars:ApplyMacroTextPreference() end
+    if key=="showUnavailableBindings" then UI:CancelLibraryDrag(); UI.selectedAction=nil end
+    UI:Refresh()
+end
 function V:Build(page,ui,w)
     w.label(page,"Settings",18):SetPoint("TOPLEFT")
-    local note=w.label(page,"For this character only. Window settings and diagnostic logs are separate from shared presets.",11,C.muted)
-    note:SetPoint("TOPLEFT",0,-29); note:SetWidth(800)
-    local appearance=w.box("Frame",page); appearance:SetPoint("TOPLEFT",0,-61); appearance:SetSize(382,210)
-    w.label(appearance,"Window appearance",15):SetPoint("TOPLEFT",14,-14)
-    page.opacity=appearanceSlider(appearance,"Opacity",-46,"windowOpacity",0.4,1)
-    page.scale=appearanceSlider(appearance,"Scale",-100,"windowScale",0.7,1.3)
+    page.scope=w.label(page,"",11,C.muted); page.scope:SetPoint("TOPLEFT",0,-28); page.scope:SetWidth(800)
+    page.sections,page.sectionButtons,page.checks={},{},{}
+    for i,name in ipairs({"Controls","Action bars","Window","Diagnostics"}) do
+        local section=w.box("Frame",page); section:SetPoint("TOPLEFT",0,-84); section:SetPoint("BOTTOMRIGHT",0,0)
+        page.sections[name]=section
+        local tab=w.button(page,name,143,function() V:ShowSection(page,name) end)
+        tab:SetPoint("TOPLEFT",(i-1)*151,-49); page.sectionButtons[name]=tab
+    end
+    local controls=page.sections.Controls
+    w.label(controls,"Keep existing controls",15):SetPoint("TOPLEFT",16,-16)
+    local intro=w.label(controls,"Checked categories keep their current bindings when this preset is applied.",11,C.muted)
+    intro:SetPoint("TOPLEFT",16,-44); intro:SetWidth(766)
+    for i,entry in ipairs(protectionOptions) do
+        option(page,controls,entry[1],entry[2],entry[3],14+((i-1)%2)*390,-73-math.floor((i-1)/2)*43)
+    end
+    page.spellsOnly=w.button(controls,"Spells only",145,function()
+        local values={}; for _,entry in ipairs(protectionOptions) do values[entry[1]]=true end
+        ui:Call(K,"UpdateSettings",values)
+        ui:Refresh()
+    end)
+    page.spellsOnly:SetPoint("TOPLEFT",18,-221); page.checks[#page.checks+1]=page.spellsOnly
+    local keep=w.label(controls,"Protect all six categories. Spell and item assignments remain editable.\nUnrelated bindings are always preserved.",11,C.muted)
+    keep:SetPoint("TOPLEFT",181,-223); keep:SetSize(589,34)
+    local bars=page.sections["Action bars"]
+    w.label(bars,"Preset behavior",15):SetPoint("TOPLEFT",16,-16)
+    option(page,bars,"hideUnavailableSpells","Hide unavailable spells on action bars","Leave unavailable spell slots empty on Blizzard's bars. Their keys and positions stay reserved.",14,-44)
+    option(page,bars,"adaptTalents","Adapt to learned talents","Keep unavailable talents off Blizzard's bars while retaining their reserved keys.",14,-79)
+    w.label(bars,"Display on this character",15):SetPoint("TOPLEFT",16,-132)
+    option(page,bars,"showMacroNames","Show macro names on action buttons","Show or hide macro labels on Blizzard's original action buttons. The macro itself is unchanged.",14,-160,true)
+    option(page,bars,"showMacroCode","Show macro code in Hot Swap tooltips","Show generated macro instructions in binding-detail tooltips. Spell and target descriptions stay visible.",14,-195,true)
+    option(page,bars,"showUnavailableBindings","Show unavailable spells in the editor","Include unlearned and unselected talent spells in the keyboard, binding list and spellbook. Hiding them does not move or release their keys.",14,-230,true)
+    local localNote=w.label(bars,"Display options apply immediately. Hidden abilities keep their assigned positions.",10,C.muted)
+    localNote:SetPoint("TOPLEFT",18,-280); localNote:SetWidth(760)
+    local appearance=page.sections.Window
+    w.label(appearance,"Window appearance",15):SetPoint("TOPLEFT",16,-16)
+    page.opacity=appearanceSlider(appearance,"Opacity",-56,"windowOpacity",0.4,1)
+    page.scale=appearanceSlider(appearance,"Scale",-117,"windowScale",0.7,1.3)
     page.resetAppearance=w.button(appearance,"Reset appearance",158,function() ui:ResetAppearance() end)
-    page.resetAppearance:SetPoint("BOTTOMLEFT",14,14)
+    page.resetAppearance:SetPoint("TOPLEFT",18,-197)
+    local windowNote=w.label(appearance,"Changes apply immediately. The window fits the available screen space.\nUse /reload or log out to save preferences to disk.",11,C.muted)
+    windowNote:SetPoint("TOPLEFT",18,-254); windowNote:SetSize(760,34)
     w.tooltip(page.scale,"Window scale","Choose your preferred size. Hot Swap reduces it when necessary to fit the window and spellbook on your screen.")
-    local diagnostics=w.box("Frame",page); diagnostics:SetPoint("TOPRIGHT",0,-61); diagnostics:SetSize(405,210)
-    w.label(diagnostics,"Diagnostics",15):SetPoint("TOPLEFT",14,-14)
+    local diagnostics=page.sections.Diagnostics
+    w.label(diagnostics,"Diagnostic logging",15):SetPoint("TOPLEFT",16,-16)
     page.diagnostics=CreateFrame("CheckButton",nil,diagnostics,"UICheckButtonTemplate")
-    page.diagnostics:SetPoint("TOPLEFT",10,-40); page.diagnostics:SetSize(26,26)
+    page.diagnostics:SetPoint("TOPLEFT",14,-48); page.diagnostics:SetSize(26,26)
     if page.diagnostics.text then page.diagnostics.text:Hide() end
     w.label(page.diagnostics,"Enable diagnostic logging",12,C.text):SetPoint("LEFT",29,0)
     page.diagnostics:SetScript("OnClick",function(self)
@@ -73,14 +141,15 @@ function V:Build(page,ui,w)
         V:Render(page,ui,w)
     end)
     local detail=w.label(diagnostics,"Record setup failures and compatibility details for troubleshooting. Off by default.",11,C.muted)
-    detail:SetPoint("TOPLEFT",14,-82); detail:SetWidth(375)
-    page.logCount=w.label(diagnostics,"",11,C.muted); page.logCount:SetPoint("TOPLEFT",14,-132)
+    detail:SetPoint("TOPLEFT",18,-93); detail:SetWidth(760)
+    page.logCount=w.label(diagnostics,"",11,C.muted); page.logCount:SetPoint("TOPLEFT",18,-136)
     page.viewLog=w.button(diagnostics,"View / copy log",160,function() V:OpenLog() end)
-    page.viewLog:SetPoint("BOTTOMLEFT",14,14)
+    page.viewLog:SetPoint("TOPLEFT",18,-170)
     page.clearLog=w.button(diagnostics,"Clear log",100,function() K.Diagnostics:Clear(); V:Render(page,ui,w) end)
-    page.clearLog:SetPoint("BOTTOMRIGHT",-14,14)
-    local info=w.label(page,"Appearance changes apply immediately. Disabling logging keeps existing entries until you clear them.\nLogs stay on this character and are never sent automatically. Use /reload or log out to save them to disk.",11,C.muted)
-    info:SetPoint("TOPLEFT",0,-292); info:SetWidth(800)
+    page.clearLog:SetPoint("TOPLEFT",190,-170)
+    local info=w.label(diagnostics,"Disabling logging keeps existing entries until you clear them. Logs stay local and are never sent automatically.\nUse /reload or log out to save the log to disk.",11,C.muted)
+    info:SetPoint("TOPLEFT",18,-238); info:SetSize(760,42)
+    self:ShowSection(page,self.section or "Controls")
 end
 function V:Render(page)
     if not page then return end
@@ -89,11 +158,20 @@ function V:Render(page)
         local value=clamp(entry[2],entry[3],entry[4]) or 1
         entry[1]:SetValue(value); entry[1].valueLabel:SetText(math.floor(value*100+0.5).."%")
     end
+    local s=K:GetSettings()
+    for _,check in ipairs(page.checks) do
+        if check.settingKey then
+            local value=check.localPreference and p[check.settingKey] or s[check.settingKey]
+            if check.localPreference then value=p[check.settingKey]~=false end
+            check:SetChecked(value==true)
+        end
+    end
     self.rendering=nil
     page.diagnostics:SetChecked(K.Diagnostics:IsEnabled())
     local count=K.Diagnostics:Count()
-    page.logCount:SetText(tostring(count).." log entr"..(count==1 and "y" or "ies").." saved")
+    page.logCount:SetText(tostring(count).." log entr"..(count==1 and "y" or "ies").." recorded")
     page.clearLog:SetEnabled(count>0)
+    self:ShowSection(page,self.section or "Controls")
 end
 function V:ClearFocus()
     if UI.diagnosticLogDialog then UI.diagnosticLogDialog.text:ClearFocus() end

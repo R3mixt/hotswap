@@ -187,7 +187,7 @@ function L:Categories(tab)
     local result={}; for name in pairs(categories) do result[#result+1]=name end; table.sort(result); return result
 end
 function L:CurrentTargetMode(action) return action.targetMode or "default" end
-function L:TargetModes(action)
+local function targetModes(action)
     if action.kind=="item" then return K.Items.GetTargetModes and K.Items:GetTargetModes(action) or {"default"} end
     if action.kind or action.builtin or action.combo or action.targeting=="form" then return {"default"} end
     if action.targeting=="ground" then return {"default","cursor"} end
@@ -201,6 +201,19 @@ function L:TargetModes(action)
     end
     return {"default"}
 end
+function L:TargetModes(action)
+    local available=targetModes(action)
+    if not action.talentChoices or not K.TalentBindings then return available end
+    local definitions=K.TalentBindings:Definitions(K:GetSettings())
+    local allowed={}; for _,mode in ipairs(available) do allowed[mode]=true end
+    for _,id in ipairs(action.talentChoices) do
+        local shared={}
+        if definitions[id] then for _,mode in ipairs(targetModes(definitions[id])) do shared[mode]=true end end
+        for mode in pairs(allowed) do if not shared[mode] then allowed[mode]=nil end end
+    end
+    local result={}; for _,mode in ipairs(available) do if allowed[mode] then result[#result+1]=mode end end
+    return result
+end
 local function findAction(id)
     for _,action in ipairs(K:PreviewCached().actions) do if action.id==id then return action end end
 end
@@ -211,7 +224,10 @@ function L:SetTargetMode(id,mode)
     if action.kind=="item" and K.Items.SetBindingTargetMode then return K.Items:SetBindingTargetMode(id,mode) end
     if not self:CanOverride(id) then return false,"This preset has reached its action-edit limit." end
     local allowed=false; for _,entry in ipairs(self:TargetModes(action)) do if entry==mode then allowed=true end end
-    if not allowed then return false,"That target mode is not supported by this action." end
+    if not allowed then
+        if (K:GetSettings().talentAlternatives or {})[id] then return false,"That target mode is not supported by every talent choice. Choose Default targeting or edit the choices first." end
+        return false,"That target mode is not supported by this action."
+    end
     local overrides=K:GetSettings().actionOverrides; overrides[id]=overrides[id] or {}; overrides[id].targetMode=mode~="default" and mode or nil
     K.Presets:Changed(); return true,"Target behavior saved to this preset."
 end
@@ -224,12 +240,22 @@ function L:SetRank(id,spellID)
         for _,rank in ipairs(K.API:GetSpellRanks(action)) do if rank.id==spellID and rank.rank and rank.rank~="" then found=true end end
         if not found then return false,"This exact rank is not available in the client's spell data." end
     end
-    local overrides=K:GetSettings().actionOverrides; overrides[id]=overrides[id] or {}; overrides[id].spellID=spellID
+    local settings=K:GetSettings()
+    local shared=spellID and settings.talentAlternatives and settings.talentAlternatives[id]
+    local overrides=settings.actionOverrides; local nextOverride=K.Copy(overrides[id] or {})
+    nextOverride.spellID=spellID
+    if shared and action.librarySourceID and action.librarySourceID~=id then
+        -- A group may currently display another spell family. Fixing its rank
+        -- freezes that displayed family instead of applying its rank to the old primary.
+        nextOverride.replacement={kind="spell",sourceID=action.librarySourceID,name=action.name,targeting=action.targeting}
+    end
+    overrides[id]=nextOverride
+    if shared then settings.talentAlternatives[id]=nil end
     if not spellID then
         local descriptor=overrides[id].replacement or K:GetSettings().customActions[id]
         if descriptor and descriptor.kind=="spell" and descriptor.spellID then descriptor.rankMode="highest" end
     end
-    K.Presets:Changed(); return true,spellID and "Fixed rank saved to this preset." or "Highest learned rank restored."
+    K.Presets:Changed(); return true,shared and "Fixed rank saved; shared talent choices on this key were cleared." or spellID and "Fixed rank saved to this preset." or "Highest learned rank restored."
 end
 function L:Place(entry,id,mode)
     if busy() then return false,"Wait for the current operation to finish." end
@@ -240,7 +266,7 @@ function L:Place(entry,id,mode)
     if not descriptor and entry and entry.actionID then
         local source=findAction(entry.actionID)
         if source and not source.kind and not source.builtin then
-            descriptor={kind="spell",sourceID=source.id,name=source.name,targeting=source.targeting}
+            descriptor={kind="spell",sourceID=source.librarySourceID or source.id,name=source.name,targeting=source.targeting}
             if source.id:match("^custom%.") then descriptor=K.Copy(K:GetSettings().customActions[source.id]) end
             if source.id:match("^spell%.") then descriptor={kind="spell",spellID=source.spellID,name=source.spellName,targeting=source.targeting,rankMode="highest"} end
         end
@@ -267,7 +293,9 @@ function L:Place(entry,id,mode)
     end
     settings.actionOverrides[id]={replacement=descriptor,targetMode=not nextItems and mode~="default" and mode or nil}
     settings.itemBindings[id]=nextItems
-    K.Presets:Changed(); return true,"Action replaced on this page. Its key and the other form pages are preserved."
+    local shared=settings.talentAlternatives and settings.talentAlternatives[id]
+    if shared then settings.talentAlternatives[id]=nil end
+    K.Presets:Changed(); return true,shared and "Action replaced; shared talent choices on this key were cleared. Its key is preserved." or "Action replaced on this page. Its key and the other form pages are preserved."
 end
 function L:Stage(entry,targetMode)
     if busy() then return false,"Wait for the current operation to finish." end

@@ -23,9 +23,9 @@ SOURCE = ROOT / "KeybindOptimizer"
 TOC = "KeybindOptimizer.toc"
 # LibraryUI extends UI after its helpers exist; Launcher loads last.
 MODULES = (
-    "Core.lua", "Diagnostics.lua", "API.lua", "Profiles.lua", "Macros.lua", "Items.lua",
-    "LibraryData.lua", "Library.lua", "NativeBars.lua", "Planner.lua",
-    "Engine.lua", "Presets.lua", "ItemsUI.lua", "UI.lua", "LibraryUI.lua",
+    "Core.lua", "Diagnostics.lua", "API.lua", "Protection.lua", "Profiles.lua", "Macros.lua", "Items.lua",
+    "LibraryData.lua", "Availability.lua", "TalentBindings.lua", "Library.lua", "NativeBars.lua", "Planner.lua",
+    "Engine.lua", "AvailabilityEngine.lua", "Presets.lua", "ItemsUI.lua", "UI.lua", "LibraryUI.lua",
     "SettingsUI.lua", "Launcher.lua",
 )
 RUNTIME_FILES = (TOC, *MODULES, "README.md")

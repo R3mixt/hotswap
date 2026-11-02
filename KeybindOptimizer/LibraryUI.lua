@@ -10,6 +10,106 @@ local tooltip, truncate, color, listRow = W.tooltip, W.truncate, W.color, W.list
 local C, keyName, actionPageNames = W.colors, W.keyName, W.actionPageNames
 local function settings() return K:GetSettings() end
 
+-- A talent group is an ordered draft choice for one shared utility position.
+-- It never changes another spell's key or chooses an action during combat.
+function UI:CanEditTalentChoices(action)
+    local override=action and (settings().actionOverrides or {})[action.id]
+    if override and (override.spellID or override.replacement) then return false end
+    return K.TalentBindings and action and not action.preserved and K.TalentBindings:IsEligible(action) or false
+end
+function UI:SaveTalentChoices(ids)
+    local f=self.talentDialog
+    if not f or not f.actionID then return false end
+    local ok,why=self:Call(K.TalentBindings,"SetChoices",f.actionID,ids)
+    if ok then self:Refresh(); self:RenderTalentChoices()
+    elseif why then f.note:SetText(why); color(f.note,C.error) end
+    return ok
+end
+function UI:MoveTalentChoice(index,delta)
+    local f=self.talentDialog; if not f then return end
+    local ids={}; for _,id in ipairs(K.TalentBindings:GetChoices(f.actionID)) do ids[#ids+1]=id end
+    local target=index+delta
+    if index<1 or target<1 or index>#ids or target>#ids then return end
+    ids[index],ids[target]=ids[target],ids[index]
+    self:SaveTalentChoices(ids)
+end
+function UI:RemoveTalentChoice(index)
+    local f=self.talentDialog; if not f then return end
+    local ids={}; for _,id in ipairs(K.TalentBindings:GetChoices(f.actionID)) do ids[#ids+1]=id end
+    if #ids<=1 then return end
+    table.remove(ids,index); self:SaveTalentChoices(ids)
+end
+function UI:RenderTalentChoices()
+    local f=self.talentDialog; if not f then return end
+    local choices=K.TalentBindings:GetChoices(f.actionID)
+    f.choices=choices
+    local byID={}
+    for _,candidate in ipairs(f.candidates or {}) do byID[candidate.id]=candidate end
+    for _,action in ipairs((self.plan or {}).actions or {}) do if not byID[action.id] then byID[action.id]=action end end
+    local active
+    for _,id in ipairs(choices) do if byID[id] and byID[id].known then active=id; break end end
+    f.note:SetText("First learned choice wins when applied. If none are learned, the slot stays inactive. Other bindings remain unchanged."); color(f.note,C.muted)
+    for _,row in ipairs(f.rows) do row:Hide() end
+    for index,id in ipairs(choices) do
+        local row=f.rows[index]
+        if not row then
+            row=listRow(f.list.child); row:SetHeight(36)
+            row.icon=row:CreateTexture(nil,"ARTWORK"); row.icon:SetPoint("LEFT",8,0); row.icon:SetSize(25,25)
+            row.name=label(row,"",12); row.name:SetPoint("LEFT",43,0); truncate(row.name,340)
+            row.state=label(row,"",10,C.muted); row.state:SetPoint("RIGHT",-233,0); row.state:SetWidth(126); row.state:SetJustifyH("RIGHT")
+            row.up=button(row,"Up",53,function(self) UI:MoveTalentChoice(self:GetParent().index,-1) end); row.up:SetPoint("RIGHT",-172,0)
+            row.down=button(row,"Down",61,function(self) UI:MoveTalentChoice(self:GetParent().index,1) end); row.down:SetPoint("RIGHT",-105,0)
+            row.remove=button(row,"Remove",89,function(self) UI:RemoveTalentChoice(self:GetParent().index) end); row.remove:SetPoint("RIGHT",-8,0)
+            f.rows[index]=row
+        end
+        local candidate=byID[id] or {label=id}
+        row.index,row.choiceID=index,id
+        row:SetPoint("TOPLEFT",0,-(index-1)*40); row:SetWidth(math.max(700,f.list.child:GetWidth()))
+        row.icon:SetTexture(candidate.displayIcon or candidate.icon or "Interface\\Icons\\INV_Misc_Book_09")
+        if row.icon.SetDesaturated then row.icon:SetDesaturated(not candidate.known) end
+        row.name:SetText(index..". "..tostring(candidate.label or candidate.name or id))
+        row.state:SetText(active==id and "Used when applied" or candidate.known and "Learned" or "Not learned")
+        color(row.state,active==id and C.accent or C.muted)
+        row.up:SetEnabled(index>1); row.down:SetEnabled(index<#choices); row.remove:SetEnabled(#choices>1)
+        row:Show()
+    end
+    f.list:UpdateHeight(math.max(45,#choices*40)); f.add:SetEnabled(#choices<8)
+end
+function UI:OpenTalentChoices(action)
+    if not self:CanEditTalentChoices(action) then return end
+    if K.Engine and K.Engine.busy then self:UpdateBusyState(); return end
+    local candidates=K.TalentBindings:ListCandidates(action) or {}
+    if #candidates==0 then self:Notice("Talent choices are available for shared class utility bindings."); return end
+    self:CloseMenu(); self:ClearInputFocus()
+    local f=self.talentDialog
+    if not f then
+        f=box("Frame",self.frame,C.bg,"KeybindOptimizerTalentChoices")
+        f:SetAllPoints(self.frame); f:SetFrameStrata("DIALOG"); f:SetFrameLevel(self.frame:GetFrameLevel()+55); f:EnableMouse(true)
+        f.title=label(f,"Talent choices",22); f.title:SetPoint("TOPLEFT",40,-40); f.title:SetWidth(770)
+        f.note=label(f,"",12,C.muted); f.note:SetPoint("TOPLEFT",40,-82); f.note:SetSize(765,40)
+        f.add=button(f,"Add talent choice",180,function(self)
+            local used={}; for _,id in ipairs(K.TalentBindings:GetChoices(f.actionID)) do used[id]=true end
+            local options={}
+            for _,candidate in ipairs(f.candidates or {}) do if not used[candidate.id] then options[#options+1]={value=candidate.id,label=candidate.label or candidate.id} end end
+            if #options==0 then UI:Notice("No more eligible talent choices for this binding."); return end
+            UI:Menu(self,options,nil,function(id)
+                local ids={}; for _,value in ipairs(K.TalentBindings:GetChoices(f.actionID)) do ids[#ids+1]=value end
+                ids[#ids+1]=id; UI:SaveTalentChoices(ids)
+            end)
+        end); f.add:SetPoint("TOPLEFT",40,-129)
+        f.list=scroll(f); f.list:SetPoint("TOPLEFT",40,-174); f.list:SetPoint("BOTTOMRIGHT",-40,105); f.rows={}
+        local help=label(f,"Choices are saved to this preset's draft. Apply & save installs them.",11,C.muted)
+        help:SetPoint("BOTTOMLEFT",40,73); help:SetWidth(760)
+        f.reset=button(f,"Reset choices",135,function() UI:SaveTalentChoices({}) end); f.reset:SetPoint("BOTTOMLEFT",40,32)
+        f.close=button(f,"Done",105,function() f:Hide() end,true); f.close:SetPoint("BOTTOMRIGHT",-40,32)
+        f:SetScript("OnHide",function() UI:CloseMenu(); UI:EndModal(f) end)
+        self.talentDialog=f
+    end
+    f.actionID=action.id; f.candidates=candidates
+    f.title:SetText("Talent choices: "..tostring(action.label or action.id).." / "..keyName(action.key))
+    self:BeginModal(f,"KeybindOptimizerTalentChoices"); f:Show(); self:RenderTalentChoices()
+end
+
 local targetNames={default="Default",target="Current target",mouseover="Mouseover",focus="Focus",self="Self",cursor="At cursor"}
 function UI:TargetDescription(action)
     if not action or action.kind=="system" or action.presetName then return nil end
@@ -105,6 +205,7 @@ function UI:DropLibraryEntry(key)
     if not entry or not key or not K.Library then return false end
     self:CancelLibraryDrag()
     if K.Engine and K.Engine.busy then return false end
+    if self:IsProtectedKey(key) then self:Notice("This control is protected in Settings. Turn off its category before replacing it.",true); return false end
     local destinations=self.keyIndex and self.keyIndex[key] or {}
     -- Replacing a native slot changes its action on the inspected page only.
     -- Key reassignment is a separate operation, linked across all form pages.
@@ -112,6 +213,7 @@ function UI:DropLibraryEntry(key)
         local function replace(destination)
             if destination.selfKey==key and destination.key~=key then self:Notice("Self-cast follows the normal spell. Drop onto its normal key to replace it.",true); return end
             local scope=destination.form and destination.form~="all" and ("This changes the "..(actionPageNames[destination.form] or destination.form).." page only.") or "This shared action is used in every form."
+            if (settings().talentAlternatives or {})[destination.id] then scope=scope.." This replaces the shared talent choices on this key." end
             UI:Confirm("Replace "..keyName(key).."?",(entry.label or entry.name).." will replace "..(destination.label or destination.id)..".\n\n"..scope.." Apply & save installs the change.",function()
                 local ok,why=UI:Call(K.Library,"Place",entry,destination.id)
                 if ok then UI.selectedAction=destination; UI:Refresh(); UI:Notice(why or "Action replaced in the preset. Apply & save installs it.") end
@@ -203,6 +305,10 @@ function UI:RenderLibrary()
     f.category.text:SetText(self.libraryCategory or "All categories"); truncate(f.category.text,133)
     f.ranks:SetShown(tab=="spells"); f.ranks:SetChecked(self.libraryRanks and true or false)
     f.entries=K.Library and K.Library:List({tab=tab,category=self.libraryCategory,showRanks=self.libraryRanks and true or false,query=f.search:GetText()}) or {}
+    if K.db.preferences and K.db.preferences.showUnavailableBindings==false then
+        local visible={}; for _,entry in ipairs(f.entries) do if not self:IsEditorHidden(entry) then visible[#visible+1]=entry end end
+        f.entries=visible
+    end
     f.list:UpdateHeight(math.max(50,#f.entries*40))
     self.libraryRendering=nil; self:RenderLibraryRows()
 end
@@ -239,13 +345,14 @@ function UI:RenderLibraryRows()
             list.rows[n]=row
         end
         row.entry=entry; row:SetPoint("TOPLEFT",0,-(index-1)*40); row:SetWidth(math.max(250,list.child:GetWidth()))
+        local state,status,tone=self:SpellAvailability(entry); tone=tone or C.warning
         row.icon:SetTexture(entry.icon or "Interface\\Icons\\INV_Misc_Book_09")
         if row.icon.SetDesaturated then row.icon:SetDesaturated(entry.known==false) end
-        row.name:SetText(entry.label or entry.name or "Action"); color(row.name,entry.known==false and C.warning or C.text)
+        row.name:SetText(entry.label or entry.name or "Action"); color(row.name,entry.known==false and tone or C.text)
         local item=entry.descriptor and entry.descriptor.kind=="item"
-        local status=item and entry.availability or (entry.known==false and "Not learned" or nil)
+        status=item and entry.availability or (state and state~="ready" and status or nil)
         row.rank:SetText((entry.rank and tostring(entry.rank) or entry.category or "")..(entry.talent and " · Talent" or "")..(status and " · "..status or ""))
-        tooltip(row,entry.label,entry.description or "Drag onto a key, or click then choose a key.",not item and entry.spellID or nil,entry.known==false and not item,entry.itemID)
+        tooltip(row,entry.label,entry.description or "Drag onto a key, or click then choose a key.",not item and entry.spellID or nil,state and state~="ready" and status,entry.itemID)
         row:Show()
     end
     if not list.empty then list.empty=label(list.child,"",11,C.muted); list.empty:SetPoint("TOPLEFT",5,-14); list.empty:SetWidth(255) end

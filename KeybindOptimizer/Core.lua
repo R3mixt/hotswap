@@ -1,11 +1,15 @@
 local addonName, K = ...
 _G.KeybindOptimizer = K
-K.name, K.version = addonName or "KeybindOptimizer", "0.3.3"
+K.name, K.version = addonName or "KeybindOptimizer", "0.4.0"
 K.defaults = {
     wheel = true, middle = true, ctrl = true,
     mouseButtons = { BUTTON4 = true, BUTTON5 = true },
     selfFallback = false, cancelForUtility = true,
     flavor = "auto", primarySchool = "frost", groundAtCursor=false,
+    preserveMovement=false, preserveCamera=false, preserveChat=false,
+    preserveInterface=false, preserveTargeting=false, preserveGameSettings=false,
+    hideUnavailableSpells=false, adaptTalents=false,
+    talentAlternatives={},
     bindingOverrides = {}, fallbackBindings = {}, actionOverrides = {}, customActions = {}, itemBindings = {}, nativeBars = {},
 }
 -- Read-only migration shim for exports made by the retired custom action dock.
@@ -35,6 +39,9 @@ function K:Init()
     self.db.preferences=type(self.db.preferences)=="table" and self.db.preferences or {}
     local preferences=self.db.preferences
     preferences.diagnostics=preferences.diagnostics==true
+    for _,key in ipairs({"showMacroNames","showMacroCode","showUnavailableBindings"}) do
+        if type(preferences[key])~="boolean" then preferences[key]=true end
+    end
     for key,range in pairs({windowOpacity={0.4,1},windowScale={0.7,1.3}}) do
         local value=preferences[key]
         if type(value)~="number" or value~=value then value=1 end
@@ -63,9 +70,19 @@ function K:ValidateNativeBars(value)
     return true
 end
 function K:UpdateSetting(key, value)
+    if value==nil then
+        if self.Engine and self.Engine.busy then return false,"Wait for the current operation to finish." end
+        if key=="nativeBars" then return false,"Action-bar preferences must be a table." end
+        self:GetSettings()[key]=nil; self.dirty=true; self:InvalidatePreview()
+        return self:PreviewCached()
+    end
+    return self:UpdateSettings({[key]=value})
+end
+function K:UpdateSettings(values)
     if self.Engine and self.Engine.busy then return false,"Wait for the current operation to finish." end
-    if key=="nativeBars" then local ok,why=self:ValidateNativeBars(value); if not ok then return false,why end end
-    self:GetSettings()[key] = K.Copy(value)
+    if values.nativeBars~=nil then local ok,why=self:ValidateNativeBars(values.nativeBars); if not ok then return false,why end end
+    local settings=self:GetSettings()
+    for key,value in pairs(values) do settings[key]=K.Copy(value) end
     self.dirty = true
     self:InvalidatePreview()
     return self:PreviewCached()
@@ -124,6 +141,11 @@ function K:OnApplyComplete(ok,message,plan,kind)
         self.dirty=self.Presets:HasUnappliedChanges()
     end
     if kind=="apply" then self.Presets:OnActivationComplete(ok,message) end
+    if kind=="maintenance" then
+        if ok then self:RefreshAvailabilityStatus()
+        else self.dirty=true; self.needsRefresh=true end
+    end
+    if ok and self.NativeBars.ApplyMacroTextPreference then self.NativeBars:ApplyMacroTextPreference() end
     self:InvalidatePreview()
     if self.UI and self.UI.OnOperationComplete then self.UI:OnOperationComplete(ok,message,kind)
     elseif message then self:Print(message) end
@@ -146,6 +168,12 @@ function K:MaintainMouseControls()
     if not ok and why then self:Print(why) end
 end
 function K:OnRestoreComplete(ok,message,plan,kind) return self:OnApplyComplete(ok,message,plan,kind or "restore") end
+function K:RefreshAvailabilityStatus()
+    local plan=self.db and self.db.enabled and self.db.appliedPlan
+    if not plan or not self.AvailabilityEngine:Handles(plan) then return end
+    self.needsRefresh=self.AvailabilityEngine:HasUnboundLearnedSpells(plan)
+    self.dirty=self.Presets:HasUnappliedChanges() or self.needsRefresh
+end
 function K:MaintainLearnedActions()
     if not self.db or not self.db.enabled or not self.db.appliedPlan then self.pendingSpellMaintenance=nil; return end
     if self.Engine.busy or (InCombatLockdown and InCombatLockdown()) then self.pendingSpellMaintenance=true; return end
@@ -157,10 +185,12 @@ function K:MaintainLearnedActions()
     elseif formsChanged then ok,why=self.Engine:Activate(plan)
     else return end
     if not ok then
+        self.dirty=true; self.needsRefresh=true
         self:Print(why or "Review your learned abilities in Hot Swap.")
         -- Stale form indices can select the wrong form. A combo-only repair
         -- failure leaves its original inert/owned macro intact for review.
         if formsChanged then local _,message=self.Engine:Restore(); if message then self:Print(message) end end
+    elseif ok==true then self:RefreshAvailabilityStatus()
     end
 end
 function K:MaintainItemBindings()
@@ -271,6 +301,7 @@ if CreateFrame then
         if event=="ADDON_LOADED" and arg==K.name then K:Init()
         elseif event=="PLAYER_LOGIN" then
             K:Init()
+            K.NativeBars:ApplyMacroTextPreference()
             K.Items:Invalidate()
             K.API:InvalidateSpellbook()
             K:InvalidatePreview()
@@ -296,6 +327,7 @@ if CreateFrame then
                 K.API:InvalidateSpellbook()
                 K.dirty=true
                 K.needsRefresh=true
+                K:RefreshAvailabilityStatus()
             end
             K:InvalidatePreview()
             if spellsChanged or event=="PLAYER_REGEN_ENABLED" then K:MaintainLearnedActions() end

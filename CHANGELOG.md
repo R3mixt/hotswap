@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.4.0 beta — 2026-11-01
+
+- Add preset protections for movement, camera/selection, chat, targeting, other game controls and casting settings; Spells only enables all six.
+- Add separate local switches for native macro labels, tooltip macro code and unavailable entries in the editor.
+- Distinguish ordinary unlearned spells from talent abilities with L/T badges and readable tooltips.
+- Optionally leave unavailable native slots empty and fill them as spells are learned, preserving keys and personal bar edits.
+- Add ordered talent alternatives on shared utility keys, with first-learned selection, out-of-combat updates and preset transfer.
+- Organize Settings into Controls, Action bars, Window and Diagnostics.
+
 ## 0.3.3 beta — 2026-11-01
 
 - Preserve bindings outside the keys assigned by the preset. When a key leaves Hot Swap control, restore its displaced binding only if the player has not changed it.

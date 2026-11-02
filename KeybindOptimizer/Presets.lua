@@ -156,6 +156,7 @@ function P:ValidateHotkeys(currentPlan)
     -- checked when selected; rebuilding every saved class layout here makes
     -- installation time grow with the number of named presets.
     if currentPlan then
+        for key in pairs(keys) do if (currentPlan.protectedKeys or {})[key] then return false,key.." is protected by this preset's control settings. Choose another preset hotkey." end end
         for _,action in ipairs(currentPlan.actions or {}) do
             if not tostring(action.id):match("^mode%.") then
                 local key=keys[action.key] and action.key or (action.selfKey and keys[action.selfKey] and action.selfKey)
@@ -170,6 +171,7 @@ function P:ValidateHotkeys(currentPlan)
             K.db.activePreset=name; K.db.settings=K.db.presets[name].settings
             local plan=name==previousName and currentPlan or K.Planner:Build(true)
             if not plan then plan=K.Planner:Build(true) end
+            for _,mode in ipairs(modes) do if (plan.protectedKeys or {})[mode.key] then error(mode.key.." is a protected control in "..name..". Choose another preset hotkey.",0) end end
             for _,action in ipairs(plan.actions or {}) do
                 if not tostring(action.id):match("^mode%.") then
                     for _,mode in ipairs(modes) do
@@ -196,7 +198,9 @@ function P:SetHotkey(name,key)
         local checked,why=pcall(function()
             for _,otherName in ipairs(self:List()) do
                 K.db.activePreset=otherName; K.db.settings=K.db.presets[otherName].settings
-                for _,action in ipairs(K.Planner:Build(true).actions or {}) do
+                local plan=K.Planner:Build(true)
+                if (plan.protectedKeys or {})[key] then error(key.." is a protected control in "..otherName..". Choose another preset hotkey.",0) end
+                for _,action in ipairs(plan.actions or {}) do
                     if action.id~="mode."..preset.id and (action.key==key or action.selfKey==key) then error(key.." is used by "..(action.label or action.id).." in "..otherName..".",0) end
                 end
             end
@@ -365,6 +369,11 @@ function P:Export(name)
         for _,id in ipairs(sorted(preset.settings.customActions)) do
             for _,field in ipairs(sorted(preset.settings.customActions[id])) do addLine(lines,"u",presetName,id,field,preset.settings.customActions[id][field]) end
         end
+        local validChoices,choiceError=K.TalentBindings:ValidateSettings(preset.settings)
+        if not validChoices then return nil,choiceError end
+        for _,id in ipairs(sorted(preset.settings.talentAlternatives)) do
+            for _,sourceID in ipairs(preset.settings.talentAlternatives[id]) do addLine(lines,"t",presetName,id,sourceID) end
+        end
         for _,id in ipairs(sorted(preset.settings.itemBindings)) do
             local binding=preset.settings.itemBindings[id]
             if binding.selected then addLine(lines,"i",presetName,id,"selected",binding.selected) end
@@ -393,6 +402,8 @@ local function setSetting(settings,key,typ,value)
     return true
 end
 local function validateSettings(settings)
+    local validChoices,choiceError=K.TalentBindings:ValidateSettings(settings)
+    if not validChoices then return false,choiceError end
     local validBars,barError=K:ValidateNativeBars(settings.nativeBars or {})
     if not validBars then return false,barError end
     if K.Library then local ok,why=K.Library:CheckLimits(settings); if not ok then return false,why end end
@@ -474,6 +485,12 @@ function P:Import(text)
                 if entry[field]~=nil then return false,"Duplicate action field." end
                 if field=="spellID" or field=="itemID" then value=tonumber(value); if not value then return false,"Invalid action ID." end end
                 entry[field]=value
+            elseif tag=="t" and #fields==4 and preset and #fields[3]<=100 and #fields[4]<=100 then
+                local choices=preset.settings.talentAlternatives
+                choices[fields[3]]=choices[fields[3]] or {}
+                local list=choices[fields[3]]
+                if #list>=8 then return false,"A shared key supports at most eight talent choices." end
+                list[#list+1]=fields[4]
             elseif tag=="i" and #fields==5 and preset and #fields[3]<=100 and fields[3]:match("^[%w%._%-]+$") and not fields[3]:match("^mode%.") then
                 local id,field,value=fields[3],fields[4],fields[5]
                 local map=preset.settings.itemBindings; map[id]=map[id] or {alternatives={}}

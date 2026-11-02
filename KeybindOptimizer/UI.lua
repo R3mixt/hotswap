@@ -54,7 +54,10 @@ local function tooltip(f, title, detail, spellID, locked, itemID)
         elseif self.tipSpellID and GameTooltip.SetSpellByID then native=pcall(GameTooltip.SetSpellByID,GameTooltip,self.tipSpellID) end
         if native then GameTooltip:AddLine(self.tipTitle or "", 1, 0.82, 0, true)
         else GameTooltip:SetText(self.tipTitle or "", 1, 1, 1) end
-        if self.tipLocked then GameTooltip:AddLine("Not learned yet — you can bind this spell now.", 1, 0.72, 0.25, true) end
+        if self.tipLocked then
+            local note=type(self.tipLocked)=="string" and self.tipLocked or "Not learned yet — you can bind this spell now."
+            GameTooltip:AddLine(note, 1, 0.72, 0.25, true)
+        end
         if self.tipDetail and self.tipDetail ~= "" then GameTooltip:AddLine(self.tipDetail, 0.7, 0.78, 0.81, true) end
         GameTooltip:Show()
     end)
@@ -322,7 +325,7 @@ function UI:UpdateBusyState()
             local page=pages[name]
             if page then
                 for _,control in ipairs({"optimize","nativeBars","new","duplicate","rename","delete","usePreset","hotkey","gearCapture","gearEquip","restoreSelected","original","import","opacity","scale","resetAppearance","diagnostics","viewLog","clearLog"}) do disable(page[control]) end
-                if page.detail then for _,control in ipairs({"rebind","change","reset","clearKey"}) do disable(page.detail[control]) end end
+                if page.detail then for _,control in ipairs({"rebind","change","reset","clearKey","talents"}) do disable(page.detail[control]) end end
                 for _,row in ipairs(page.checks or {}) do disable(row); disable(row.checkbox) end
                 for _,row in ipairs(page.list and page.list.rows or {}) do disable(row); disable(row.key) end
             end
@@ -330,7 +333,7 @@ function UI:UpdateBusyState()
         self:ClearInputFocus(); self:EndCapture(); self:CloseMenu()
         if self.CancelLibraryDrag then self:CancelLibraryDrag() end
         if self.library then self.library:Hide() end
-        for _,name in ipairs({"confirm","picker","review","nameDialog","nativeBarsDialog","operationErrorDialog","diagnosticLogDialog"}) do
+        for _,name in ipairs({"confirm","picker","review","nameDialog","nativeBarsDialog","operationErrorDialog","diagnosticLogDialog","talentDialog"}) do
             local modal=self[name]; if modal then modal:Hide() end
         end
         self:ResetKeyTest()
@@ -580,6 +583,7 @@ end
 function UI:AssignBinding(action, key)
     if K.Engine and K.Engine.busy then self:UpdateBusyState(); return false end
     if not action then return false end
+    if action.preserved or self:IsProtectedKey(key) then self:Notice("This control is protected in Settings. Turn off its category to edit it.",true); return false end
     if action.presetName then
         local ok,why=self:Call(K.Presets,"SetHotkey",action.presetName,key)
         if ok then self:EndCapture(); if self.picker then self.picker:Hide() end; self:Refresh(); self:Notice(why or "Hot Swap key saved. Choose Apply & save to enable it.") end
@@ -690,6 +694,7 @@ function UI:CaptureInput(key)
 end
 function UI:BeginActionCapture(action)
     if not action then return end
+    if action.preserved then self:Notice("This control is protected in Settings. Its current game binding is kept."); return end
     if action.presetID and K.Presets and K.Presets.FindID then
         local name=K.Presets:FindID(action.presetID)
         if name then action.presetName=name end
@@ -722,6 +727,11 @@ function UI:BeginCapture(mode, action)
         f.targetLabel=label(f,"Targeting",12,C.text); f.targetLabel:SetPoint("TOPLEFT",64,-329)
         f.targetMode=button(f,"Default",190,function(self) UI:OpenTargetMenu(self) end)
         f.targetMode:SetPoint("TOPLEFT",155,-320)
+        f.talents=button(f,"Talent choices",150,function()
+            local selected=UI.captureAction; UI:EndCapture()
+            if selected then UI:OpenTalentChoices(selected) end
+        end)
+        f.talents:SetPoint("TOPLEFT",64,-368)
         local function dispatch(key)
             UI.captureDispatch=true
             local ok, why=pcall(UI.CaptureInput,UI,key)
@@ -748,6 +758,7 @@ function UI:BeginCapture(mode, action)
     local linked=mode=="key" and #self:LinkedBindings(action)>1
     self.captureNote:SetText(mode == "mouse" and "Recorded buttons are kept. Escape or Done finishes. Apply & save installs your changes." or (linked and "Escape cancels. This action-bar position changes in every form. Apply & save installs it." or "Escape cancels this key change. Apply & save installs your changes."))
     self.captureDone.text:SetText(mode == "mouse" and "Done" or (mode=="key" and "Done" or "Cancel"))
+    self.capture.talents:SetShown(mode=="key" and self.CanEditTalentChoices and self:CanEditTalentChoices(action) or false)
     self:RenderCaptureTarget()
     if self.capture.targetMode:IsShown() then self.captureHint:SetText("Press a new key to rebind, or choose Targeting below. Hold Shift or Ctrl for a modified key.") end
     self.capture:EnableKeyboard(true)
@@ -918,6 +929,35 @@ local function actionIcon(action)
     if isSpellAction(action) then return "Interface\\Icons\\INV_Misc_Book_09" end
     return "Interface\\Icons\\INV_Misc_Bag_08"
 end
+function UI:SpellAvailability(action)
+    if not action then return nil end
+    local descriptor=action.descriptor
+    local spell=descriptor and descriptor.kind=="spell" or (not descriptor and isSpellAction(action))
+    if not spell then return nil end
+    local state=action.availabilityState or (action.known==false and (action.talent and "talent" or "unlearned") or "ready")
+    local text=action.availabilityLabel or (state=="talent" and "Talent not learned" or state=="unlearned" and "Not learned" or "Ready")
+    local tone=state=="talent" and {0.55,0.78,1,1} or C.warning
+    return state,text,tone
+end
+function UI:IsEditorHidden(action)
+    if not K.db or not K.db.preferences or K.db.preferences.showUnavailableBindings~=false then return false end
+    local state=self:SpellAvailability(action)
+    return state~=nil and state~="ready"
+end
+function UI:DisplayActions()
+    local actions={}
+    for _,action in ipairs((self.plan or {}).actions or {}) do actions[#actions+1]=action end
+    for _,action in ipairs((self.plan or {}).preservedActions or {}) do actions[#actions+1]=action end
+    return actions
+end
+function UI:IsProtectedKey(key)
+    for _,action in ipairs((self.plan or {}).preservedActions or {}) do if action.key==key or action.selfKey==key then return true end end
+    return false
+end
+function UI:MacroDetail(action)
+    local show=not K.db or not K.db.preferences or K.db.preferences.showMacroCode~=false
+    return (show and action.body) or action.source or action.id
+end
 function UI:IsKeyTestAvailable()
     return self.frame and self.frame:IsShown() and self.activePage == "Bindings" and self.bindingView ~= "list"
         and not (K.Engine and K.Engine.busy)
@@ -944,9 +984,9 @@ function UI:TestKeyDown(base)
     local full = self.testKeys[base]
     local actions = self.keyIndex and self.keyIndex[full] or {}
     local names = {}
-    for _, action in ipairs(actions) do names[#names+1] = actionName(action) .. (#actions > 1 and (" (" .. (action.form or "all") .. ")") or "") end
+    for _, action in ipairs(actions) do names[#names+1] = (self:IsEditorHidden(action) and "Reserved unavailable spell" or actionName(action)) .. (#actions > 1 and (" (" .. (action.form or "all") .. ")") or "") end
     self.lastTest = keyName(full) .. " -> " .. (#names > 0 and table.concat(names, " / ") or "Unassigned")
-    if actions[1] then self.selectedAction=actions[1]; self:BindingDetail(actions[1]) end
+    if actions[1] and not self:IsEditorHidden(actions[1]) then self.selectedAction=actions[1]; self:BindingDetail(actions[1]) end
     self.pages.Bindings.keyboard.note:SetText("Testing planned binds — no casting  |  " .. self.lastTest)
     self:RenderKeyboard()
 end
@@ -1029,7 +1069,7 @@ function UI:UpdateBindingTester()
     self.testMouseShield:Show()
     self.tester:Show()
     if available then
-        self.pages.Bindings.keyboard.note:SetText(self.lastTest and ("Testing planned binds — no casting  |  " .. self.lastTest) or "Test keys here — no casting. Click an icon to rebind. Amber L = not learned.")
+        self.pages.Bindings.keyboard.note:SetText(self.lastTest and ("Testing planned binds — no casting  |  " .. self.lastTest) or "Test keys here — no casting. Click to rebind. L = unlearned; T = talent.")
     else
         self:ResetKeyTest()
         self.pages.Bindings.keyboard.note:SetText("Choose an action or press Escape to return to key testing. No casting.")
@@ -1104,7 +1144,7 @@ function UI:BuildKeyboard(page)
     key("SPACE", "Space", 140, 203, 320, 34)
     key("RALT", "Alt", 463, 203, 77, 34)
     key("RCTRL", "Ctrl", 543, 203, 77, 34)
-    board.note = label(board, "Test keys here — no casting. Click an icon to rebind. Amber L = not learned.", 10, C.muted)
+    board.note = label(board, "Test keys here — no casting. Click to rebind. L = unlearned; T = talent.", 10, C.muted)
     board.note:SetPoint("TOPLEFT", 0, -247)
     board.note:SetWidth(800)
     label(board, "MOUSE", 10, C.muted):SetPoint("TOPLEFT", 644, -7)
@@ -1149,7 +1189,7 @@ function UI:IndexKeyboard(reuseIcons)
     self.keyIndex = {}
     if not reuseIcons or not self.keyIcons then self.keyIcons = {} end
     local filter = self.formFilter or "all"
-    for _, a in ipairs((self.plan or {}).actions or {}) do
+    for _, a in ipairs(self:DisplayActions()) do
         if not reuseIcons or self.keyIcons[a.id]==nil then self.keyIcons[a.id] = a.displayIcon or a.icon or (a.itemSlot and GetInventoryItemTexture and GetInventoryItemTexture("player", a.itemSlot)) or actionIcon(a) end
         if filter == "all" or a.form == "all" or not a.form or a.form == filter then
             for _, key in ipairs({a.key or false, a.selfKey or false}) do
@@ -1194,35 +1234,41 @@ function UI:RenderKeyboard()
         cap.actions = self.keyIndex and self.keyIndex[full] or {}
         cap.action, cap.fullKey = cap.actions[1], full
         local a = cap.action
+        local hidden=self:IsEditorHidden(a)
+        local state,status,tone=self:SpellAvailability(a)
+        tone=tone or C.warning
         cap.alias = a and a.selfKey == full and a.key ~= full or false
-        cap.icon:SetShown(a ~= nil and (a.kind ~= "system" or a.presetName~=nil))
+        cap.icon:SetShown(a ~= nil and not hidden and (a.kind ~= "system" or a.presetName~=nil))
         cap.icon:SetTexture(a and ((self.keyIcons or {})[a.id] or actionIcon(a)) or nil)
-        cap.locked = isSpellAction(a) and a.known == false or false
+        cap.locked = state~=nil and state~="ready" and not hidden or false
         cap.icon:SetAlpha(cap.locked and 0.85 or 1)
         if cap.icon.SetDesaturated then cap.icon:SetDesaturated(cap.locked) end
-        cap.icon:SetVertexColor(cap.locked and 1 or 1, cap.locked and 0.72 or 1, cap.locked and 0.35 or 1)
+        cap.icon:SetVertexColor(unpack(cap.locked and tone or C.white))
         cap.lockBadge:SetShown(cap.locked)
+        cap.lockBadge:SetText(state=="talent" and "T" or "L"); color(cap.lockBadge,tone)
         local badge,target=self:TargetDescription(a)
-        cap.targetBadge:SetText(badge or ""); cap.targetBadge:SetShown(badge~=nil)
-        if cap.SetBackdropBorderColor then cap:SetBackdropBorderColor(unpack(cap.locked and C.warning or C.edge)) end
+        cap.targetBadge:SetText(badge or ""); cap.targetBadge:SetShown(badge~=nil and not hidden)
+        if cap.SetBackdropBorderColor then cap:SetBackdropBorderColor(unpack(cap.locked and tone or C.edge)) end
         cap.pressed = self.testKeys and self.testKeys[base] ~= nil or false
         if mods[base] then
             local down = mods[base]=="SHIFT-" and IsShiftKeyDown or (mods[base]=="CTRL-" and IsControlKeyDown or IsAltKeyDown)
             cap.pressed = self:IsKeyTestAvailable() and down and down() or false
         end
         cap.pressGlow:SetShown(cap.pressed)
-        cap.tag:SetText(a and a.kind == "system" and not a.presetName and actionName(a) or "")
+        cap.tag:SetText(hidden and "Reserved" or (a and a.kind == "system" and not a.presetName and actionName(a) or ""))
         cap.count:SetText(#cap.actions > 1 and tostring(#cap.actions) or (cap.alias and "S" or ""))
         color(cap.caption, mods[base] and prefix:find(mods[base],1,true) and C.accent or (a and C.text or C.muted))
         local detail = {}
         for _, action in ipairs(cap.actions) do
-            detail[#detail+1] = actionName(action) .. " (" .. (action.form or "all") .. ")" .. (action.known == false and (isSpellAction(action) and " — not learned" or " — "..(action.itemAvailability or "unavailable")) or "")
+            local actionState,actionStatus=self:SpellAvailability(action)
+            detail[#detail+1] = self:IsEditorHidden(action) and "Reserved unavailable spell. Enable Show unavailable spells in Settings to inspect it." or (actionName(action) .. " (" .. (action.form or "all") .. ")" .. (actionState and actionState~="ready" and " — "..actionStatus or action.known==false and " — "..(action.itemAvailability or "unavailable") or ""))
         end
         if mods[base] then detail={"Click to preview this modifier layer. Hold the physical key to preview combinations."}
         elseif cap.alias then detail[#detail+1]="Self-cast alias. Edit the normal binding to move both keys."
         elseif #detail == 0 then detail[1]="Unassigned. Click to choose an action." end
-        if target then detail[#detail+1]="Targeting: "..target end
-        tooltip(cap, keyName(full), table.concat(detail,"\n"), a and (a.displaySpellID or a.spellID), cap.locked,a and a.itemID)
+        if target and not hidden then detail[#detail+1]="Targeting: "..target end
+        if a and a.preserved then detail[#detail+1]="Protected in Settings. Current game binding is kept." end
+        tooltip(cap, keyName(full), table.concat(detail,"\n"), not hidden and a and (a.displaySpellID or a.spellID), cap.locked and status or nil,a and a.itemID)
     end
 end
 function UI:KeyboardKeyClick(base)
@@ -1236,6 +1282,7 @@ function UI:KeyboardKeyClick(base)
     local cap = self.pages.Bindings.keyboard.keys[base]
     if not cap then return end
     local function selectAction(action)
+        if UI:IsEditorHidden(action) then UI:Notice("This key is reserved. Enable Show unavailable spells in Settings to edit it."); return end
         UI.selectedAction = action
         UI:BindingDetail(action)
         if cap.alias then UI:Notice("Self-cast follows " .. keyName(action.key) .. ". Rebind the normal action to move both.") end
@@ -1281,7 +1328,7 @@ function UI:RenderActionPicker()
     for _, a in ipairs((self.plan or {}).actions or {}) do
         local hay=string.lower(actionName(a).." "..(a.key or "").." "..(a.category or ""))
         local form=self.formFilter or "all"
-        if (form=="all" or not a.form or a.form=="all" or a.form==form) and (query=="" or hay:find(query,1,true)) then matches[#matches+1]=a end
+        if not self:IsEditorHidden(a) and (form=="all" or not a.form or a.form=="all" or a.form==form) and (query=="" or hay:find(query,1,true)) then matches[#matches+1]=a end
     end
     local list=f.list
     for _,row in ipairs(list.rows) do row:Hide() end
@@ -1296,12 +1343,13 @@ function UI:RenderActionPicker()
             list.rows[i]=row
         end
         row.action=a; row:ClearAllPoints(); row:SetPoint("TOPLEFT",0,-(i-1)*38); row:SetWidth(math.max(600,list.child:GetWidth()))
+        local state,status,tone=self:SpellAvailability(a); tone=tone or C.warning
         row.icon:SetTexture(actionIcon(a))
         if row.icon.SetDesaturated then row.icon:SetDesaturated(a.known==false) end
-        row.icon:SetVertexColor(1,a.known==false and 0.72 or 1,a.known==false and 0.35 or 1)
-        row.name:SetText(actionName(a)..(a.known==false and (isSpellAction(a) and " · not learned" or " · unavailable") or "")); row.key:SetText(keyName(a.key or "Unbound"))
-        color(row.name,a.known==false and C.warning or C.text)
-        tooltip(row,actionName(a),"Click to bind this action to "..keyName(f.key)..".",a.displaySpellID or a.spellID,isSpellAction(a) and a.known==false)
+        row.icon:SetVertexColor(unpack(a.known==false and tone or C.white))
+        row.name:SetText(actionName(a)..(state and state~="ready" and " · "..status or a.known==false and " · unavailable" or "")); row.key:SetText(keyName(a.key or "Unbound"))
+        color(row.name,a.known==false and tone or C.text)
+        tooltip(row,actionName(a),"Click to bind this action to "..keyName(f.key)..".",a.displaySpellID or a.spellID,state and state~="ready" and status)
         row:Show()
     end
     if not list.empty then list.empty=label(list.child,"",12,C.muted); list.empty:SetPoint("TOPLEFT",10,-15) end
@@ -1403,7 +1451,9 @@ function UI:BuildBindings(page)
     detail.reset:SetPoint("TOPRIGHT", -12, -12)
     detail.reset:SetEnabled(false)
     detail.note = label(detail, "Apply & save installs your changes.", 10, C.muted)
-    detail.note:SetPoint("TOPRIGHT", -12, -46)
+    detail.note:SetPoint("TOPLEFT", 12, -62); detail.note:SetWidth(630)
+    detail.talents=button(detail,"Talent choices",128,function() if UI.selectedAction then UI:OpenTalentChoices(UI.selectedAction) end end)
+    detail.talents:SetPoint("TOPRIGHT",-12,-44); detail.talents:SetEnabled(false)
     page.detail = detail
     self:BuildKeyboard(page)
 end
@@ -1422,6 +1472,7 @@ function UI:RenderBindings(reusePageCache)
             page.detail.title:SetText("Select a binding")
             page.detail.desc:SetText("Press a key to test its planned action. Click an icon to rebind.")
             page.detail.rebind:SetEnabled(false); page.detail.change:SetEnabled(false); page.detail.reset:SetEnabled(false)
+            page.detail.talents:SetEnabled(false)
             page.detail:EnableMouse(false)
         end
     end
@@ -1438,16 +1489,22 @@ function UI:RenderBindings(reusePageCache)
     self:RenderKeyboard()
     self:UpdateBindingTester()
     self:SyncLibrary(not reusePageCache)
+    if self.selectedAction and self:IsEditorHidden(self.selectedAction) then self.selectedAction=nil end
+    if not self.selectedAction then
+        page.detail.title:SetText("Select a binding"); page.detail.desc:SetText("Press a key to test its planned action. Click an icon to rebind.")
+        page.detail.rebind:SetEnabled(false); page.detail.change:SetEnabled(false); page.detail.reset:SetEnabled(false); page.detail.talents:SetEnabled(false)
+        page.detail.note:SetText("Apply & save installs your changes."); page.detail:EnableMouse(false)
+    end
     if self.selectedAction then
-        for _, a in ipairs((self.plan or {}).actions or {}) do if a.id == self.selectedAction.id then self.selectedAction=a; break end end
+        for _, a in ipairs(self:DisplayActions()) do if a.id == self.selectedAction.id then self.selectedAction=a; break end end
         self:BindingDetail(self.selectedAction)
     end
     if not listView then return end
     local list, results = page.list, {}
-    for _, a in ipairs((self.plan or {}).actions or {}) do
+    for _, a in ipairs(self:DisplayActions()) do
         local form = a.form or "all"
         local hay = string.lower(table.concat({a.label or "", a.key or "", a.id or "", a.category or "", a.spellName or ""}, " "))
-        if (filter == "all" or form == "all" or form == filter) and (not self.search or self.search == "" or hay:find(self.search, 1, true)) then results[#results+1] = a end
+        if not self:IsEditorHidden(a) and (filter == "all" or form == "all" or form == filter) and (not self.search or self.search == "" or hay:find(self.search, 1, true)) then results[#results+1] = a end
     end
     for _, row in ipairs(list.rows) do row:Hide() end
     for i, a in ipairs(results) do
@@ -1478,20 +1535,22 @@ function UI:RenderBindings(reusePageCache)
         row:SetPoint("TOPLEFT", 0, -(i-1)*39)
         row:SetWidth(math.max(560, list.child:GetWidth()))
         row.key.text:SetText(keyName(a.key or "Unbound"))
+        row.key:SetEnabled(not a.preserved)
         row.name:SetText(a.label or a.spellName or a.id)
         row.form:SetText(a.form == "all" and "Every page" or (actionPageNames[a.form] or a.form or "Every page"))
         local pinned = (settings().bindingOverrides or {})[a.id]
-        row.state:SetText(a.known == false and (isSpellAction(a) and "Not learned" or "Unavailable") or (pinned and "Pinned" or "Ready"))
-        color(row.name, a.known == false and C.warning or C.text)
-        color(row.state, a.known==false and C.warning or (pinned and C.accent or C.muted))
-        tooltip(row.key, a.label or a.id, "Click to capture a replacement key. A pinned key is retained when the profile updates.",a.displaySpellID or a.spellID,isSpellAction(a) and a.known==false)
+        local state,status,tone=self:SpellAvailability(a); tone=tone or C.warning
+        row.state:SetText(a.preserved and "Protected" or state and state~="ready" and status or a.known==false and "Unavailable" or (pinned and "Pinned" or "Ready"))
+        color(row.name, a.known == false and tone or C.text)
+        color(row.state, a.known==false and tone or (pinned and C.accent or C.muted))
+        tooltip(row.key, a.label or a.id, a.preserved and "Protected in Settings. Current game binding is kept." or "Click to capture a replacement key. A pinned key is retained when the profile updates.",a.displaySpellID or a.spellID,state and state~="ready" and status)
         row:Show()
     end
     if not list.empty then list.empty = label(list.child, "", 13, C.muted); list.empty:SetPoint("TOPLEFT", 10, -18); list.empty:SetWidth(550) end
     list.empty:SetText(#results == 0 and "No matching bindings. Clear the search or select All." or "")
     list:UpdateHeight(math.max(50, #results*39))
     if self.selectedAction then
-        for _, a in ipairs((self.plan or {}).actions or {}) do if a.id == self.selectedAction.id then self.selectedAction = a; break end end
+        for _, a in ipairs(self:DisplayActions()) do if a.id == self.selectedAction.id then self.selectedAction = a; break end end
         self:BindingDetail(self.selectedAction)
     end
 end
@@ -1500,18 +1559,22 @@ function UI:BindingDetail(a)
     d.title:SetText((a.label or a.id) .. "  /  " .. keyName(a.key or "Unbound"))
     local _,target=self:TargetDescription(a)
     local parts = {a.category or "Action",target or "Default behavior"}
-    if a.known == false then parts[#parts+1] = isSpellAction(a) and "not learned; bind in advance" or a.itemAvailability or "unavailable" end
+    local state,status=self:SpellAvailability(a)
+    if state and state~="ready" then parts[#parts+1]=status.."; key reserved"
+    elseif a.known==false then parts[#parts+1]=a.itemAvailability or "Unavailable" end
+    if a.preserved then parts[#parts+1]="Protected in Settings" end
     if a.previousBinding and a.previousBinding ~= "" then parts[#parts+1] = "replaces " .. bindingLabel(a.previousBinding) end
     d.desc:SetText(table.concat(parts, "  |  "))
     local linked=self:LinkedBindings(a)
     local pinned=false
     for _,action in ipairs(linked) do if (settings().bindingOverrides or {})[action.id]~=nil then pinned=true; break end end
-    d.reset:SetEnabled(a.presetName~=nil or pinned)
+    d.reset:SetEnabled(not a.preserved and (a.presetName~=nil or pinned))
     d.note:SetText(#linked>1 and "This action-bar position changes in every form." or "Apply & save installs your changes.")
     d.reset.text:SetText(a.presetName and "Clear key" or "Reset key")
-    d.rebind:SetEnabled(true)
-    d.change:SetEnabled(a.key ~= nil and a.kind ~= "system" and not a.presetName)
-    tooltip(d, a.label or a.id, a.body or a.source or a.id,a.displaySpellID or a.spellID,isSpellAction(a) and a.known==false,a.itemID)
+    d.rebind:SetEnabled(not a.preserved)
+    d.change:SetEnabled(not a.preserved and a.key ~= nil and a.kind ~= "system" and not a.presetName)
+    d.talents:SetEnabled(self.CanEditTalentChoices and self:CanEditTalentChoices(a) or false)
+    tooltip(d, a.label or a.id, self:MacroDetail(a),a.displaySpellID or a.spellID,state and state~="ready" and status,a.itemID)
     d:EnableMouse(true)
 end
 
@@ -1871,6 +1934,7 @@ function UI:Create()
         if UI.nativeBarsDialog then UI.nativeBarsDialog:Hide() end
         if UI.operationErrorDialog then UI.operationErrorDialog:Hide() end
         if UI.diagnosticLogDialog then UI.diagnosticLogDialog:Hide() end
+        if UI.talentDialog then UI.talentDialog:Hide() end
     end)
     specialFrame("KeybindOptimizerWindow", true)
     local title = f.TitleText or label(f, "", 14, C.accent)

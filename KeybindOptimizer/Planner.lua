@@ -29,6 +29,11 @@ function P:Build(useCachedData)
     local version,build=GetBuildInfo()
     local selected=K.db.presets[K.db.activePreset]
     local plan={actions={},system={},conflicts={},errors={},warnings={},changes={},coverage={total=0,bound=0,missing={},catalogTotal=0,catalogKnown=0,catalogReserved=0},class=class,flavor=flavor,build=tostring(version).."."..tostring(build),formSignature=K.API:FormSignature(),settings=K.Copy(settings),fallbackBindings=K.Copy(settings.fallbackBindings or {}),presetName=K.db.activePreset,presetID=selected and selected.id}
+    local protected,preserved,protectionError=K.Protection:Build(settings)
+    plan.protectedKeys,plan.preservedActions=protected or {},preserved or {}
+    if protectionError then plan.errors[#plan.errors+1]=protectionError end
+    local validChoices,choiceError=K.TalentBindings:ValidateSettings(settings)
+    if not validChoices then plan.errors[#plan.errors+1]=choiceError end
     local book=useCachedData and K.API:GetCachedSpellbook() or K.API:ScanSpellbook()
     local definitions=K.Profiles and K.Profiles:Get(class,flavor) or {}
     if #definitions==0 then plan.warnings[#plan.warnings+1]="This class uses spellbook coverage rather than a curated class profile." end
@@ -37,7 +42,7 @@ function P:Build(useCachedData)
     local used={}
     local ids={}
     local function add(def)
-        local action=K.Copy(def)
+        local action=K.TalentBindings and K.TalentBindings:Resolve(def,settings,book) or K.Copy(def)
         local override=(settings.actionOverrides or {})[action.id]
         if override and override.replacement and K.Library then
             local replacement,why=K.Library:ResolveDescriptor(def.id,override.replacement,book)
@@ -114,6 +119,7 @@ function P:Build(useCachedData)
             end
         end
         action.key=K.API:NormalizeKey((not action.id:match("^mode%.") and settings.bindingOverrides[action.id]) or action.key)
+        if K.Availability then K.Availability:Annotate(action,class,flavor) end
         if class=="MAGE" and settings.primarySchool=="fire" and not settings.bindingOverrides[action.id] then
             if action.name=="Fireball" then action.key="1" elseif action.name=="Frostbolt" then action.key="SHIFT-1" end
         end
@@ -145,9 +151,14 @@ function P:Build(useCachedData)
     if K.Library then
         local actions,errors=K.Library:Actions(book)
         for _,why in ipairs(errors) do plan.errors[#plan.errors+1]=why end
-        for _,def in ipairs(actions) do add(def) end
+        for _,def in ipairs(actions) do
+            if def.kind=="system" and K.Protection:Preserves(def.command,settings,bindingCommands) then
+                plan.warnings[#plan.warnings+1]="Protected game control left unchanged: "..tostring(def.label or def.command)
+            else add(def) end
+        end
     end
     local function addSystem(id,key,command,label)
+        if K.Protection:Preserves(command,settings,bindingCommands) then return end
         local supported=K.API:IsBindingCommandSupported(command,bindingCommands) or (not bindingCommandsReadable and command~="TARGETFOCUS")
         if supported then
             local a=add({id=id,key=key,label=label,kind="system",command=command,known=true,category="System"})
@@ -188,7 +199,9 @@ function P:Build(useCachedData)
     end
     for _,v in ipairs({{"cancel","BUTTON3","Leave form"},{"focus","SHIFT-BUTTON3","Set focus"},{"clearfocus","CTRL-BUTTON3","Clear focus"}}) do
         local id="utility."..v[1]
-        if v[1]=="cancel" or supportsFocus then
+        if settings.preserveTargeting and v[1]~="cancel" then
+            -- Focus management is a targeting control, not a class spell.
+        elseif v[1]=="cancel" or supportsFocus then
             add({id=id,key=v[2],label=v[3],builtin=v[1],known=true,category="Utility"})
         elseif (settings.bindingOverrides or {})[id] or (settings.actionOverrides or {})[id] then
             plan.errors[#plan.errors+1]="Saved focus utility is unavailable on this client: "..v[3]..". Remove its override before using this preset."
@@ -208,6 +221,8 @@ function P:Build(useCachedData)
     -- Hardware availability is based on observed input events, never guessed hardware counts.
     local function available(key,action)
         if not key then return false end
+        if plan.protectedKeys[key] then return false end
+        if action and (action.talentHasHelpful or ((action.targeting=="help" or action.itemTargeting=="help") and not action.noSelf)) and plan.protectedKeys[altKey(key)] then return false end
         if action.kind=="system" then return true end
         if not settings.ctrl and key:find("CTRL%-") then return false end
         local base=bases(key)
@@ -222,6 +237,7 @@ function P:Build(useCachedData)
         used[a.key][#used[a.key]+1]=a
     end
     local function free(key,form)
+        if plan.protectedKeys[key] then return false end
         for _,a in ipairs(used[key] or {}) do if overlaps(a.form,form) then return false end end
         return true
     end
@@ -240,21 +256,63 @@ function P:Build(useCachedData)
         end
     end
     if settings.ctrl then for _,key in ipairs({"H","Y","U","N","6","7","8","9","0","-","=","[","]",";","'",",",".","/","\\"}) do fallbacks[#fallbacks+1]="CTRL-"..key end end
+    -- A native main-bar position has one binding across every form bank.
+    -- Protection can block only one page's Alt-self alias, but allocation must
+    -- still move the whole position rather than splitting its form keys.
+    local linked,groupOf={},{}
+    local nativeDruidPages={caster=true,cat=true,bear=true,moonkin=true}
     for _,action in ipairs(plan.actions) do
-        if available(action.key,action) then reserve(action) else action.requestedKey=action.key; action.key=nil end
+        if action.barSlot and ((class=="DRUID" and nativeDruidPages[action.form]) or class~="DRUID") then
+            local group=linked[action.barSlot] or {actions={}}
+            linked[action.barSlot]=group; groupOf[action]=group
+            group.actions[#group.actions+1]=action
+            group.blocked=group.blocked or not available(action.key,action)
+        end
+    end
+    for _,action in ipairs(plan.actions) do
+        local group=groupOf[action]
+        if not (group and group.blocked) and available(action.key,action) then reserve(action)
+        else action.requestedKey=action.key; action.key=nil end
     end
     local function allocate(action)
         local preferred=K.API:NormalizeKey(plan.fallbackBindings[action.id])
         if preferred and available(preferred,action) and free(preferred,action.form) then action.key=preferred
         else
-            for _,key in ipairs(fallbacks) do if free(key,action.form) then action.key=key; break end end
+            for _,key in ipairs(fallbacks) do if available(key,action) and free(key,action.form) then action.key=key; break end end
         end
         if action.key then plan.fallbackBindings[action.id]=action.key; reserve(action)
         else plan.errors[#plan.errors+1]="No available key for "..action.label end
     end
+    local function allocateGroup(group)
+        if group.attempted then return end
+        group.attempted=true
+        for _,action in ipairs(group.actions) do
+            if settings.bindingOverrides[action.id] then
+                plan.errors[#plan.errors+1]="Custom key "..tostring(settings.bindingOverrides[action.id]).." is protected or unavailable for linked position "..action.barSlot
+                return
+            end
+        end
+        local function usable(key)
+            if not key then return false end
+            for _,action in ipairs(group.actions) do if not available(key,action) or not free(key,action.form) then return false end end
+            return true
+        end
+        local selected
+        for _,action in ipairs(group.actions) do
+            local preferred=K.API:NormalizeKey(plan.fallbackBindings[action.id])
+            if usable(preferred) then selected=preferred; break end
+        end
+        if not selected then for _,key in ipairs(fallbacks) do if usable(key) then selected=key; break end end end
+        if not selected then plan.errors[#plan.errors+1]="No available key for linked main-bar position "..group.actions[1].barSlot; return end
+        for _,action in ipairs(group.actions) do
+            action.key=selected; plan.fallbackBindings[action.id]=selected; reserve(action)
+        end
+    end
     for _,action in ipairs(plan.actions) do
         if not action.key then
-            if settings.bindingOverrides[action.id] then plan.errors[#plan.errors+1]="Invalid or unavailable custom key for "..action.label
+            if action.id:match("^mode%.") then plan.errors[#plan.errors+1]="Preset hotkey "..tostring(action.requestedKey).." is protected or unavailable. Choose another preset hotkey."
+            elseif groupOf[action] then allocateGroup(groupOf[action])
+            elseif settings.bindingOverrides[action.id] then plan.errors[#plan.errors+1]="Custom key "..tostring(settings.bindingOverrides[action.id]).." is protected or unavailable for "..action.label
             else allocate(action) end
         end
     end
@@ -263,7 +321,10 @@ function P:Build(useCachedData)
         plan.coverage.total=plan.coverage.total+1
         if not coverage[spell.name] then
             local a=add({id="spell."..K.Macros:Name(spell.name):sub(5),name=spell.name,spellIDs={spell.id},category="Additional spells",targeting=K.API:Helpful(spell.id) and "help" or "harm",source="Spellbook coverage",known=true})
-            if a.key then reserve(a) else allocate(a) end
+            if a.key and not available(a.key,a) then
+                plan.errors[#plan.errors+1]="Custom key "..a.key.." is protected or unavailable for "..a.label
+                a.requestedKey=a.key; a.key=nil
+            elseif a.key then reserve(a) else allocate(a) end
             coverage[spell.name]=a.key~=nil
         end
         if coverage[spell.name] then plan.coverage.bound=plan.coverage.bound+1 else plan.coverage.missing[#plan.coverage.missing+1]=spell.name end
@@ -289,7 +350,7 @@ function P:Build(useCachedData)
                 conflictKeys[a.key]=true
                 plan.conflicts[#plan.conflicts+1]={key=a.key,label=a.label,previous=a.previousBinding,previousLabel=a.previousBindingLabel,message=a.key..": "..a.previousBindingLabel.." -> "..a.label}
             end
-            if (a.targeting=="help" or a.itemTargeting=="help") and not a.noSelf then
+            if a.talentHasHelpful or ((a.targeting=="help" or a.itemTargeting=="help") and not a.noSelf) then
                 a.selfKey=altKey(a.key)
                 if a.selfKey and used[a.selfKey] then plan.errors[#plan.errors+1]="Self-cast conflict: "..a.selfKey end
                 local previous=a.selfKey and K.API:BindingAction(a.selfKey) or ""
@@ -307,9 +368,11 @@ function P:Build(useCachedData)
     plan.macrosNeeded,plan.macrosAvailable=K.Macros:Budget(plan)
     if plan.macrosNeeded>plan.macrosAvailable then plan.errors[#plan.errors+1]="Need "..plan.macrosNeeded.." free macro slots; only "..plan.macrosAvailable.." are available. No macros will be overwritten." end
     if plan.coverage.total==0 then plan.warnings[#plan.warnings+1]="No active spells found. Open your spellbook and refresh before applying." end
-    plan.warnings[#plan.warnings+1]="Talent, rank, and item changes are proposed for review; established keys are not moved automatically."
-    plan.changes[#plan.changes+1]="Alt self-cast; focus-cast modifier cleared; automatic self fallback "..(settings.selfFallback and "enabled in helpful macros" or "disabled").."."
-    plan.changes[#plan.changes+1]="Mouse wheel abilities "..(settings.wheel and "on; Alt-wheel zoom" or "off; normal wheel zoom restored").."."
+    if settings.hideUnavailableSpells or settings.adaptTalents or next(settings.talentAlternatives or {}) then
+        plan.changes[#plan.changes+1]="Learned spells and talent choices update owned slots outside combat. Keys stay in place; personal bar edits are preserved."
+    else plan.warnings[#plan.warnings+1]="Review new spells and talents here. Established keys are not moved automatically." end
+    plan.changes[#plan.changes+1]=settings.preserveGameSettings and "Existing casting modifiers and game settings are preserved." or ("Alt self-cast; focus-cast modifier cleared; automatic self fallback "..(settings.selfFallback and "enabled in helpful macros" or "disabled")..".")
+    plan.changes[#plan.changes+1]=settings.preserveCamera and "Existing camera and mouse controls are protected." or ("Mouse wheel abilities "..(settings.wheel and "on; Alt-wheel zoom" or "off; normal wheel zoom restored")..".")
     plan.changes[#plan.changes+1]="A named backup is saved first. Applying updates planned keys and preserves unrelated bindings."
     table.sort(plan.actions,function(a,b)
         local x,y=pageOrder[a.form] or 9,pageOrder[b.form] or 9
