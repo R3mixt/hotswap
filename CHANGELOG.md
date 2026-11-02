@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.4.5 beta — 2026-11-02
+
+- Fix restored direct macro identities and preserve personal changes after failed form maintenance.
+- Correct draft editor state, imported shortcut validation, copied fixed ranks and recommendation preview filters.
+- Avoid reapplying unchanged presets; distinguish unreadable live slots; add All pages in List and named-restore confirmation.
+- Verify Hover bind includes every planned spell across all nine classes, unavailable talents and configured ranks.
+- Validated with mocked Lua APIs; live-client acceptance remains pending.
+
 ## 0.4.4 beta â€” 2026-11-02
 
 - Open on the current character's actual bindings and native bar contents, including movement, mouse controls and current pet slots. Do not substitute class recommendations or reserve future spells in this view.

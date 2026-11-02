@@ -1,8 +1,8 @@
-# Hot Swap 0.4.4
+# Hot Swap 0.4.5
 
 A configurable World of Warcraft addon for stable class bindings, druid form pages, mouseover/focus macros, Alt self-cast, and selectable on-use items.
 
-**Status: installable beta.** Version 0.4.4 opens Bindings on your actual game layout, read-only. Preview recommendations separately on Presets, save a new named draft, then explicitly Apply & save. The scrollable Hover bind editor edits saved drafts without casting. Generated native buttons retain readable action labels and explanatory trinket tooltips. Generated macros remain character-specific by default, with future spell positions reserved when space is limited. Account-wide overflow is an explicit preset option. Bindings and mouse controls outside the selected preset remain unchanged. The actual Lua modules are checked using Lua 5.1 and mocked WoW APIs; real-client behavior still needs a retest. Geometry previews approximate artwork and fonts and are not game screenshots.
+**Status: installable beta.** Version 0.4.5 opens Bindings on your actual game layout, read-only. Preview recommendations separately on Presets, save a new named draft, then explicitly Apply & save. The scrollable Hover bind editor edits saved drafts without casting. Generated native buttons retain readable action labels and explanatory trinket tooltips. Generated macros remain character-specific by default, with future spell positions reserved when space is limited. Account-wide overflow is an explicit preset option. Bindings and mouse controls outside the selected preset remain unchanged. The actual Lua modules are checked using Lua 5.1 and mocked WoW APIs; real-client behavior still needs a retest. Geometry previews approximate artwork and fonts and are not game screenshots.
 
 ## Install and open
 
