@@ -7,6 +7,7 @@ Hot Swap prepares a binding layout, then installs it onto Blizzard's original ba
 | Module | Responsibility |
 | --- | --- |
 | Core | SavedVariables migration, settings, events and public entry points |
+| Diagnostics | Opt-in bounded per-character error/operation records and copyable export; preserves prior error handler |
 | API | Client feature detection, localized spell/item metadata and game API wrappers |
 | Profiles / LibraryData | Stable class IDs, recommended keys and display-only specialization/talent metadata |
 | Macros | Supported target, form, rank and item macro bodies |
@@ -16,7 +17,7 @@ Hot Swap prepares a binding layout, then installs it onto Blizzard's original ba
 | Planner | Resolve knowledge, reserve future positions, cover learned actions and validate the plan |
 | Engine | Bounded apply, recovery, rollback and maintenance jobs; macro ownership |
 | Presets | Complete drafts, activation shortcuts, backups and data-only transfer |
-| UI / LibraryUI / ItemsUI | Main configuration, spellbook/target editor and item editor |
+| UI / LibraryUI / ItemsUI / SettingsUI | Main configuration, spellbook/target and item editors, local appearance/log controls |
 | Launcher | Native settings and Escape-menu integration |
 
 Each Lua module receives the shared `K` namespace through addon varargs. The TOC defines load order. Python is for development only.
@@ -26,7 +27,7 @@ Each Lua module receives the shared `K` namespace through addon varargs. The TOC
 1. The selected preset holds editable settings. Stable action IDs connect bindings, overrides and item alternatives; preset IDs survive renames.
 2. Planner resolves current-client metadata. Display metadata is separate from learned eligibility. Future actions reserve positions without becoming usable.
 3. NativeBars assigns main positions and available extra slots. A main position has one key across form pages. A spell edit changes the selected page; a key edit changes every linked page. Overflow uses ordinary macro bindings after capacity validation.
-4. Engine preflight checks combat, cursor state, capacity, shortcut overlap and restorable action types. Snapshot reads finish before the named backup is stored and live writes begin.
+4. Engine preflight checks combat, supported native commands/focus capability, capacity and shortcut overlap; snapshot preparation validates cursor state and restorable action types. Snapshot reads finish before the named backup is stored and live writes begin.
 5. A frame worker advances small steps with time and operation budgets: macros, native actions, new bindings, obsolete binding removal, settings save and completion verification. Recovery uses the same mechanism.
 6. The applied plan is separate from the draft. Inventory and form maintenance use applied settings; an event cannot silently install an edited draft item choice.
 
@@ -52,3 +53,11 @@ Each Lua module receives the shared `K` namespace through addon varargs. The TOC
 Keep client API differences in API/NativeBars, not UI handlers. Add catalog entries with stable IDs and sourced spell IDs. Keep display categories separate from capability. Extend target modes through the shared capability/compiler path and test Alt behavior. Add settings through defaults, migration, import validation and export together.
 
 Run `python tests/run_tests.py` after installing requirements-dev.txt. Tests execute actual modules in fresh Lua 5.1 VMs with mocked APIs. Failure injection covers partial apply, rollback, binding-set reads, cursor cleanup, macro edits and combat pauses. UI tests cover input ownership and staging. `ui-qa/capture.py` and `render.ps1` render actual frame geometry with approximate artwork; neither replaces the live-client checks in compatibility.md.
+
+## Local diagnostics and preferences
+
+`db.preferences` holds diagnostics (default false), windowOpacity and windowScale independently of preset data. Import/export, switching and recovery do not overwrite it. Effective scale fits the viewport without changing the stored preference. `db.diagnostics` holds at most 200 records, each with a 3000-character message, timestamp, severity/event and a whitelist of short primitive context fields. There are no raw macro/preset dumps or network operations.
+
+Engine logs transitions rather than every mutation. Scoped protected calls capture a bounded stack only while diagnostics are enabled. Logger failures cannot interrupt a transaction. The opt-in global wrapper only records errors identifying Hot Swap and always forwards to the previous handler. Disabling restores that handler only while Hot Swap is still the outermost wrapper; an intervening addon's chain keeps an inactive pass-through wrapper. SavedVariables persist on normal reload/logout.
+
+Client command capabilities are cached separately from assigned keys and invalidated by UPDATE_BINDINGS. Apply forces a fresh registry read before mutation. The Engine only permits generated preset CLICK commands after validating their stable identity; imported macro references follow the fingerprint-verified macro path. Restoring a baseline preserves arbitrary original commands. Restoring an enabled named backup checks saved preset identities, including modes that recovery will resurrect, without changing current state before backup.

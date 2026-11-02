@@ -5,10 +5,10 @@
   "name": "Hot Swap",
   "summary": "Build and switch class keybind presets on Blizzard's original action bars, with a visual keyboard editor, generated macros, item choices, and named backups.",
   "release": {
-    "version": "0.3.1",
-    "displayName": "Hot Swap 0.3.1 beta",
+    "version": "0.3.2",
+    "displayName": "Hot Swap 0.3.2 beta",
     "releaseType": "beta",
-    "automatedTests": 214,
+    "automatedTests": 253,
     "testMethod": "Actual Lua modules executed under Lua 5.1 with mocked WoW APIs",
     "liveClientAcceptance": "pending"
   },

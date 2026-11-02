@@ -17,17 +17,18 @@ local function text(value,max) return type(value)=="string" and #value>0 and #va
 local function integer(value) return type(value)=="number" and value>0 and value<2147483647 and value%1==0 end
 local function chat(command) return command:find("CHAT") or command:find("REPLY") or command:find("WHISPER") or command:find("SAY") or command:find("YELL") end
 function L:Commands()
-    local count=GetNumBindings and GetNumBindings() or 0
+    local commands,readable=K.API:GetBindingCommands()
+    if not readable then return {} end
     local locale=GetLocale and GetLocale() or "enUS"
-    if self.commandCache and self.commandCount==count and self.commandLocale==locale then return self.commandCache end
+    if self.commandCache and self.commandSource==commands and self.commandLocale==locale then return self.commandCache end
     local result={}
-    for i=1,count do
-        local command,category=GetBinding(i)
+    for command,info in pairs(commands) do
+        local category=info.category
         if command and command~="" and not command:match("^HEADER") and not command:match("^MACRO ") and not command:match("^CLICK ") then
             result[command]={label=K.API:BindingLabel(command),category=category and (_G[category] or category) or "Game controls",tab=chat(command) and "chat" or "game"}
         end
     end
-    self.commandCache,self.commandCount,self.commandLocale=result,count,locale
+    self.commandCache,self.commandSource,self.commandLocale=result,commands,locale
     return result
 end
 function L:Emotes()
@@ -53,6 +54,7 @@ function L:ValidateDescriptor(d)
     for key in pairs(d) do if not allowed[key] then return false,"Unknown library action field: "..tostring(key) end end
     if d.form and not ({all=true,caster=true,cat=true,bear=true,moonkin=true})[d.form] then return false,"Invalid action page." end
     if d.targeting and not ({harm=true,help=true,dead=true,self=true,none=true,ground=true,form=true,focus=true})[d.targeting] then return false,"Invalid action target." end
+    if d.targeting=="focus" and not K.API:SupportsFocus() then return false,"Focus targeting is unavailable on this client. Choose another target mode." end
     if d.name and (not text(d.name,120) or (d.kind=="spell" and d.name:find("[;%[%]/]"))) then return false,"Invalid action name." end
     if d.rankMode and d.rankMode~="highest" then return false,"Invalid rank mode." end
     if d.kind=="spell" then
@@ -190,9 +192,13 @@ function L:TargetModes(action)
     if action.kind or action.builtin or action.combo or action.targeting=="form" then return {"default"} end
     if action.targeting=="ground" then return {"default","cursor"} end
     if action.targeting=="help" then
-        local values={"default","mouseover","target","focus"}; if not action.noSelf then values[#values+1]="self" end; return values
+        local values={"default","mouseover","target"}
+        if K.API:SupportsFocus() then values[#values+1]="focus" end
+        if not action.noSelf then values[#values+1]="self" end; return values
     end
-    if action.targeting=="harm" or action.targeting=="focus" or action.targeting=="dead" then return {"default","mouseover","target","focus"} end
+    if action.targeting=="harm" or action.targeting=="focus" or action.targeting=="dead" then
+        local values={"default","mouseover","target"}; if K.API:SupportsFocus() then values[#values+1]="focus" end; return values
+    end
     return {"default"}
 end
 local function findAction(id)
@@ -200,6 +206,7 @@ local function findAction(id)
 end
 function L:SetTargetMode(id,mode)
     if busy() then return false,"Wait for the current operation to finish." end
+    if mode=="focus" and not K.API:SupportsFocus() then return false,"Focus targeting is unavailable on this client. Choose another target mode." end
     local action=findAction(id); if not action then return false,"That action is unavailable." end
     if action.kind=="item" and K.Items.SetBindingTargetMode then return K.Items:SetBindingTargetMode(id,mode) end
     if not self:CanOverride(id) then return false,"This preset has reached its action-edit limit." end

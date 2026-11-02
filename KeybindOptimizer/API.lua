@@ -260,6 +260,35 @@ function A:ItemSpell(id)
     if fn then return fn(id) end
 end
 function A:BindingAction(key) return GetBindingAction and GetBindingAction(key) or "" end
+function A:InvalidateBindingCommands()
+    self.bindingCommands=nil; self.bindingCommandCount=nil; self.bindingCommandLocale=nil
+end
+function A:GetBindingCommands(forceRefresh)
+    -- This is the client's command registry, including commands with no key.
+    -- A flavor preference or a localized binding label does not prove support.
+    if forceRefresh then self:InvalidateBindingCommands() end
+    if type(GetNumBindings)~="function" or type(GetBinding)~="function" then self:InvalidateBindingCommands(); return {},false end
+    local ok,count=pcall(GetNumBindings)
+    if not ok or type(count)~="number" or count<1 or count>10000 or count%1~=0 then self:InvalidateBindingCommands(); return {},false end
+    local locale=GetLocale and GetLocale() or "enUS"
+    if not forceRefresh and self.bindingCommands and self.bindingCommandCount==count and self.bindingCommandLocale==locale then return self.bindingCommands,true end
+    local commands={}
+    for index=1,count do
+        local readable,command,category=pcall(GetBinding,index)
+        if not readable or type(command)~="string" or command=="" then self:InvalidateBindingCommands(); return {},false end
+        commands[command]={category=category,index=index}
+    end
+    self.bindingCommands,self.bindingCommandCount,self.bindingCommandLocale=commands,count,locale
+    return commands,true
+end
+function A:SupportsFocus()
+    local commands,readable=self:GetBindingCommands()
+    return readable and (commands.TARGETFOCUS~=nil or commands.FOCUSTARGET~=nil) or false
+end
+function A:ActionUsesFocus(action)
+    return action.builtin=="focus" or action.builtin=="clearfocus" or action.targetMode=="focus"
+        or (action.targeting=="focus" and (not action.targetMode or action.targetMode=="default"))
+end
 function A:BindingLabel(command)
     if not command or command=="" then return "Unbound" end
     local index=command:match("^ACTIONBUTTON(%d+)$")

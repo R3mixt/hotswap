@@ -2,11 +2,12 @@
 ## Title: Hot Swap
 ## Notes: Original action bars, optimized class bindings, spellbook editing, presets and recovery.
 ## Author: Clay
-## Version: 0.3.1
+## Version: 0.3.2
 ## SavedVariablesPerCharacter: KeybindOptimizerDB
 ## Category: Action Bars
 
 Core.lua
+Diagnostics.lua
 API.lua
 Profiles.lua
 Macros.lua
@@ -20,4 +21,5 @@ Presets.lua
 ItemsUI.lua
 UI.lua
 LibraryUI.lua
+SettingsUI.lua
 Launcher.lua

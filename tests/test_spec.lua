@@ -1404,6 +1404,7 @@ end
 
 function Tests.keyboard_existing_game_binding_replacement_stages_without_false_conflict()
   local k=init(); k.UI:Open(); k.UI:ShowPage("Bindings")
+  Mock:RegisterBindingCommand("TOGGLEACHIEVEMENT","BINDING_HEADER_INTERFACE")
   Mock.bindings.U="TOGGLEACHIEVEMENT"
   local heal=actionByID(k.UI.plan,"druid.rejuvenation")
   Mock:ResetWrites()

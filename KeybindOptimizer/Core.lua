@@ -1,6 +1,6 @@
 local addonName, K = ...
 _G.KeybindOptimizer = K
-K.name, K.version = addonName or "KeybindOptimizer", "0.3.1"
+K.name, K.version = addonName or "KeybindOptimizer", "0.3.2"
 K.defaults = {
     wheel = true, middle = true, ctrl = true,
     mouseButtons = { BUTTON4 = true, BUTTON5 = true },
@@ -31,12 +31,22 @@ end
 function K:Init()
     if type(KeybindOptimizerDB) ~= "table" then KeybindOptimizerDB = {} end
     self.db = KeybindOptimizerDB
+    -- Device-local preferences never travel with a shared binding preset.
+    self.db.preferences=type(self.db.preferences)=="table" and self.db.preferences or {}
+    local preferences=self.db.preferences
+    preferences.diagnostics=preferences.diagnostics==true
+    for key,range in pairs({windowOpacity={0.4,1},windowScale={0.7,1.3}}) do
+        local value=preferences[key]
+        if type(value)~="number" or value~=value then value=1 end
+        preferences[key]=math.max(range[1],math.min(range[2],value))
+    end
     self.db.settings = type(self.db.settings)=="table" and self.db.settings or {}
     defaults(self.db.settings, self.defaults)
     self.Presets:Initialize()
     self.db.ownedMacros = self.db.ownedMacros or {}
     self.db.history = self.db.history or {}
     self.dirty=self.Presets:HasUnappliedChanges()
+    if self.Diagnostics then self.Diagnostics:Init() end
 end
 function K:GetSettings() if not self.db then self:Init() end return self.db.settings end
 function K:Print(message)
@@ -99,7 +109,7 @@ function K:Apply()
     if InCombatLockdown and InCombatLockdown() then return false, "Leave combat before applying changes." end
     local plan=self:Preview()
     local valid,why=self.Presets:ValidateHotkeys(plan)
-    if not valid then return false,why end
+    if not valid then return self.Engine:Reject(why) end
     local ok, message = self.Engine:Apply(plan)
     if ok==true then self.dirty = false; self.db.appliedPreset=self.db.activePreset; self.db.appliedPresetSignature=self.Presets:Signature(self.db.activePreset) end
     self:InvalidatePreview()
@@ -264,7 +274,10 @@ if CreateFrame then
             end
             if not K.db.welcomed then K:Print("Type /hotswap to review your layout. Nothing changes until you apply it."); K.db.welcomed=true end
         elseif K.db then
-            if event=="UPDATE_BINDINGS" and K.Library then K.Library.commandCache=nil end
+            if event=="UPDATE_BINDINGS" then
+                if K.Library then K.Library.commandCache=nil end
+                K.API:InvalidateBindingCommands()
+            end
             if event=="GET_ITEM_INFO_RECEIVED" and not K.Items:OnItemInfoReceived(arg,success) then return end
             if event=="UNIT_PET" and arg and arg~="player" then return end
             local spellsChanged=event=="SPELLS_CHANGED" or event=="LEARNED_SPELL_IN_TAB" or event=="LEARNED_SPELL_IN_SKILL_LINE" or event=="PLAYER_TALENT_UPDATE" or event=="UPDATE_SHAPESHIFT_FORMS" or event=="UNIT_PET" or event=="PET_BAR_UPDATE"

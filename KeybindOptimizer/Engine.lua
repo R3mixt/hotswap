@@ -1,6 +1,36 @@
 local _, K = ...
 K.Engine={buttons={}}
 local E=K.Engine
+local function record(level,event,message,job,extra)
+    if not K.Diagnostics or not K.Diagnostics:IsEnabled() then return end
+    local context={operation=job and job.kind,stage=job and job.message,backup=job and job.entry and job.entry.id,
+        key=job and job.failureKey,command=job and job.failureCommand,action=job and job.failureAction}
+    for key,value in pairs(extra or {}) do context[key]=value end
+    -- Diagnostics must never turn a recoverable game error into another failure.
+    pcall(K.Diagnostics.Record,K.Diagnostics,level,event,message,context)
+end
+local function protectedStep(fn)
+    if not K.Diagnostics or not K.Diagnostics:IsEnabled() then return pcall(fn) end
+    local trace
+    local ok,result=xpcall(fn,function(why)
+        if K.Diagnostics.Trace then
+            local traced,value=pcall(K.Diagnostics.Trace,K.Diagnostics,why)
+            if traced then trace=value end
+        end
+        return why
+    end)
+    return ok,result,trace
+end
+function E:Reject(message,operation)
+    record("error","preflight",message,nil,{operation=operation or "apply",outcome="not-started"})
+    return false,message
+end
+local function actionLabel(plan,key,command)
+    for _,action in ipairs(plan and plan.actions or {}) do
+        if action.key==key or action.selfKey==key then return action.label or action.name or command end
+    end
+    return K.API:BindingLabel(command)
+end
 local function inCombat() return InCombatLockdown and InCombatLockdown() end
 local function captureBindings()
     local result={}
@@ -227,7 +257,11 @@ bindingSteps=function(job,target)
         local binding,command=key,target[key]
         if job.currentBindings[binding]~=command then
             addStep(steps,function()
-                if not SetBinding(binding,command) then error("The client rejected key "..binding) end
+                if not SetBinding(binding,command) then
+                    local label=actionLabel(job.plan,binding,command)
+                    if not job.rollingBack then job.failureKey=binding; job.failureCommand=command; job.failureAction=label end
+                    error("The client rejected "..binding.." ("..tostring(label).."; "..command..").")
+                end
                 job.currentBindings[binding]=command
             end,"Installing bindings",false,true)
         end
@@ -236,7 +270,10 @@ bindingSteps=function(job,target)
     for key in pairs(job.currentBindings) do
         local binding=key
         if target[binding]==nil then addStep(steps,function()
-            if not SetBinding(binding) then error("The client could not clear old key "..binding) end
+            if not SetBinding(binding) then
+                if not job.rollingBack then job.failureKey=binding; job.failureCommand=job.currentBindings[binding] end
+                error("The client could not clear old key "..binding.." ("..tostring(job.currentBindings[binding])..").")
+            end
             job.currentBindings[binding]=nil
         end,"Removing obsolete bindings",false,true) end
     end
@@ -316,6 +353,7 @@ function E:FinishJob(job,ok,message)
     if self.runner then self.runner:SetScript("OnUpdate",nil) end
     job.progress=1; job.message=message; job.finished=true; job.ok=ok
     self.lastJob=job; self.job=nil; self.busy=false
+    record(ok and "info" or "error","operation-finished",message,job,{outcome=ok and "success" or (job.rollbackComplete and "rolled-back" or (job.rollingBack and "rollback-failed" or "failed"))})
     if K.OnApplyComplete then K:OnApplyComplete(ok,message,job.plan,job.kind)
     elseif message then K:Print(message) end
     if K.QueueRefresh then K:QueueRefresh() end
@@ -324,20 +362,28 @@ function E:StartJob(job)
     if self.busy then return false,"Wait for the current operation to finish." end
     self.busy=true; self.job=job
     job.index=1; job.total=#job.steps; job.progress=0; job.message="Preparing "..job.kind
+    record("info","operation-start",job.message,job)
     if not self.runner then self.runner=CreateFrame("Frame") end
     self.runner:SetScript("OnUpdate",function()
         if E.job~=job then return end
         if inCombat() then
+            if not job.paused then record("info","combat-pause","Operation paused in combat.",job) end
             job.paused=true; job.message="Paused in combat. Setup is partly complete and will resume afterward."; return
         end
+        if job.paused then record("info","combat-resume","Operation resumed after combat.",job) end
         job.paused=false
         local started=clockMS(); local count=0
         while job.index<=#job.steps and count<6 do
             local step=job.steps[job.index]
             job.message=step.message or job.message
+            if job.loggedStage~=job.message then
+                job.loggedStage=job.message; record("info","phase",job.message,job)
+            end
             if step.mutates then job.changed=true end
-            local ok,why=pcall(step.run)
+            local ok,why,trace=protectedStep(step.run)
             if not ok then
+                if not job.rollingBack then job.failureStage=job.message end
+                record("error",job.rollingBack and "rollback-error" or "step-error",trace or tostring(why),job)
                 if job.entry then job.entry.status="failed"; job.entry.error=tostring(why) end
                 if job.rollingBack then
                     E:FinishJob(job,false,"Setup failed; rollback could not finish. Use the saved backup. "..tostring(why)); return
@@ -346,6 +392,7 @@ function E:StartJob(job)
                 if not job.changed or not job.backupReady then E:FinishJob(job,false,"Setup cancelled: "..tostring(why)); return end
                 local built,rollback=pcall(job.rollback,job)
                 if not built then E:FinishJob(job,false,"Setup failed; could not prepare rollback. Backup retained. "..tostring(rollback)); return end
+                record("warning","rollback-start",job.failure,job)
                 job.steps=rollback; job.index=1; job.total=#rollback; job.rollingBack=true; job.message="Rolling back failed setup"; return
             end
             job.index=job.index+1; job.total=#job.steps; job.progress=math.min(0.99,(job.index-1)/math.max(1,job.total))
@@ -353,13 +400,20 @@ function E:StartJob(job)
             if step.barrier or clockMS()-started>=4 then break end
         end
         if job.index>#job.steps then
-            if job.rollingBack then E:FinishJob(job,false,"Setup failed and was rolled back: "..tostring(job.failure))
+            if job.rollingBack then
+                job.rollbackComplete=true
+                record("info","rollback-complete","Previous state restored.",job,{outcome="restored"})
+                E:FinishJob(job,false,"Setup failed and was rolled back: "..tostring(job.failure))
             else
-                local ok,message=pcall(job.commit,job)
+                local ok,message,trace=protectedStep(function() return job.commit(job) end)
                 if not ok then
                     job.failure=tostring(message)
+                    job.failureStage="Committing saved preset"
+                    record("error","commit-error",trace or job.failure,job,{stage=job.failureStage})
                     local built,rollback=pcall(job.rollback,job)
-                    if built then job.steps=rollback; job.index=1; job.total=#rollback; job.rollingBack=true
+                    if built then
+                        record("warning","rollback-start",job.failure,job)
+                        job.steps=rollback; job.index=1; job.total=#rollback; job.rollingBack=true
                     else E:FinishJob(job,false,"Setup failed; backup retained. "..tostring(rollback)) end
                 else E:FinishJob(job,true,message) end
             end
@@ -395,13 +449,43 @@ local function nativePrepare(plan)
     plan.nativeLayout=layout
     return layout
 end
+function E:ValidatePlanCommands(plan,layout,presetState)
+    local commands,readable=K.API:GetBindingCommands(true)
+    if not readable then return false,"The game's binding list is not ready. Reload the UI and try again. No changes were made." end
+    -- Only our generated preset shortcuts may precede their frame creation.
+    -- Never trust an imported string merely because it starts with CLICK.
+    local shortcuts={}
+    local presetIDs={}
+    -- Named recovery can legitimately resurrect a deleted saved mode. Resolve
+    -- identities from that snapshot without restoring its state before backup.
+    for _,preset in pairs(presetState and presetState.presets or K.db.presets or {}) do
+        if type(preset)=="table" and type(preset.id)=="string" then presetIDs[preset.id]=true end
+    end
+    for _,action in ipairs(plan.actions or {}) do
+        if K.API:ActionUsesFocus(action) and not K.API:SupportsFocus() then
+            return false,"Cannot apply "..tostring(action.key or action.label)..": "..tostring(action.label or action.id).." uses focus targeting, which is unavailable on this client."
+        end
+        if action.kind=="system" and action.presetID and presetIDs[action.presetID] then
+            local expected="CLICK KBO_Mode_"..action.presetID..":LeftButton"
+            if action.id=="mode."..action.presetID and action.command==expected then shortcuts[expected]=true end
+        end
+    end
+    for key,entry in pairs(layout.keys or {}) do
+        local dynamic=entry.command and (entry.command:match("^CLICK ") or entry.command:match("^MACRO "))
+        if entry.command and not shortcuts[entry.command] and (dynamic or not commands[entry.command]) then
+            return false,"Cannot apply "..key..": "..tostring(actionLabel(plan,key,entry.command)).." ("..entry.command..") is unavailable on this client. No changes were made."
+        end
+    end
+    return true
+end
 function E:Apply(plan)
     if self.busy then return false,"Wait for the current operation to finish." end
     if inCombat() then return false,"Leave combat before applying a preset." end
-    if not plan or #(plan.errors or {})>0 then return false,plan and plan.errors[1] or "Create a preview first." end
-    local layout,why=nativePrepare(plan); if not layout then return false,why end
+    if not plan or #(plan.errors or {})>0 then return self:Reject(plan and plan.errors[1] or "Create a preview first.") end
+    local layout,why=nativePrepare(plan); if not layout then return self:Reject(why) end
+    local valid,problem=self:ValidatePlanCommands(plan,layout); if not valid then return self:Reject(problem) end
     local needed,available=K.Macros:Budget(plan)
-    if needed>available then return false,"Not enough free macro slots. No changes were made." end
+    if needed>available then return self:Reject("Not enough free macro slots. No changes were made.") end
     local job={kind="apply",plan=plan,previous=runtimeState(),created={}}
     job.steps=snapshotSteps(job); job.rollback=rollbackJob
     for _,step in ipairs(macroSteps(plan,job.created)) do job.steps[#job.steps+1]=step end
@@ -454,6 +538,8 @@ function E:RestoreBackup(id)
     local owned=K.Copy(K.db.ownedMacros or {})
     for name,body in pairs(target.ownedMacros or {}) do if owned[name]==nil then owned[name]=body end end
     if target.enabled then
+        local valid,why=self:ValidatePlanCommands(target.appliedPlan,target.appliedPlan.nativeLayout,target.presetState)
+        if not valid then return self:Reject(why,"restore") end
         local current=K.db.ownedMacros; K.db.ownedMacros=owned
         local needed,available=K.Macros:Budget(target.appliedPlan); K.db.ownedMacros=current
         if needed>available then return false,"Not enough free macro slots to restore this backup. No changes were made." end
@@ -495,6 +581,8 @@ function E:Activate(plan)
     if self.busy then return "pending","An operation is already running." end
     if inCombat() then return false,"Leave combat before activating the layout." end
     if not plan or not plan.nativeLayout then return false,"This saved layout used custom bars. Restore the original setup, then apply a preset for native action bars." end
+    local valid,why=self:ValidatePlanCommands(plan,plan.nativeLayout)
+    if not valid then return self:Reject(why,"activate") end
     self:Deactivate()
     K.playerClass=plan.class or K.playerClass
     if K.Presets and K.Presets.EnsureButtons then K.Presets:EnsureButtons() end

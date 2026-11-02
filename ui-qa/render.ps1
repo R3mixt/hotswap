@@ -16,7 +16,7 @@ function Draw-QABevel($graphics, $rect, $top, $bottom, $edge) {
     $graphics.DrawLine($pen,$rect.X+2,$rect.Y+2,$rect.Right-3,$rect.Y+2)
     $pen.Dispose()
 }
-foreach ($pageName in @('setup','presets','bindings','bindings-shift','bindings-cat','bindings-test','items','safety','share','library-spells','library-ranks','library-items','library-macros','action-bars')) {
+foreach ($pageName in @('setup','presets','bindings','bindings-shift','bindings-cat','bindings-test','items','safety','share','library-spells','library-ranks','library-items','library-macros','action-bars','settings','diagnostic-log','operation-error')) {
     $nodes = Get-Content -LiteralPath (Join-Path $PSScriptRoot "$pageName.json") -Raw | ConvertFrom-Json
     $canvasWidth = if ($pageName -like 'library-*') { 1180 } else { 860 }
     $bitmap = [System.Drawing.Bitmap]::new($canvasWidth, 652)
@@ -68,6 +68,12 @@ foreach ($pageName in @('setup','presets','bindings','bindings-shift','bindings-
         if ($node.template -match 'CharacterFrameTab|PanelTabButtonTemplate') {
             $light=if ($node.selected) { [System.Drawing.Color]::FromArgb(79,67,46) } else { [System.Drawing.Color]::FromArgb(42,37,29) }
             Draw-QABevel $graphics $rect $light ([System.Drawing.Color]::FromArgb(23,20,16)) ([System.Drawing.Color]::FromArgb(100,85,58))
+        }
+        if ($node.template -eq 'OptionsSliderTemplate') {
+            $track=[System.Drawing.RectangleF]::new($rect.X,$rect.Y+6,$rect.Width,6)
+            Draw-QABevel $graphics $track ([System.Drawing.Color]::FromArgb(20,18,15)) ([System.Drawing.Color]::FromArgb(42,36,26)) ([System.Drawing.Color]::FromArgb(115,99,66))
+            $thumb=[System.Drawing.RectangleF]::new($rect.Right-9,$rect.Y,9,$rect.Height)
+            Draw-QABevel $graphics $thumb ([System.Drawing.Color]::FromArgb(162,136,82)) ([System.Drawing.Color]::FromArgb(80,66,39)) ([System.Drawing.Color]::FromArgb(202,173,112))
         }
         if ($node.template -eq 'InputBoxTemplate') {
             Draw-QABevel $graphics $rect ([System.Drawing.Color]::FromArgb(8,7,5)) ([System.Drawing.Color]::FromArgb(20,17,12)) ([System.Drawing.Color]::FromArgb(93,81,59))

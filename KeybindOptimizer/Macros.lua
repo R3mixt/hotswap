@@ -1,6 +1,9 @@
 local _, K = ...
 K.Macros={}
 function K.Macros:Build(action,settings)
+    if K.API:ActionUsesFocus(action) and not K.API:SupportsFocus() then
+        return nil,"Focus targeting is unavailable on this client: "..tostring(action.label or action.name or action.id)..". Choose another target mode."
+    end
     if not action.known and not action.nativePending then return nil end
     if action.kind=="system" then return nil end
     if action.kind=="macroref" then return nil end

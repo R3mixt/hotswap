@@ -9,6 +9,7 @@ local function has(text,needle) return type(text)=="string" and text:find(needle
 
 function Tests.full_preset_replacement_persists_named_backup_before_any_macro_or_binding_write()
   local k=ready()
+  Mock:RegisterBindingCommand("TOGGLEACHIEVEMENT","BINDING_HEADER_INTERFACE")
   Mock.bindings.BACKSPACE="ACTIONBUTTON12"; Mock.bindings.NUMPADDECIMAL="TOGGLEACHIEVEMENT"
   local original=k.Copy(Mock.bindings)
   local write=Mock.Write; local observed=false

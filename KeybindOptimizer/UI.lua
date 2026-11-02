@@ -163,10 +163,96 @@ local function copy(t)
     for k, v in pairs(t or {}) do out[k] = v end
     return out
 end
+-- A native multiline EditBox grows with its text. Keep the caret visible when
+-- navigating long logs/exports without estimating text height or scanning lines.
+function UI:ConfigureCopyScroll(text,sf)
+    text.scrollFrame=sf
+    sf:SetScript("OnSizeChanged",function(owner) text:SetWidth(math.max(1,owner:GetWidth())) end)
+    text:SetScript("OnCursorChanged",function(_,_,y,_,height)
+        local top=math.max(0,-y)
+        local offset=sf:GetVerticalScroll()
+        local bottom=top+(height or 0)
+        if top<offset then sf:SetVerticalScroll(top)
+        elseif bottom>offset+sf:GetHeight() then
+            sf:SetVerticalScroll(math.max(0,math.min(sf:GetVerticalScrollRange(),bottom-sf:GetHeight())))
+        end
+    end)
+end
 function UI:Notice(text, isError)
     self.notice = tostring(text or "")
     self.noticeError = isError
-    if self.status then self.status:SetText(self.notice); color(self.status, isError and C.error or C.muted) end
+    if self.status then self.status:SetText(self.operationError and self.operationError.summary or self.notice); color(self.status, (self.operationError or isError) and C.error or C.muted) end
+end
+function UI:ClearOperationError()
+    local previous=self.operationError
+    self.operationError=nil
+    if previous and (self.notice==previous.message or self.notice==previous.summary) then self.notice=nil; self.noticeError=nil end
+    if self.operationErrorDialog then self.operationErrorDialog:Hide() end
+    if self.reviewButton then self.reviewButton:SetText("Review") end
+end
+function UI:RecordOperationFailure(message,kind,job)
+    local action=kind=="maintenance" and "Update" or tostring(kind or "apply"):find("restore",1,true) and "Restore" or "Apply"
+    local record={message=tostring(message or "The operation could not finish."),kind=kind or "apply",outcome="not-started"}
+    if job then
+        record.reason=job.failure; record.stage=job.failureStage
+        record.key,record.action,record.command=job.failureKey,job.failureAction,job.failureCommand
+        record.backupID=job.entry and job.entry.complete~=false and job.entry.id or nil
+        record.backupName=record.backupID and job.entry.name or nil
+        if job.rollingBack and record.message:find("was rolled back",1,true) then record.outcome="restored"
+        elseif job.changed then record.outcome="incomplete" end
+    end
+    if record.outcome=="restored" then
+        record.summary=action.." failed; previous setup restored. Details."
+        record.explanation="A later step failed, so Hot Swap restored your previous setup. Bars can appear briefly because their spells are placed before keybindings finish. Your draft remains saved for editing."
+    elseif record.outcome=="incomplete" then
+        record.summary=action.." failed; recovery needs attention. Details."
+        record.explanation="Restoration did not finish. Some game settings may have changed. "..(record.backupID and "Open Backups to restore the recorded setup." or "No completed recovery backup was recorded; check your game bindings and action bars.")
+    else
+        record.summary=action.." could not start. Open Details."
+        record.explanation="The installation did not start. No game changes were made. Your draft remains saved for editing."
+    end
+    local details={action.." failure",record.explanation,"","Full message:",record.message}
+    if record.reason and record.reason~=record.message then details[#details+1]=""; details[#details+1]="Original failure: "..record.reason end
+    if record.stage then details[#details+1]="Stage: "..tostring(record.stage) end
+    if record.key then details[#details+1]="Binding: "..tostring(record.key)..(record.action and (" - "..tostring(record.action)) or "")..(record.command and (" ("..tostring(record.command)..")") or "") end
+    details[#details+1]=record.backupID and ("Backup: "..tostring(record.backupName or record.backupID).." ["..record.backupID.."]") or "No new recovery backup was created."
+    record.details=table.concat(details,"\n")
+    self.operationError=record
+    if self.reviewButton then self.reviewButton:SetText("Details") end
+    self:Notice(record.message,true)
+    if self.frame and self.frame:IsShown() then self:OpenOperationError() end
+end
+function UI:OpenOperationError()
+    local record=self.operationError
+    if not record or not self.frame or (K.Engine and K.Engine.busy) then return end
+    self:CloseMenu(); self:ClearInputFocus()
+    if not self.operationErrorDialog then
+        local f=box("Frame",self.frame,C.bg,"KeybindOptimizerOperationError")
+        f:SetAllPoints(self.frame); f:SetFrameStrata("DIALOG"); f:SetFrameLevel(self.frame:GetFrameLevel()+55); f:EnableMouse(true)
+        label(f,"Setup could not finish",22):SetPoint("TOPLEFT",40,-40)
+        f.summary=label(f,"",14,C.error); f.summary:SetPoint("TOPLEFT",40,-80); f.summary:SetWidth(770); f.summary:SetHeight(42)
+        f.explanation=label(f,"",12,C.muted); f.explanation:SetPoint("TOPLEFT",40,-130); f.explanation:SetWidth(770); f.explanation:SetHeight(64)
+        label(f,"Details to copy",12):SetPoint("TOPLEFT",40,-207)
+        local shell=box("Frame",f,C.field); shell:SetPoint("TOPLEFT",40,-232); shell:SetPoint("BOTTOMRIGHT",-40,110)
+        local sf=CreateFrame("ScrollFrame",nil,shell,"UIPanelScrollFrameTemplate"); sf:SetPoint("TOPLEFT",10,-10); sf:SetPoint("BOTTOMRIGHT",-29,10)
+        local text=CreateFrame("EditBox",nil,sf); text:SetMultiLine(true); text:SetAutoFocus(false); text:SetFontObject(ChatFontNormal or GameFontHighlight)
+        text:SetSize(700,180); text:SetMaxLetters(2000000); sf:SetScrollChild(text); f.text=text
+        self:ConfigureCopyScroll(text,sf)
+        text:SetScript("OnEscapePressed",function() f:Hide() end)
+        text:SetScript("OnEditFocusGained",function() UI:UpdateBindingTester() end)
+        text:SetScript("OnEditFocusLost",function() UI:UpdateBindingTester() end)
+        local note=label(f,"Select the text, then press Ctrl+C. Closing keeps these details available.",10,C.muted)
+        note:SetPoint("BOTTOMLEFT",40,80); note:SetWidth(760)
+        f.copy=button(f,"Select text",120,function() text:SetFocus(); text:HighlightText() end); f.copy:SetPoint("BOTTOMLEFT",40,40)
+        f.dismiss=button(f,"Dismiss error",130,function() UI:ClearOperationError(); UI:Refresh() end); f.dismiss:SetPoint("BOTTOMRIGHT",-158,40)
+        f.close=button(f,"Close",105,function() f:Hide() end,true); f.close:SetPoint("BOTTOMRIGHT",-40,40)
+        f:SetScript("OnHide",function() text:ClearFocus(); UI:EndModal(f) end)
+        self.operationErrorDialog=f
+    end
+    local f=self.operationErrorDialog
+    f.summary:SetText(record.summary); f.explanation:SetText(record.explanation); f.text:SetText(record.details)
+    self:BeginModal(f,"KeybindOptimizerOperationError"); f:Show()
+    f.text:SetFocus(); f.text:HighlightText()
 end
 function UI:Call(owner, method, ...)
     if K.Engine and K.Engine.busy then
@@ -177,11 +263,33 @@ function UI:Call(owner, method, ...)
         self:Notice("This feature is not available in this client.", true)
         return nil
     end
-    local ok, a, b = pcall(owner[method], owner, ...)
-    if not ok then self:Notice(tostring(a), true); return nil end
+    local operation=(owner==K.Presets and (method=="Activate" or method=="Optimize")) or (owner==K and (method=="Apply" or method=="Restore")) or (owner==K.Engine and method=="RestoreBackup")
+    local priorError=self.operationError
+    local kind=method:find("Restore",1,true) and "restore" or "apply"
+    local ok,a,b
+    local diagnostics=K.Diagnostics
+    if diagnostics and diagnostics:IsEnabled() then
+        local args,count={...},select("#",...)
+        local traced
+        ok,a,b=xpcall(function() return owner[method](owner,unpack(args,1,count)) end,function(problem)
+            local captured,detail=pcall(diagnostics.Trace,diagnostics,problem)
+            traced=captured and detail or tostring(problem)
+            return problem
+        end)
+        if not ok then pcall(diagnostics.Record,diagnostics,"error","ui-error",traced or tostring(a),{stage="UI call",operation=method}) end
+    else
+        ok,a,b=pcall(owner[method],owner,...)
+    end
+    if not ok then
+        self:Notice(tostring(a),true)
+        if operation and self.operationError==priorError then self:RecordOperationFailure(a,kind) end
+        return nil
+    end
     if a == "pending" then self:UpdateBusyState()
     elseif a == false then self:Notice(b or "The action could not be completed.", true)
     elseif b and type(b) == "string" then self:Notice(b, false) end
+    if operation and a==false and self.operationError==priorError then self:RecordOperationFailure(b,kind)
+    elseif operation and a==true then self:ClearOperationError() end
     return a, b
 end
 function UI:UpdateBusyState()
@@ -210,10 +318,10 @@ function UI:UpdateBusyState()
         for _,name in ipairs({"apply","optimize","restore","reviewButton"}) do disable(self[name]) end
         for _,tab in pairs(self.nav or {}) do disable(tab) end
         local pages=self.pages or {}
-        for _,name in ipairs({"Setup","Presets","Bindings","Items","Safety","Share"}) do
+        for _,name in ipairs({"Setup","Presets","Bindings","Items","Safety","Share","Settings"}) do
             local page=pages[name]
             if page then
-                for _,control in ipairs({"optimize","nativeBars","new","duplicate","rename","delete","usePreset","hotkey","gearCapture","gearEquip","restoreSelected","original","import"}) do disable(page[control]) end
+                for _,control in ipairs({"optimize","nativeBars","new","duplicate","rename","delete","usePreset","hotkey","gearCapture","gearEquip","restoreSelected","original","import","opacity","scale","resetAppearance","diagnostics","viewLog","clearLog"}) do disable(page[control]) end
                 if page.detail then for _,control in ipairs({"rebind","change","reset","clearKey"}) do disable(page.detail[control]) end end
                 for _,row in ipairs(page.checks or {}) do disable(row); disable(row.checkbox) end
                 for _,row in ipairs(page.list and page.list.rows or {}) do disable(row); disable(row.key) end
@@ -222,7 +330,7 @@ function UI:UpdateBusyState()
         self:ClearInputFocus(); self:EndCapture(); self:CloseMenu()
         if self.CancelLibraryDrag then self:CancelLibraryDrag() end
         if self.library then self.library:Hide() end
-        for _,name in ipairs({"confirm","picker","review","nameDialog","nativeBarsDialog"}) do
+        for _,name in ipairs({"confirm","picker","review","nameDialog","nativeBarsDialog","operationErrorDialog","diagnosticLogDialog"}) do
             local modal=self[name]; if modal then modal:Hide() end
         end
         self:ResetKeyTest()
@@ -277,7 +385,12 @@ function UI:OnOperationComplete(ok,message,kind)
         self.awaitingOptimize=nil
     end
     self:UpdateBusyState()
-    self:Notice(message or (ok and "Setup updated." or "The update could not finish."),not ok)
+    if ok then self:ClearOperationError(); self:Notice(message or "Setup updated.")
+    else
+        local job=K.Engine and K.Engine.lastJob
+        if not (job and job.finished and job.ok==false and job.message==message and job.kind==kind) then job=nil end
+        self:RecordOperationFailure(message,kind,job)
+    end
     if K.QueueRefresh then K:QueueRefresh() end
 end
 function UI:Stage(key, value)
@@ -433,7 +546,9 @@ function UI:ClearInputFocus()
     if self.picker and self.picker.search then self.picker.search:ClearFocus() end
     if self.nameDialog and self.nameDialog.input then self.nameDialog.input:ClearFocus() end
     if self.library and self.library.search then self.library.search:ClearFocus() end
+    if self.operationErrorDialog then self.operationErrorDialog.text:ClearFocus() end
     if K.ItemsUI and K.ItemsUI.ClearFocus then K.ItemsUI:ClearFocus() end
+    if K.SettingsUI and K.SettingsUI.ClearFocus then K.SettingsUI:ClearFocus() end
 end
 function UI:LinkedBindings(action)
     local group={}
@@ -1453,7 +1568,7 @@ function UI:BuildShare(page)
     local sf=CreateFrame("ScrollFrame",nil,shell,"UIPanelScrollFrameTemplate"); sf:SetPoint("TOPLEFT",10,-10); sf:SetPoint("BOTTOMRIGHT",-29,10)
     local e=CreateFrame("EditBox",nil,sf); e:SetMultiLine(true); e:SetAutoFocus(false); e:SetFontObject(ChatFontNormal or GameFontHighlight)
     e:SetSize(700,100); e:SetMaxLetters(2000000); sf:SetScrollChild(e); page.transfer=e
-    sf:SetScript("OnSizeChanged",function(self) e:SetWidth(math.max(1,self:GetWidth())) end)
+    self:ConfigureCopyScroll(e,sf)
     e:SetScript("OnEscapePressed",function(self) self:ClearFocus() end)
     e:SetScript("OnTextChanged",function() if page.copy then page.copy:SetEnabled(e:GetText()~=""); page.import:SetEnabled(e:GetText()~="") end end)
     page.message=label(page,"",11,C.muted); page.message:SetPoint("BOTTOMLEFT",0,77); page.message:SetWidth(795); page.message:SetHeight(25)
@@ -1633,6 +1748,7 @@ function UI:RenderSafety()
 end
 function UI:OpenReview()
     if K.Engine and K.Engine.busy then self:UpdateBusyState(); return end
+    if self.operationError then return self:OpenOperationError() end
     self:CloseMenu(); self:ClearInputFocus()
     local plan=self:Call(K,"Preview")
     if type(plan)=="table" then self.plan=plan end
@@ -1750,6 +1866,8 @@ function UI:Create()
         if UI.review then UI.review:Hide() end
         if UI.nameDialog then UI.nameDialog:Hide() end
         if UI.nativeBarsDialog then UI.nativeBarsDialog:Hide() end
+        if UI.operationErrorDialog then UI.operationErrorDialog:Hide() end
+        if UI.diagnosticLogDialog then UI.diagnosticLogDialog:Hide() end
     end)
     specialFrame("KeybindOptimizerWindow", true)
     local title = f.TitleText or label(f, "", 14, C.accent)
@@ -1774,7 +1892,7 @@ function UI:Create()
         inset:SetPoint("BOTTOMRIGHT", -16, 75)
     end
     self.pages, self.nav = {}, {}
-    local ids = {"Setup", "Presets", "Bindings", "Items", "Safety", "Share"}
+    local ids = {"Setup", "Presets", "Bindings", "Items", "Safety", "Share", "Settings"}
     local classic = WOW_PROJECT_ID and WOW_PROJECT_CLASSIC and WOW_PROJECT_ID == WOW_PROJECT_CLASSIC
     local tabTemplate = classic and "CharacterFrameTabButtonTemplate" or "PanelTabButtonTemplate"
     local tabX = 18
@@ -1814,6 +1932,7 @@ function UI:Create()
     self:BuildItems(self.pages.Items)
     self:BuildSafety(self.pages.Safety)
     self:BuildShare(self.pages.Share)
+    K.SettingsUI:Build(self.pages.Settings,self,self.widgets)
     local footer = CreateFrame("Frame", nil, f)
     footer:SetPoint("BOTTOMLEFT", 18, 15)
     footer:SetPoint("BOTTOMRIGHT", -18, 15)
@@ -1822,7 +1941,7 @@ function UI:Create()
     self.status:SetPoint("TOPLEFT", 12, -10)
     self.status:SetWidth(326)
     self.status:SetHeight(34)
-    local preview = button(footer, "Review", 84, function() UI.notice=nil; UI:OpenReview() end)
+    local preview = button(footer, "Review", 84, function() UI:OpenReview() end)
     self.reviewButton=preview
     preview:SetPoint("RIGHT", -390, 0)
     self.restore = button(footer, "Backups", 92, function() UI:ShowPage("Safety") end)
@@ -1892,8 +2011,10 @@ function UI:Refresh()
     elseif self.activePage == "Presets" then self:RenderPresets()
     elseif self.activePage == "Items" then self:RenderItems()
     elseif self.activePage == "Safety" then self:RenderSafety()
-    elseif self.activePage == "Share" then self:RenderShare() end
+    elseif self.activePage == "Share" then self:RenderShare()
+    elseif self.activePage == "Settings" then K.SettingsUI:Render(self.pages.Settings,self,self.widgets) end
     self:RenderNativeBars()
+    self.reviewButton:SetText(self.operationError and "Details" or "Review")
     for id, b in pairs(self.nav) do selectTab(b, id == self.activePage) end
     local errors = #(self.plan.errors or {})
     local combat = InCombatLockdown and InCombatLockdown()
@@ -1905,6 +2026,7 @@ function UI:Refresh()
     color(self.apply.text, (combat or errors > 0 or self.previewFailed) and C.muted or C.accent)
     if combat then self.status:SetText("In combat. Preset switching and restoring are paused."); color(self.status, C.warning)
     elseif self.previewFailed then self.status:SetText("This preset could not be prepared. Open Review to check it."); color(self.status, C.error)
+    elseif self.operationError then self.status:SetText(self.operationError.summary); color(self.status,C.error)
     elseif self.notice then self.status:SetText(self.notice); color(self.status, self.noticeError and C.error or C.muted)
     elseif errors > 0 then self.status:SetText(errors .. " binding issue(s) to fix. Open Review before applying this preset."); color(self.status, C.error)
     else
@@ -1920,8 +2042,6 @@ function UI:Open()
         self.restoreEscapeFrame = nil
         specialFrame("KeybindOptimizerWindow", true)
     end
-    local width, height = UIParent:GetWidth(), UIParent:GetHeight()
-    self.frame:SetScale(math.min(1, (width-30)/860, (height-30)/620))
     self.frame:Show()
     if self.frame.Raise then self.frame:Raise() end
     self:Refresh()

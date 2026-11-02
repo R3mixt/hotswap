@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.3.2 beta — 2026-11-01
+
+- Fix fresh-character Optimize on Classic Era: omit unavailable default focus controls and validate actual registered commands before action-bar or macro writes. Explicit saved focus intent stays an actionable error.
+- Add Settings with character-local opacity, preferred scale, automatic screen fitting and Reset appearance. Preset imports and switches preserve these preferences.
+- Add opt-in diagnostics, off by default, with a bounded 200-entry history, setup phases, key/command/stage, backup and rollback result, bounded error stacks, copy and clear controls. Preserve the existing game error handler.
+- Add persistent, selectable failure details; distinguish preflight rejection, completed rollback and incomplete recovery instead of clipping the error into the footer.
+- Strengthen the binding mock to enumerate supported commands, reject unavailable commands and reproduce the Era F6 failure; test logging, recovery, saved-mode restoration and UI controls.
+
 ## 0.3.1 beta — 2026-11-01
 
 - Fix Optimize failing with "A generated action macro changed before placement." Macro creation can reorder indices; placement and maintenance now resolve and verify stable names and exact contents.

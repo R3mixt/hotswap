@@ -97,14 +97,19 @@ K.UI:Open()
 ''')
 anchors={'TOPLEFT':(0,1),'TOP':(.5,1),'TOPRIGHT':(1,1),'LEFT':(0,.5),'CENTER':(.5,.5),'RIGHT':(1,.5),'BOTTOMLEFT':(0,0),'BOTTOM':(.5,0),'BOTTOMRIGHT':(1,0)}
 cases=[('Setup','setup',None,None),('Presets','presets',None,None),('Bindings','bindings','caster',''),('Bindings','bindings-shift','caster','SHIFT-'),('Bindings','bindings-cat','cat',''),('Bindings','bindings-test','cat',''),('Items','items',None,None),('Safety','safety',None,None),('Share','share',None,None),('Bindings','library-spells','caster',''),('Bindings','library-ranks','caster',''),('Bindings','library-items','caster',''),('Bindings','library-macros','caster','')]
-cases.append(('Setup','action-bars',None,None))
+cases.extend([('Setup','action-bars',None,None),('Settings','settings',None,None),('Settings','diagnostic-log',None,None),('Setup','operation-error',None,None)])
 for page,filename,form,layer in cases:
+    lua.execute('for _,name in ipairs({"nativeBarsDialog","diagnosticLogDialog","operationErrorDialog"}) do local f=K.UI[name]; if f then f:Hide() end end')
     lua.globals().K.UI.libraryOpen=filename.startswith('library-')
     if form:lua.globals().K.UI.SetActionPage(lua.globals().K.UI,form)
     if layer is not None:lua.globals().K.UI.pinnedLayer=layer
     lua.globals().K.UI.ShowPage(lua.globals().K.UI,page)
     if filename == 'action-bars':
         lua.globals().K.UI.OpenNativeBars(lua.globals().K.UI)
+    if filename == 'diagnostic-log':
+        lua.execute('K.Diagnostics:SetEnabled(true); K.Diagnostics:Record("error","step-error","Sample: the client rejected a binding.",{operation="apply",stage="Installing bindings",key="F6",command="TARGETFOCUS",backup="backup-example"}); K.SettingsUI:OpenLog()')
+    if filename == 'operation-error':
+        lua.execute('K.Engine.lastJob={kind="apply",finished=true,ok=false,rollingBack=true,message="Setup failed and was rolled back: Sample binding failure.",failure="The client rejected F6 (Target focus; TARGETFOCUS).",failureStage="Installing bindings",entry={id="backup-example",name="Character-Druid-2026-11-01 17:00:00",complete=true}}; K.UI:OnOperationComplete(false,K.Engine.lastJob.message,"apply")')
     if filename == 'bindings-test':
         lua.globals().K.UI.TestKeyDown(lua.globals().K.UI,'1')
     if filename == 'share':

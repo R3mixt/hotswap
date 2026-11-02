@@ -361,16 +361,100 @@ function IsKeyDown(key)
 end
 function IsMouseButtonDown(key) return Mock.downKeys[key] or Mock.downKeys[({LeftButton="BUTTON1",RightButton="BUTTON2",MiddleButton="BUTTON3",Button4="BUTTON4",Button5="BUTTON5"})[key]] or false end
 function GetCurrentBindingSet() return Mock.bindingSet end
-function SetBinding(key,action) Mock:Write("binding",key,action); Mock.bindings[key]=action; return true end
+-- Reviewed command fixtures from Blizzard_FrameXML/Bindings_Vanilla.xml on
+-- classic_era and Bindings_Camelot.xml on forever (Gethe/wow-ui-source).
+-- Era comments out FOCUSTARGET/TARGETFOCUS; Camelot registers both. Commands
+-- are enumerated even when unbound, with multiple keys returned on one row.
+local bindingCatalog={}
+local function registerGroup(category,commands)
+  for command in commands:gmatch("%S+") do bindingCatalog[command]=category end
+end
+registerGroup("BINDING_HEADER_MOVEMENT",[[MOVEANDSTEER MOVEFORWARD MOVEBACKWARD TURNLEFT TURNRIGHT STRAFELEFT STRAFERIGHT JUMP SITORSTAND TOGGLESHEATH TOGGLEAUTORUN STARTAUTORUN STOPAUTORUN PITCHUP PITCHDOWN TOGGLERUN FOLLOWTARGET]])
+registerGroup("BINDING_HEADER_CHAT",[[OPENCHAT OPENCHATSLASH CHATPAGEUP CHATPAGEDOWN CHATBOTTOM REPLY REPLY2 COMBATLOGPAGEUP COMBATLOGPAGEDOWN COMBATLOGBOTTOM]])
+registerGroup("BINDING_HEADER_TARGETING",[[TARGETNEARESTENEMY TARGETPREVIOUSENEMY TARGETSCANENEMY TARGETNEARESTFRIEND TARGETPREVIOUSFRIEND TARGETNEARESTENEMYPLAYER TARGETPREVIOUSENEMYPLAYER TARGETNEARESTFRIENDPLAYER TARGETPREVIOUSFRIENDPLAYER TARGETNEAREST TARGETPREVIOUS TARGETSELF TARGETPET TARGETLASTHOSTILE TARGETLASTTARGET NAMEPLATES FRIENDNAMEPLATES ALLNAMEPLATES INTERACTMOUSEOVER INTERACTTARGET ASSISTTARGET ATTACKTARGET STARTATTACK PETATTACK TARGETMOUSEOVER TARGETTALKER FOCUSTARGET TARGETFOCUS]])
+registerGroup("BINDING_HEADER_INTERFACE",[[TOGGLEGAMEMENU TOGGLEBACKPACK TOGGLEBAG1 TOGGLEBAG2 TOGGLEBAG3 TOGGLEBAG4 OPENALLBAGS TOGGLECHARACTER0 TOGGLECHARACTER1 TOGGLECHARACTER2 TOGGLECHARACTER3 TOGGLECHARACTER4 TOGGLESPELLBOOK TOGGLEPETBOOK TOGGLETALENTS TOGGLEQUESTLOG TOGGLEWORLDMAP TOGGLEMINIMAP TOGGLEMINIMAPROTATION TOGGLEBATTLEFIELDMINIMAP TOGGLEWORLDSTATESCORES TOGGLESOCIAL TOGGLEFRIENDSTAB TOGGLEWHOTAB TOGGLEGUILDTAB TOGGLERAIDTAB TOGGLEBLIZZARDGROUPSTAB TOGGLECHATTAB]])
+registerGroup("BINDING_HEADER_MISC",[[STOPCASTING STOPATTACK DISMOUNT MINIMAPZOOMIN MINIMAPZOOMOUT TOGGLEMUSIC TOGGLESOUND MASTERVOLUMEUP MASTERVOLUMEDOWN TOGGLEUI TOGGLEFPS SCREENSHOT ITEMCOMPARISONCYCLING TOGGLEGRAPHICSSETTINGS TOGGLESELFHIGHLIGHT CAMERAORSELECTORMOVE TURNORACTION]])
+registerGroup("BINDING_HEADER_CAMERA",[[NEXTVIEW PREVVIEW CAMERAZOOMIN CAMERAZOOMOUT FLIPCAMERAYAW]])
+registerGroup("BINDING_HEADER_ACTIONBAR",[[PREVIOUSACTIONPAGE NEXTACTIONPAGE TOGGLEACTIONBARLOCK TOGGLEAUTOSELFCAST]])
+for n=1,12 do bindingCatalog["ACTIONBUTTON"..n]="BINDING_HEADER_ACTIONBAR" end
+for bank=1,7 do for n=1,12 do bindingCatalog["MULTIACTIONBAR"..bank.."BUTTON"..n]="BINDING_HEADER_MULTIACTIONBAR" end end
+for n=1,10 do bindingCatalog["SHAPESHIFTBUTTON"..n]="BINDING_HEADER_SHAPESHIFT"; bindingCatalog["BONUSACTIONBUTTON"..n]="BINDING_HEADER_PET" end
+for n=1,6 do bindingCatalog["ACTIONPAGE"..n]="BINDING_HEADER_ACTIONBAR" end
+for n=1,4 do bindingCatalog["TARGETPARTYMEMBER"..n]="BINDING_HEADER_TARGETING"; bindingCatalog["TARGETPARTYPET"..n]="BINDING_HEADER_TARGETING" end
+for n=1,5 do for _,prefix in ipairs({"SETVIEW","SAVEVIEW","RESETVIEW"}) do bindingCatalog[prefix..n]="BINDING_HEADER_CAMERA" end end
+for n=1,8 do bindingCatalog["RAIDTARGET"..n]="BINDING_HEADER_RAID_TARGET" end
+bindingCatalog.RAIDTARGETNONE="BINDING_HEADER_RAID_TARGET"
+Mock.registeredBindingCommands={}; Mock.bindingCommandAvailability={}; Mock.observedBindingCommands={}
+Mock.validEmoteCommands={WAVE=true,HELLO=true,CHEER=true,THANK=true}
+local function commandDenied(command)
+  local available=Mock.bindingCommandAvailability[command]
+  if available~=nil then return not available end
+  return (command=="TARGETFOCUS" or command=="FOCUSTARGET") and Mock.build:match("^1%.15%.")~=nil
+end
+local function dynamicCommand(command)
+  if command:match("^MACRO [^%c]+$") or command:match("^CLICK [^:%s%c]+:[%w]+$") then return true end
+  local emote=command:match("^EMOTE ([A-Z_]+)$")
+  if emote then
+    if Mock.validEmoteCommands[emote] then return true end
+    for key,value in pairs(_G) do if type(key)=="string" and key:match("^EMOTE%d+_TOKEN$") and value==emote then return true end end
+  end
+  return false
+end
+function Mock:RegisterBindingCommand(command,category)
+  assert(type(command)=="string" and command:match("^[A-Z][A-Z0-9_]*$"),"Register a canonical binding command")
+  self.registeredBindingCommands[command]=category or "GENERAL"; self.bindingCommandAvailability[command]=true
+  self.bindingInventory=nil
+  if TestAddon and TestAddon.API.InvalidateBindingCommands then TestAddon.API:InvalidateBindingCommands() end
+end
+function Mock:SetBindingCommandAvailable(command,available)
+  self.bindingCommandAvailability[command]=available and true or false
+  if available and not bindingCatalog[command] and not self.registeredBindingCommands[command] then self.registeredBindingCommands[command]="GENERAL" end
+  self.bindingInventory=nil
+  if TestAddon and TestAddon.API.InvalidateBindingCommands then TestAddon.API:InvalidateBindingCommands() end
+end
+function Mock:IsBindingCommandSupported(command)
+  if type(command)~="string" or commandDenied(command) then return false end
+  return bindingCatalog[command]~=nil or self.registeredBindingCommands[command]~=nil or self.observedBindingCommands[command]~=nil or dynamicCommand(command)
+end
+local function bindingInventory()
+  local categories={}
+  for command,category in pairs(bindingCatalog) do if not commandDenied(command) then categories[command]=category end end
+  for command,category in pairs(Mock.registeredBindingCommands) do if not commandDenied(command) then categories[command]=category end end
+  for command,category in pairs(Mock.observedBindingCommands) do if not commandDenied(command) then categories[command]=category end end
+  for _,command in pairs(Mock.bindings) do
+    if type(command)=="string" and not commandDenied(command) then
+      if not categories[command] and command:match("^[A-Z][A-Z0-9_]*$") then
+        -- A command already assigned by the client can belong to another addon.
+        -- Explicitly unavailable native commands never enter this fallback.
+        Mock.observedBindingCommands[command]="GENERAL"; categories[command]="GENERAL"
+      elseif dynamicCommand(command) then categories[command]="GENERAL" end
+    end
+  end
+  local commands={}; for command in pairs(categories) do commands[#commands+1]=command end; table.sort(commands)
+  local rows={}; for _,command in ipairs(commands) do
+    local keys={}; for key,assigned in pairs(Mock.bindings) do if assigned==command then keys[#keys+1]=key end end; table.sort(keys)
+    local row={command,categories[command]}; for _,key in ipairs(keys) do row[#row+1]=key end; rows[#rows+1]=row
+  end
+  Mock.bindingInventory=rows; Mock.bindingInventoryBuild=Mock.build
+  return rows
+end
+function SetBinding(key,action)
+  if action~=nil and not Mock:IsBindingCommandSupported(action) then return false end
+  Mock:Write("binding",key,action); Mock.bindings[key]=action; Mock.bindingInventory=nil; return true
+end
 function SetBindingClick(key,button,mouse) return SetBinding(key,"CLICK "..button..":"..(mouse or "LeftButton")) end
 function GetBindingAction(key) return Mock.bindings[key] or "" end
-function GetBindingKey(action) local found={}; for k,v in pairs(Mock.bindings) do if v==action then found[#found+1]=k end end; return unpack(found) end
-function GetNumBindings() local count=0; for _ in pairs(Mock.bindings) do count=count+1 end; return count end
-function GetBinding(index) local keys={}; for k in pairs(Mock.bindings) do keys[#keys+1]=k end; table.sort(keys); local key=keys[index]; return key and Mock.bindings[key],"GENERAL",key end
+function GetBindingKey(action) local found={}; for k,v in pairs(Mock.bindings) do if v==action then found[#found+1]=k end end; table.sort(found); return unpack(found) end
+function GetNumBindings() return #bindingInventory() end
+function GetBinding(index)
+  local rows=Mock.bindingInventory
+  if not rows or Mock.bindingInventoryBuild~=Mock.build then rows=bindingInventory() end
+  if rows[index] then return unpack(rows[index]) end
+end
 local function cloneMap(t) local out={}; for k,v in pairs(t) do out[k]=v end; return out end
 Mock.bindingSets={[1]=cloneMap(Mock.bindings),[2]={C="TOGGLECHARACTER0",I="OPENALLBAGS"}}
 function SaveBindings(set) Mock:Write("savebindings",set); Mock.bindingSets[set]=cloneMap(Mock.bindings); Mock.bindingSet=set end
-function LoadBindings(set) Mock:Write("loadbindings",set); Mock.bindings=cloneMap(Mock.bindingSets[set] or {}); Mock.bindingSet=set end
+function LoadBindings(set) Mock:Write("loadbindings",set); Mock.bindings=cloneMap(Mock.bindingSets[set] or {}); Mock.bindingSet=set; Mock.bindingInventory=nil end
 function GetBindingText(key) return key end
 function SetOverrideBindingClick(owner,priority,key,button,mouse) return SetBindingClick(key,button,mouse) end
 function ClearOverrideBindings(owner) Mock:Write("clearoverrides") end

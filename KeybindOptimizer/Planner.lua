@@ -24,6 +24,8 @@ function P:Build(useCachedData)
     local settings=K:GetSettings()
     local _,class=UnitClass("player"); K.playerClass=class
     local flavor=K.API:GetFlavor()
+    local bindingCommands,bindingCommandsReadable=K.API:GetBindingCommands()
+    local supportsFocus=K.API:SupportsFocus()
     local version,build=GetBuildInfo()
     local selected=K.db.presets[K.db.activePreset]
     local plan={actions={},system={},conflicts={},errors={},warnings={},changes={},coverage={total=0,bound=0,missing={},catalogTotal=0,catalogKnown=0,catalogReserved=0},class=class,flavor=flavor,build=tostring(version).."."..tostring(build),formSignature=K.API:FormSignature(),settings=K.Copy(settings),fallbackBindings=K.Copy(settings.fallbackBindings or {}),presetName=K.db.activePreset,presetID=selected and selected.id}
@@ -85,6 +87,9 @@ function P:Build(useCachedData)
             end
         end
         if action.explicitRank and action.selectedRank then action.label=action.label.." · "..action.selectedRank end
+        if K.API:ActionUsesFocus(action) and not supportsFocus then
+            plan.errors[#plan.errors+1]="Focus targeting is unavailable on this client: "..action.label..". Choose another target mode."
+        end
         if action.targetMode and K.Library then
             local valid=false; for _,mode in ipairs(K.Library:TargetModes(action)) do if mode==action.targetMode then valid=true end end
             if not valid then plan.errors[#plan.errors+1]="Unsupported target mode for "..action.label end
@@ -115,7 +120,16 @@ function P:Build(useCachedData)
         plan.actions[#plan.actions+1]=action
         return action
     end
-    for _,def in ipairs(definitions) do add(def) end
+    for _,def in ipairs(definitions) do
+        local override=settings.actionOverrides and settings.actionOverrides[def.id]
+        local replaced=override and (override.replacement or (override.targetMode and override.targetMode~="default" and override.targetMode~="focus"))
+        if supportsFocus or not K.API:ActionUsesFocus(def) or replaced then add(def)
+        elseif (settings.bindingOverrides or {})[def.id] or override then
+            -- A stock focus variant can be omitted on Era. An edited/imported
+            -- focus intent needs an explicit error, never a different target.
+            plan.errors[#plan.errors+1]="Saved focus action is unavailable on this client: "..tostring(def.label or def.name or def.id)..". Remove its override or choose another target mode."
+        end
+    end
     local catalogFamilies={}
     for _,action in ipairs(plan.actions) do
         if not action.combo and not action.focusOf and action.targeting~="focus" then
@@ -133,9 +147,17 @@ function P:Build(useCachedData)
         for _,why in ipairs(errors) do plan.errors[#plan.errors+1]=why end
         for _,def in ipairs(actions) do add(def) end
     end
+    local function addSystem(id,key,command,label)
+        local supported=bindingCommands[command]~=nil or (not bindingCommandsReadable and command~="TARGETFOCUS")
+        if supported then
+            local a=add({id=id,key=key,label=label,kind="system",command=command,known=true,category="System"})
+            plan.system[#plan.system+1]=a
+        elseif (settings.bindingOverrides or {})[id] or (settings.actionOverrides or {})[id] then
+            plan.errors[#plan.errors+1]="Saved game command is unavailable on this client: "..label.." ("..command.."). Remove its override before using this preset."
+        else plan.warnings[#plan.warnings+1]=label.." is unavailable on this client; its default key is not assigned." end
+    end
     for _,mapping in ipairs(systemMap) do
-        local a=add({id="system."..mapping[2],key=mapping[1],label=mapping[3],kind="system",command=mapping[2],known=true,category="System"})
-        plan.system[#plan.system+1]=a
+        addSystem("system."..mapping[2],mapping[1],mapping[2],mapping[3])
     end
     if K.Presets and K.Presets.Actions then
         for _,definition in ipairs(K.Presets:Actions()) do
@@ -144,7 +166,7 @@ function P:Build(useCachedData)
     end
     if not settings.wheel then
         for _,m in ipairs({{"MOUSEWHEELUP","CAMERAZOOMIN","Zoom in"},{"MOUSEWHEELDOWN","CAMERAZOOMOUT","Zoom out"}}) do
-            local a=add({id="system.normal."..m[2],key=m[1],label=m[3],kind="system",command=m[2],known=true,category="System"}); plan.system[#plan.system+1]=a
+            addSystem("system.normal."..m[2],m[1],m[2],m[3])
         end
     end
     add({id="item.trinket13",key="T",label="Trinket · upper slot",kind="item",itemSlot=13,known=true,category="Items"})
@@ -165,7 +187,12 @@ function P:Build(useCachedData)
         end
     end
     for _,v in ipairs({{"cancel","BUTTON3","Leave form"},{"focus","SHIFT-BUTTON3","Set focus"},{"clearfocus","CTRL-BUTTON3","Clear focus"}}) do
-        add({id="utility."..v[1],key=v[2],label=v[3],builtin=v[1],known=true,category="Utility"})
+        local id="utility."..v[1]
+        if v[1]=="cancel" or supportsFocus then
+            add({id=id,key=v[2],label=v[3],builtin=v[1],known=true,category="Utility"})
+        elseif (settings.bindingOverrides or {})[id] or (settings.actionOverrides or {})[id] then
+            plan.errors[#plan.errors+1]="Saved focus utility is unavailable on this client: "..v[3]..". Remove its override before using this preset."
+        end
     end
     local racialCount=0; local raceNames={}
     for _,def in ipairs(racialDefs) do

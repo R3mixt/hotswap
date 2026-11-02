@@ -1,6 +1,6 @@
 # Hot Swap
 
-WoW binding presets and keyboard editing using Blizzard's original action bars. **0.3.1 beta** targets Forever, with Classic Era / Hardcore as the current test client.
+WoW binding presets and keyboard editing using Blizzard's original action bars. **0.3.2 beta** targets Forever, with Classic Era / Hardcore as the current test client.
 
 [Player instructions](KeybindOptimizer/README.md), [scope and known gaps](docs/requirements.md), [architecture](docs/architecture.md), [code review](docs/code-review.md), [CurseForge setup](docs/curseforge.md).
 

@@ -243,7 +243,10 @@ function P:Activate(name)
     self.activating=true
     self:Select(name)
     local called,ok,why=pcall(K.Apply,K)
-    if not called then ok,why=false,ok end
+    if not called then
+        ok,why=false,ok
+        if K.Diagnostics then pcall(K.Diagnostics.Record,K.Diagnostics,"error","preset-error",tostring(why),{operation="apply",stage="Preparing preset"}) end
+    end
     if ok=="pending" then return ok,why end
     self:OnActivationComplete(ok,why)
     if not ok then return false,tostring(why or "Preset could not be activated.") end

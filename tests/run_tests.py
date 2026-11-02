@@ -13,7 +13,7 @@ sys.path.insert(0, str(WORK / "python-deps"))
 from lupa.lua51 import LuaRuntime, lua_type
 
 SOURCE = WORK if (WORK / "Core.lua").exists() else WORK / "KeybindOptimizer"
-MODULES = ["Core", "API", "Profiles", "Macros", "Items", "LibraryData", "Library", "NativeBars", "Planner", "Engine", "Presets", "ItemsUI", "UI", "LibraryUI", "Launcher"]
+MODULES = ["Core", "Diagnostics", "API", "Profiles", "Macros", "Items", "LibraryData", "Library", "NativeBars", "Planner", "Engine", "Presets", "ItemsUI", "UI", "LibraryUI", "SettingsUI", "Launcher"]
 
 
 def environment():

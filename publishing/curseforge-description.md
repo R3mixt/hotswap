@@ -4,7 +4,7 @@ Build a comfortable keyboard layout, keep it consistent across your class, and s
 
 Hot Swap places spells and generated macros on **Blizzard's original action bars**. Its in-game keyboard editor shows what each key does, including Shift and Ctrl layers, mouse buttons, and optional wheel bindings. The interface uses WoW's own frames and controls.
 
-**0.3.1 beta:** Classic Era and Hardcore are the current test clients; Forever is the final release target. The automated suite passes **214 tests using the actual Lua modules with mocked WoW APIs**. Live-client acceptance testing is still pending. Retail and other Classic expansions are not supported release targets.
+**0.3.2 beta:** Classic Era and Hardcore are the current test clients; Forever is the final release target. The automated suite passes **253 tests using the actual Lua modules with mocked WoW APIs**. Live-client acceptance testing is still pending. Retail and other Classic expansions are not supported release targets.
 
 ## Set up your keys
 
@@ -26,6 +26,10 @@ Create, duplicate, rename, import, and export complete presets. Leveling, Dungeo
 **Apply & save replaces your entire binding map**, populates the original action bars, enables the extra bars it needs, and applies the selected self-cast settings. It records a named backup first, including bindings and affected bar contents. The Backups tab can restore a selected snapshot or the original setup.
 
 Setup and recovery run in small steps with a progress indicator. They cannot start in combat; an operation already underway pauses if combat begins and resumes afterward. Wait for completion before testing the result. Restore your original setup before disabling or removing the addon.
+
+## Window settings and troubleshooting
+
+The **Settings** tab offers window opacity and scale, plus optional diagnostic logging that starts off. Logs stay local, retain the latest 200 entries, and can be viewed, copied or cleared. Full failure details explain whether nothing changed, recovery succeeded, or a backup needs attention.
 
 ## Get started
 

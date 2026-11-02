@@ -1,8 +1,8 @@
-# Hot Swap 0.3.1
+# Hot Swap 0.3.2
 
 A configurable World of Warcraft addon for stable class bindings, druid form pages, mouseover/focus macros, Alt self-cast, and selectable on-use items.
 
-**Status: installable beta.** Version 0.3.1 fixes Optimize's macro-index placement failure and adds native action-bar visibility settings. It uses Blizzard's original action bars, a miniature spellbook editor, and bounded setup/recovery jobs. The actual Lua modules pass the regression suite using Lua 5.1 and mocked WoW APIs; real-client behavior still needs a retest. Geometry previews approximate artwork and fonts and are not game screenshots.
+**Status: installable beta.** Version 0.3.2 fixes the Classic Era F6/Target focus failure, validates commands before applying, and adds diagnostic logging and window settings. It uses Blizzard's original action bars, a miniature spellbook editor, and bounded setup/recovery jobs. The actual Lua modules pass the regression suite using Lua 5.1 and mocked WoW APIs; real-client behavior still needs a retest. Geometry previews approximate artwork and fonts and are not game screenshots.
 
 ## Install and open
 
@@ -36,7 +36,7 @@ To import someone else's settings, open their file, copy its text, paste it into
 
 ## In-game interface
 
-The six tabs are **Setup**, **Presets**, **Bindings**, **Items**, **Backups**, and **Import / export**. The interface uses the game's own frame, button, checkbox, scrollbar and action-slot artwork, game fonts, gold headings and native tooltips. Advanced options stay collapsed until needed. Combat actions use Blizzard's original bars and their own cooldowns, tooltips and hotkey labels.
+The seven tabs are **Setup**, **Presets**, **Bindings**, **Items**, **Backups**, **Import / export**, and **Settings**. The interface uses the game's own frame, button, checkbox, scrollbar and action-slot artwork, game fonts, gold headings and native tooltips. Advanced options stay collapsed until needed. Combat actions use Blizzard's original bars and their own cooldowns, tooltips and hotkey labels.
 
 All artwork is referenced from the installed game; there is no browser, web UI, bundled replacement font, or external skin dependency. Geometry previews use approximate artwork and fonts, so the exact client rendering still needs an in-game check.
 
@@ -53,6 +53,18 @@ Unlearned spells use the current client's spell database for their real icon and
 Escape ends mouse recording or closes an action picker first, keeping the main window open. A subsequent Escape closes the main window. Opening the settings category or game-menu shortcut never applies a layout automatically.
 
 The interface reuses its preview between relevant changes, updates only the visible page, filters item-data events, and redraws after Apply on a later frame. Apply still runs fresh validation before modifying bindings.
+
+## Settings and troubleshooting
+
+**Settings** controls this character's window opacity (40–100%) and preferred scale (70–130%). Changes take effect immediately. The window reduces its effective scale when necessary to fit the screen and spellbook. **Reset appearance** restores the defaults. These preferences stay local when importing or switching binding presets.
+
+**Enable diagnostic logging** is off by default. Turn it on before reproducing a problem. It keeps the latest 200 Hot Swap entries, including setup phases, failures, key/command, backup identifier, rollback outcome and bounded stack traces when available. It captures uncaught errors that identify Hot Swap; it is not a general other-addon error collector and never replaces the game's existing error presentation. Logs do not contain raw preset exports or macro bodies from context fields and are never uploaded automatically.
+
+Use **View / copy log → Select text → Ctrl+C** to share the output or paste it into an external text file. After reproducing, `/reload` or log out so WoW writes the log into this character's `SavedVariables/KeybindOptimizer.lua` file. The file also contains personal presets and backups; share the copied diagnostic text when you only want to share diagnostics. Disabling logging preserves existing entries; **Clear log** removes them.
+
+Apply failures also have a full selectable **Details** view even when logging is off. Closing it keeps the last failure accessible; **Dismiss error** or a successful retry clears it. The message distinguishes a preflight rejection (nothing changed), a verified rollback, and recovery that still needs attention.
+
+Classic Era omits unavailable default focus controls. Command support comes from the running client's binding registry, not the selected profile label. Explicit saved focus targeting is rejected for review instead of silently changing its target. Unsupported commands fail before backup or action-bar writes.
 
 ## Core behavior
 
@@ -79,10 +91,10 @@ The interface reuses its preview between relevant changes, updates only the visi
 | Alt-wheel up / down | Camera zoom |
 | Shift-Space / Ctrl-Space | Selected Healthstone / healing potion |
 | Ctrl-T | Selected on-use bag or equipped item |
-| Middle / Shift-middle / Ctrl-middle | Leave form / set focus / clear focus |
+| Middle / Shift-middle / Ctrl-middle | Leave form / set focus / clear focus (focus only on supporting clients) |
 | I / J / K / P | Bags / character / spellbook / talents |
 | M / L / O | Map / quest log / social |
-| F1–F5 / F6 | Self and party selection / focus selection |
+| F1–F5 / F6 | Self and party selection / focus selection (focus only on supporting clients) |
 
 With wheel abilities enabled, Druid uses wheel up/down for Bear/Cat, Shift-wheel for Travel/Aquatic, and Ctrl-wheel for Moonkin/Prowl. With wheel abilities disabled, normal zoom is restored and affected abilities receive keyboard or recorded-button alternatives. The Binding preview is authoritative for those replacements.
 

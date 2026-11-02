@@ -62,8 +62,7 @@ end
 function UI:FitWindows()
     if not self.frame then return end
     local wide=self.library and self.library:IsShown() and self.activePage=="Bindings"
-    local width,height=UIParent:GetWidth(),UIParent:GetHeight()
-    self.frame:SetScale(math.min(1,(width-30)/(wide and 1180 or 860),(height-30)/620))
+    self:ApplyAppearance(wide)
     self.frame:ClearAllPoints(); self.frame:SetPoint("CENTER",UIParent,"CENTER",wide and -160 or 0,0)
 end
 function UI:CancelLibraryDrag()

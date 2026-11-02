@@ -27,3 +27,15 @@ The live-client Optimize error exposed a gap in the original test double: it app
 Bar visibility now has a staged native UI, strict per-preset import/export flags and required-bar enforcement. Tests verify actual mocked frames become visible, nil/legacy flags preserve positions, unused bars retain explicit choices, delayed mirror values refresh correctly, stale proxy cache bits are cleared, Restore supersedes prior requests, and combat stops frame updates. The derived-setting adapter and deferred refresh were independently reviewed against Blizzard's current Era/Forever implementation. The final button is Apply & save; selection only opens a saved draft.
 
 See the generated validation report for the current full-suite count. These reproductions strengthen coverage but do not replace the requested in-game retest.
+
+## 0.3.2 follow-up — 1 November 2026
+
+Reproduced the reported new-Druid Optimize failure by making the mock enumerate real supported commands and reject TARGETFOCUS on Era. The former assigned-key-only mock accepted any command and concealed the defect. Planning now omits unsupported defaults; explicit saved focus intent and every planned native command are checked against the actual registry before mutation.
+
+Independent review also found and fixed two edge cases: a registered arbitrary CLICK/MACRO command must not bypass the typed action path, and a named backup must authenticate preset shortcuts using the saved modes it will restore, including deleted modes. Baseline recovery still preserves arbitrary original personal bindings.
+
+Diagnostics are modular, opt-in and bounded. Disabled operation records nothing; enabled transactions record phases and outcomes with exact failing command/context and bounded stacks. Logger failures cannot break setup. The global handler forwards original arguments/results and does not replace another addon's newer wrapper when disabled. Settings and logs stay outside import/export and recovery state.
+
+UI review checked persistent error details, explicit recovery outcomes, Escape handling, native slider support on Era/Forever, copy/clear controls and preferred-versus-fitted scale. Geometry previews were inspected for Settings, diagnostic log and failure details. Regression coverage includes fresh Era Optimize, no-write preflight, native recovery, disabled/enabled diagnostics, failure injection, handler chaining, capped storage, reload and appearance isolation.
+
+The final integrated suite passed **253/253** scenarios using actual Lua 5.1 modules and mocked WoW APIs. No unresolved blocking source issue was identified. Real-client protected execution, slider dragging, rendered textures and long-log scrolling/copy remain acceptance checks; mock and geometry results are not a live-client certification. Public CurseForge creation/upload is still unfinished after the dashboard returned a client error.

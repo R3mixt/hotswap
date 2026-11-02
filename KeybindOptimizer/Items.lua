@@ -148,8 +148,12 @@ function I:GetTargetInfo(action)
 end
 function I:GetTargetModes(action)
     local kind=self:GetTargetInfo(action).kind
-    if kind=="help" then return {"default","mouseover","target","focus","self"} end
-    if kind=="harm" then return {"default","mouseover","target","focus"} end
+    if kind=="help" or kind=="harm" then
+        local values={"default","mouseover","target"}
+        if K.API:SupportsFocus() then values[#values+1]="focus" end
+        if kind=="help" then values[#values+1]="self" end
+        return values
+    end
     return {"default"}
 end
 function I:ValidateBinding(record)
@@ -168,6 +172,7 @@ function I:ValidateBinding(record)
         if count~=#record.alternatives then return false,"Saved item choices must be a continuous list." end
     end
     if record.targetMode and record.targetMode~="default" then
+        if record.targetMode=="focus" and not K.API:SupportsFocus() then return false,"Focus targeting is unavailable on this client. Choose another item target mode." end
         local allowed=false; for _,mode in ipairs(self:GetTargetModes({selectedID=record.selected})) do if mode==record.targetMode then allowed=true end end
         if not allowed then return false,"That item has no verified support for this target mode." end
     end

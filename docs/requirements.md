@@ -1,4 +1,4 @@
-# Requirement map — 0.3.1 beta
+# Requirement map — 0.3.2 beta
 
 The final release targets WoW Forever. Classic Era / Hardcore is the temporary development target. Retail is not a supported release target. Automated tests use Lua 5.1 with mocked game APIs; a passing suite does not certify protected execution inside either client.
 
@@ -29,6 +29,10 @@ The final release targets WoW Forever. Classic Era / Hardcore is the temporary d
 | Item targeting | Verified friendly/hostile unit modes; food self-use and mortar ground use | Unknown items expose default only; no guessed capability |
 | Portable item choices | Item IDs, alternatives and target edits carry in presets/imports | No automatic equipment swap when activating a binding preset |
 | Food/water | May be selected and bound as inventory items | Automatic best-food/water selection is **not implemented** |
+| Diagnostic logging | Opt-in, off by default, bounded saved history with operations, key/command/stage, backups, recovery outcomes and bounded stacks | Hot Swap errors only; copy/clear controls; persisted by WoW on reload/logout |
+| Local window preferences | Settings tab with opacity, scale, viewport fitting and Reset appearance | Character-local; independent of shared binding presets |
+| Readable failure details | Persistent selectable Details dialog with explicit outcome and backup | Current-session last error stays available even if logging is disabled |
+| Native command capability | Registry-based preflight before action writes; unavailable defaults omitted | Explicit unsupported focus targets need review rather than silent retargeting |
 | Settings/menu entry points | AddOns settings category, Escape menu and `/hotswap` | Separate client menu adapters |
 | Escape during recording | Cancels capture before closing the main window | Modal tests pass; client retest required |
 | Avoid script timeout | Bounded jobs, cached previews/catalogs and coalesced events | Individual game API calls cannot be interrupted; client retest required |

@@ -1,6 +1,6 @@
 # CurseForge submission
 
-Status: prepared locally; author-dashboard sign-in is required before creating a project or submitting files. There is no assigned project ID or public project URL yet. This file must not be mistaken for proof of publication.
+Status: prepared locally; the author dashboard was opened, but its project-creation page returned a client error. Creation and upload remain unfinished. There is no assigned project ID or public project URL yet. This file must not be mistaken for proof of publication.
 
 ## Prepared materials
 
@@ -8,8 +8,8 @@ Status: prepared locally; author-dashboard sign-in is required before creating a
 - `publishing/curseforge-description.md`: player-facing description.
 - `publishing/logo.png`: original project logo; `logo.svg` is its editable source.
 - `CHANGELOG.md`: release notes.
-- `dist/HotSwap-0.3.1.zip`: game installation ZIP produced by `python package.py`.
-- `dist/HotSwap-0.3.1-source.zip`: separate development archive; do not use as the primary game-install file.
+- `dist/HotSwap-0.3.2.zip`: game installation ZIP produced by `python package.py`.
+- `dist/HotSwap-0.3.2-source.zip`: separate development archive; do not use as the primary game-install file.
 - SHA-256 manifests: verify the file you upload matches the reviewed build.
 
 The default license is All Rights Reserved with permission for personal gameplay. It does not grant others permission to republish modified copies. A broader open-source license can be chosen deliberately later.
