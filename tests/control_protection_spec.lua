@@ -150,11 +150,9 @@ function Tests.control_protection_preset_hotkey_rejects_protected_controls_acros
   equal(#Mock.writes,0)
   local payload="KBO2\nc\tDRUID\nn\tImported protected\ns\tImported protected\tpreserveTargeting\tboolean\ttrue\nh\tImported protected\tF\na\tImported protected"
   ok,why=k:Import(payload); assert(ok,why)
-  local plan=k:Preview(); assert(#plan.errors>0 and table.concat(plan.errors,"; "):find("Preset hotkey F",1,true),"Imported protected hotkey silently fell back to another key")
-  local modeID="mode."..k.db.presets[k.db.activePreset].id
-  for _,a in ipairs(plan.actions) do if a.id==modeID then assert(not a.key,"Protected mode hotkey was allocated a fallback") end end
-  equal(k.db.presets[k.db.activePreset].hotkey,"F"); assert(not plan.fallbackBindings[modeID])
-  Mock:ResetWrites(); ok=k:Apply(); assert(not ok)
+  k:GetSettings().allowAccountMacros=true -- Capacity is independent of shortcut validation.
+  local plan=k:Preview(); assert(#plan.errors==0,table.concat(plan.errors,"; "))
+  equal(k.db.presets[k.db.activePreset].hotkey,nil)
   equal(#Mock.writes,0); equal(#k.Engine:ListBackups(),0); equal(GetBindingAction("F"),"ASSISTTARGET")
 end
 

@@ -104,6 +104,7 @@ function V:Build(page,ui,w)
     end
     page.spellsOnly=w.button(controls,"Spells only",145,function()
         local values={}; for _,entry in ipairs(protectionOptions) do values[entry[1]]=true end
+        ui.bindingSource="draft"
         ui:Call(K,"UpdateSettings",values)
         ui:Refresh()
     end)

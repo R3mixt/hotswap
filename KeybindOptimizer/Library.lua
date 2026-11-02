@@ -267,6 +267,7 @@ function L:Place(entry,id,mode)
         local source=findAction(entry.actionID)
         if source and not source.kind and not source.builtin then
             descriptor={kind="spell",sourceID=source.librarySourceID or source.id,name=source.name,targeting=source.targeting}
+            if source.explicitRank then descriptor.spellID=source.selectedSpellID or source.spellID end
             if source.id:match("^custom%.") then descriptor=K.Copy(K:GetSettings().customActions[source.id]) end
             if source.id:match("^spell%.") then descriptor={kind="spell",spellID=source.spellID,name=source.spellName,targeting=source.targeting,rankMode="highest"} end
         end

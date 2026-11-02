@@ -135,6 +135,7 @@ function K:Apply()
 end
 function K:OnApplyComplete(ok,message,plan,kind)
     kind=kind or "apply"
+    if ok and (kind=="apply" or kind=="restore") then self.db.recoveryRequired=nil; self.recoveryQuarantined=nil end
     if kind=="apply" and ok then
         local name=plan and plan.presetID and self.Presets:FindID(plan.presetID) or (plan and plan.presetName) or self.db.activePreset
         self.db.appliedPreset=name
@@ -153,7 +154,7 @@ function K:OnApplyComplete(ok,message,plan,kind)
     self:QueueRefresh()
     if kind=="maintenance" and not ok and self.db.enabled and self.db.appliedPlan and self.db.appliedPlan.formSignature~=self.API:FormSignature() then
         self.pendingSpellMaintenance=nil
-        local _,why=self.Engine:Restore(); if why then self:Print(why) end
+        self:RequireRecovery(message)
         return
     end
     if self.pendingSpellMaintenance then self:MaintainLearnedActions() end
@@ -177,7 +178,18 @@ function K:RefreshAvailabilityStatus()
     self.needsRefresh=self.AvailabilityEngine:HasUnboundLearnedSpells(plan)
     self.dirty=self.Presets:HasUnappliedChanges() or self.needsRefresh
 end
+function K:RequireRecovery(reason)
+    self.db.recoveryRequired=tostring(reason or "The installed layout needs review.")
+    self.pendingSpellMaintenance=nil; self.pendingItemMaintenance=nil
+    self.dirty=true; self.needsRefresh=true
+    if InCombatLockdown and InCombatLockdown() then return end
+    if self.recoveryQuarantined or self.Engine.busy then return end
+    local ok,why=self.Engine:QuarantineForms()
+    if not ok then self:Print(why) end
+
+end
 function K:MaintainLearnedActions()
+    if self.db and self.db.recoveryRequired then self:RequireRecovery(self.db.recoveryRequired); return end
     if not self.db or not self.db.enabled or not self.db.appliedPlan then self.pendingSpellMaintenance=nil; return end
     if self.Engine.busy or (InCombatLockdown and InCombatLockdown()) then self.pendingSpellMaintenance=true; return end
     self.pendingSpellMaintenance=nil
@@ -192,11 +204,12 @@ function K:MaintainLearnedActions()
         self:Print(why or "Review your learned abilities in Hot Swap.")
         -- Stale form indices can select the wrong form. A combo-only repair
         -- failure leaves its original inert/owned macro intact for review.
-        if formsChanged then local _,message=self.Engine:Restore(); if message then self:Print(message) end end
+        if formsChanged then self:RequireRecovery(why) end
     elseif ok==true then self:RefreshAvailabilityStatus()
     end
 end
 function K:MaintainItemBindings()
+    if self.db and self.db.recoveryRequired then return end
     if not self.db or not self.db.enabled or not self.db.appliedPlan then self.pendingItemMaintenance=nil; return end
     if self.Engine.busy or (InCombatLockdown and InCombatLockdown()) then self.pendingItemMaintenance=true; return end
     self.pendingItemMaintenance=nil
@@ -308,11 +321,12 @@ if CreateFrame then
             K.Items:Invalidate()
             K.API:InvalidateSpellbook()
             K:InvalidatePreview()
-            if K.db.enabled and K.db.appliedPlan then
+            if K.db.recoveryRequired then K:RequireRecovery(K.db.recoveryRequired)
+            elseif K.db.enabled and K.db.appliedPlan then
                 local ok,err=K.Engine:Activate(K.db.appliedPlan)
                 if not ok then
                     K:Print(err or "Could not activate the saved layout. Open /hotswap.")
-                    if K.db.backup then local _,message=K.Engine:Restore(); if message then K:Print(message) end end
+                    K:RequireRecovery(err)
                 end
                 K:MaintainMouseControls()
             end

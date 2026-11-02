@@ -701,7 +701,7 @@ function Tests.form_index_maintenance_updates_guards_in_place_without_rebinding(
   for _,write in ipairs(Mock.writes) do assert(write[1]~="binding" and write[1]~="savebindings","Maintenance reassigned keys") end
 end
 
-function Tests.form_maintenance_failure_restores_original_setup()
+function Tests.form_maintenance_failure_quarantines_owned_forms()
   local k=init()
   local original=k.Copy(Mock.bindings)
   assert(k:Apply())
@@ -713,9 +713,8 @@ function Tests.form_maintenance_failure_restores_original_setup()
     return real(...)
   end
   Mock:Fire("UPDATE_SHAPESHIFT_FORMS")
-  assert(not k.db.enabled,"Failed form maintenance left stale layout active")
-  sameMap(Mock.bindings,original,"form failure restore bindings")
-  local a,c=GetNumMacros(); equal(a+c,1,"form failure generated macros cleaned up")
+  if k.Engine.busy then Mock:Drain() end
+  assert(k.db.enabled and k.db.recoveryRequired and k.recoveryQuarantined,"Failed maintenance needs explicit recovery")
   equal(GetMacroInfo(GetMacroIndexByName("UserMacro")),"UserMacro","form failure personal macro")
 end
 

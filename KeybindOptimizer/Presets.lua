@@ -458,7 +458,7 @@ function P:MergeImport(incoming,active,sourceClass)
     if sourceClass and sourceClass~=class then return false,"This export is for "..sourceClass..". Import it on a "..sourceClass.." character; this character is "..class.."." end
     local names=sorted(incoming)
     if #names==0 then return false,"The export contains no presets." end
-    local mapped={}; local hotkeys={}
+    local mapped={}; local hotkeys={}; local proposed={}
     for _,preset in pairs(K.db.presets) do if preset.hotkey then hotkeys[preset.hotkey]=true end end
     local cleared=0
     for _,name in ipairs(names) do
@@ -469,11 +469,15 @@ function P:MergeImport(incoming,active,sourceClass)
         local preset=K.Copy(incoming[name])
         preset.id=self:NewID(); preset.sourceClass=sourceClass or class
         if preset.hotkey and hotkeys[preset.hotkey] then preset.hotkey=nil; cleared=cleared+1 end
-        if preset.hotkey then hotkeys[preset.hotkey]=true end
+        proposed[target]=preset.hotkey; preset.hotkey=nil
         K.db.presets[target]=preset; mapped[name]=target
     end
+    for _,name in ipairs(names) do
+        local target=mapped[name]; local key=proposed[target]
+        if key then local ok=self:SetHotkey(target,key); if not ok then cleared=cleared+1 end end
+    end
     self:Select(mapped[active] or mapped[names[1]])
-    return true,"Imported "..#names.." preset(s). Editing "..K.db.activePreset.."; your active setup is unchanged."..(cleared>0 and (" "..cleared.." duplicate preset hotkey(s) were left unassigned.") or "")
+    return true,"Imported "..#names.." preset(s). Editing "..K.db.activePreset.."; your active setup is unchanged."..(cleared>0 and (" "..cleared.." conflicting preset hotkey(s) were left unassigned.") or "")
 end
 function P:Import(text)
     if busy() then return false,waitMessage end

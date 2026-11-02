@@ -677,6 +677,31 @@ function E:RepairMouseControls()
     end
     return self:StartJob(job)
 end
+function E:QuarantineForms()
+    if self.busy or inCombat() then return false,"Recovery waits until the current operation and combat finish." end
+    local job={kind="recovery",previous=runtimeState(),created={}}
+    job.steps=snapshotSteps(job); job.rollback=rollbackJob
+    for _,a in ipairs(K.db.appliedPlan and K.db.appliedPlan.actions or {}) do
+        if a.macroName and a.body and (a.targeting=="form" or a.body:find("form:",1,true) or a.body:find("/cancelform",1,true)) then
+            local name,expected=a.macroName,a.body
+            addStep(job.steps,function()
+                local index=GetMacroIndexByName(name)
+                local actual,_,body=GetMacroInfo(index)
+                if actual==name and body==expected and K.db.ownedMacros[name]==expected then
+                    EditMacro(index,nil,nil,"#showtooltip")
+                    if select(3,GetMacroInfo(GetMacroIndexByName(name)))~="#showtooltip" then error("Could not quarantine "..name) end
+                    K.db.ownedMacros[name]="#showtooltip"
+                end
+            end,"Disabling stale owned form actions",true,true)
+        end
+    end
+    job.commit=function()
+        K.recoveryQuarantined=true
+        job.entry.status="saved"
+        return "Recovery needed: stale owned form macros disabled. Personal controls preserved. Review and Apply a preset or explicitly restore a backup."
+    end
+    return self:StartJob(job)
+end
 function E:RestoreBackup(id)
     if self.busy then return false,"Wait for the current operation to finish." end
     if inCombat() then return false,"Leave combat before restoring a backup." end
@@ -697,7 +722,26 @@ function E:RestoreBackup(id)
     job.steps=snapshotSteps(job); job.rollback=rollbackJob
     addStep(job.steps,function() E:Deactivate(); restoreRuntime(target,true); K.db.ownedMacros=owned end,"Restoring saved preset state",true,false)
     for _,step in ipairs(macroSteps(target.enabled and target.appliedPlan,job.created)) do job.steps[#job.steps+1]=step end
-    for _,step in ipairs(restoreSteps(job,entry.snapshot)) do job.steps[#job.steps+1]=step end
+    local snapshot=K.Copy(entry.snapshot)
+    local identities={}
+    for _,a in ipairs(target.appliedPlan and target.appliedPlan.actions or {}) do
+        if a.macroName and a.body and (target.ownedMacros or {})[a.macroName]==a.body then identities[a.macroName]={action=a,body=a.body} end
+    end
+    addStep(job.steps,function()
+        local function remap(command)
+            local name=type(command)=="string" and command:match("^MACRO (.+)$")
+            local identity=name and identities[name]
+            if identity then return "MACRO "..identity.action.macroName end
+            return command
+        end
+        for _,field in ipairs({"bindings","accountBindings","characterBindings"}) do
+            for key,command in pairs(snapshot[field] or {}) do snapshot[field][key]=remap(command) end
+        end
+        for _,record in pairs(target.appliedPlan and target.appliedPlan.bindingOwnership or {}) do
+            record.command=remap(record.command)
+        end
+    end,"Resolving restored macro bindings",true,false)
+    for _,step in ipairs(restoreSteps(job,snapshot)) do job.steps[#job.steps+1]=step end
     job.commit=function()
         if K.Presets and K.Presets.EnsureButtons then K.Presets:EnsureButtons() end
         K.db.appliedPlan=K.Copy(target.appliedPlan)

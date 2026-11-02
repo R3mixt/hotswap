@@ -22,7 +22,7 @@ function V:Build(page,ui,w)
  w.label(page,"Items",18):SetPoint("TOPLEFT")
  page.context=w.label(page,"",11,c.muted); page.context:SetPoint("TOPLEFT",0,-28); page.context:SetWidth(620)
  page.openBook=w.button(page,"Open spellbook",132,function()
-  ui:ShowPage("Bindings")
+  ui:EndCapture(); ui:SetBindingSource("draft"); ui:ShowPage("Bindings")
   ui.libraryTab="items"; ui.libraryCategory=nil; ui.libraryOpen=true
   if ui.library then ui.library.search:SetText("") end
   if ui.SyncLibrary then ui:SyncLibrary() end

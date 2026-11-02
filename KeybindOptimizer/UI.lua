@@ -1410,6 +1410,7 @@ function UI:PreviewRecommendations()
     if type(plan)~="table" then return false end
     self.recommendationPlan,self.recommendationSnapshot=plan,snapshot
     self.bindingSource="recommendation"; self.selectedAction=nil; self.keyIcons=nil; self.availableActionPages=nil
+    self.search=nil; self.pages.Bindings.search:SetText(""); self.bindingView="keyboard"; self.pinnedLayer=""; self.lastTest=nil
     self.followForm=true; self:ShowPage("Bindings")
     self:Notice("Recommendation preview only. No preset has been created and no game changes made.")
     return true
@@ -1988,6 +1989,7 @@ function UI:ShowPage(name)
     self:CloseMenu()
     self:ClearInputFocus()
     self.activePage = name
+    if name=="Items" then self.bindingSource="draft" end
     self:SyncLibrary(false)
     self:UpdateBindingTester()
     for id, page in pairs(self.pages) do page:SetShown(id == name); selectTab(self.nav[id], id == name) end
@@ -2190,6 +2192,7 @@ function UI:Refresh()
     if combat then self.status:SetText("In combat. Preset switching and restoring are paused."); color(self.status, C.warning)
     elseif self.previewFailed then self.status:SetText("This preset could not be prepared. Open Review to check it."); color(self.status, C.error)
     elseif self.operationError then self.status:SetText(self.operationError.summary); color(self.status,C.error)
+    elseif K.db.recoveryRequired then self.status:SetText("Recovery needed. Review and Apply a preset, or explicitly restore a backup."); color(self.status,C.error)
     elseif self.notice then self.status:SetText(self.notice); color(self.status, self.noticeError and C.error or C.muted)
     elseif self.bindingSource=="current" then
         local failed=#((self.bindingPlan or {}).errors or {})>0

@@ -62,6 +62,9 @@ The interface reuses its preview between relevant changes, updates only the visi
 
 ## Settings and troubleshooting
 
+If automatic form maintenance fails, Hot Swap retains your personal bindings and bar edits, saves a recovery backup, and disables only unchanged owned form-dependent macros. A persistent recovery notice asks you to review and explicitly Apply a preset or restore a backup. Personally edited macros remain yours. Recovery work waits out combat; it never silently restores the entire original setup.
+
+
 **Settings → Controls** lets each preset preserve movement, camera/selection, chat, targeting, other interface controls, and casting settings. **Spells only** checks all six. Checked categories keep their existing keys, including custom remaps; automatic spell assignments choose another free key. A manually pinned spell on a protected key must be changed before Apply. Unrelated keys are preserved regardless of these checkboxes. Protection takes effect with **Apply & save** and travels with preset exports.
 
 **Settings → Action bars** includes **Hide unavailable spells on action bars**, which leaves unknown spell slots empty, and **Adapt to learned talents**, which does this for talent abilities only. Slots and keys stay reserved. Learning or resetting talents refreshes the applied layout outside combat, without applying draft edits or overwriting personal bar changes. Blizzard's **Always Show Action Bars** setting may still show empty button borders; Hot Swap does not hide protected native button frames.
