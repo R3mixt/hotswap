@@ -1,4 +1,4 @@
--- Full preset replacement and named rollback regression coverage.
+-- Preset activation, binding ownership and named rollback regression coverage.
 local function ready() TestAddon:Init(); return TestAddon end
 local function equal(a,b,label) assert(a==b,(label or "value")..": expected "..tostring(b)..", got "..tostring(a)) end
 local function same(a,b,label)
@@ -7,7 +7,7 @@ local function same(a,b,label)
 end
 local function has(text,needle) return type(text)=="string" and text:find(needle,1,true)~=nil end
 
-function Tests.full_preset_replacement_persists_named_backup_before_any_macro_or_binding_write()
+function Tests.preset_activation_preserves_unassigned_keys_and_saves_backup_before_any_write()
   local k=ready()
   Mock:RegisterBindingCommand("TOGGLEACHIEVEMENT","BINDING_HEADER_INTERFACE")
   Mock.bindings.BACKSPACE="ACTIONBUTTON12"; Mock.bindings.NUMPADDECIMAL="TOGGLEACHIEVEMENT"
@@ -25,13 +25,13 @@ function Tests.full_preset_replacement_persists_named_backup_before_any_macro_or
   end
   local ok,why=k:Apply(); assert(ok,why)
   assert(observed,"Apply did not exercise protected mutation")
-  equal(Mock.bindings.BACKSPACE,nil,"Unused old game binding survived full replacement")
-  equal(Mock.bindings.NUMPADDECIMAL,nil,"Unused old numpad binding survived full replacement")
-  equal(Mock.bindings.ENTER,"OPENCHAT","Complete replacement removed normal chat")
-  equal(Mock.bindings["SHIFT-ENTER"],"OPENCHATSLASH","Complete replacement removed command chat")
-  equal(Mock.bindings.BUTTON1,"CAMERAORSELECTORMOVE","Complete replacement removed mouse selection / camera")
-  equal(Mock.bindings.BUTTON2,"TURNORACTION","Complete replacement removed right-button turn / interact")
-  equal(Mock.bindings.PRINTSCREEN,"SCREENSHOT","Complete replacement removed screenshots")
+  equal(Mock.bindings.BACKSPACE,"ACTIONBUTTON12","Apply removed an unassigned game binding")
+  equal(Mock.bindings.NUMPADDECIMAL,"TOGGLEACHIEVEMENT","Apply removed an unassigned numpad binding")
+  equal(Mock.bindings.ENTER,"OPENCHAT","Apply omitted normal chat")
+  equal(Mock.bindings["SHIFT-ENTER"],"OPENCHATSLASH","Apply omitted command chat")
+  equal(Mock.bindings.BUTTON1,"CAMERAORSELECTORMOVE","Apply omitted mouse selection / camera")
+  equal(Mock.bindings.BUTTON2,"TURNORACTION","Apply omitted right-button turn / interact")
+  equal(Mock.bindings.PRINTSCREEN,"SCREENSHOT","Apply omitted screenshots")
   local entry=k.Engine:ListBackups()[1]
   assert(entry.name:match("^Tester%-Druid%-"),"Backup lacks Character-Class-Date naming")
   equal(entry.status,"applied","Successful Apply backup status")

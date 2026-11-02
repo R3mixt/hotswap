@@ -32,7 +32,16 @@ local function actionLabel(plan,key,command)
     return K.API:BindingLabel(command)
 end
 local function inCombat() return InCombatLockdown and InCombatLockdown() end
-local function captureBindings()
+local function readHiddenBindings(result)
+    local ok,why=K.API:ReadHiddenMouseBindings(result)
+    if not ok then error(why) end
+end
+local function readKey(key,result)
+    local command=GetBindingAction(key)
+    if type(command)~="string" then error("Could not inspect binding "..key) end
+    result[key]=command~="" and command or nil
+end
+local function captureBindings(probeKeys)
     local result={}
     for index=1,(GetNumBindings and GetNumBindings() or 0) do
         local values={GetBinding(index)}
@@ -40,6 +49,8 @@ local function captureBindings()
         -- Current supported clients return command, category, key1, key2, ... .
         for i=3,#values do if values[i] and values[i]~="" then result[values[i]]=command end end
     end
+    readHiddenBindings(result)
+    for key in pairs(probeKeys or {}) do readKey(key,result) end
     return result
 end
 local function getCVar(name)
@@ -188,21 +199,31 @@ local function readBinding(index,result)
     local values={GetBinding(index)}
     for n=3,#values do if values[n] and values[n]~="" then result[values[n]]=values[1] end end
 end
-local function readSteps(result)
+local function readSteps(result,probeKeys)
     local steps={}; local count=bindingCount()
     for first=1,count,24 do
         local start,last=first,math.min(first+23,count)
         addStep(steps,function() for index=start,last do readBinding(index,result) end end,"Reading bindings",true,false)
     end
+    addStep(steps,function() readHiddenBindings(result) end,"Reading mouse controls",true,false)
+    local keys={}; for key in pairs(probeKeys or {}) do keys[#keys+1]=key end
+    for first=1,#keys,24 do
+        local start,last=first,math.min(first+23,#keys)
+        addStep(steps,function() for i=start,last do readKey(keys[i],result) end end,"Reading assigned keys",true,false)
+    end
     return steps
 end
 local bindingSteps
 local function snapshotSteps(job)
-    local snapshot={bindings={},bindingSet=GetCurrentBindingSet and GetCurrentBindingSet() or 2,modified={},cvars={},createdAt=time and time() or 0,native={}}
+    local snapshot={bindings={},bindingSet=GetCurrentBindingSet and GetCurrentBindingSet() or 2,modified={},cvars={},createdAt=time and time() or 0,native={},mouseBindingsVersion=1}
     job.before=snapshot
     for _,key in ipairs({"SELFCAST","FOCUSCAST"}) do snapshot.modified[key]=GetModifiedClick and GetModifiedClick(key) or "NONE" end
     snapshot.cvars.autoSelfCast=getCVar("autoSelfCast")
-    local steps=readSteps(snapshot.bindings)
+    local probes={}
+    for key in pairs(job.plan and job.plan.nativeLayout and job.plan.nativeLayout.keys or {}) do probes[key]=true end
+    for key in pairs(job.previous and job.previous.appliedPlan and job.previous.appliedPlan.nativeLayout and job.previous.appliedPlan.nativeLayout.keys or {}) do probes[key]=true end
+    for key in pairs(job.previous and job.previous.appliedPlan and job.previous.appliedPlan.bindingOwnership or {}) do probes[key]=true end
+    local steps=readSteps(snapshot.bindings,probes)
     addStep(steps,function()
         job.currentBindings=K.Copy(snapshot.bindings)
         local _,entry=E:CaptureBackup(job.kind,snapshot); job.entry=entry
@@ -216,18 +237,18 @@ local function snapshotSteps(job)
             local inactive=snapshot.bindingSet==1 and 2 or 1
             local ok,why=pcall(function()
                 loadBindings(inactive)
-                snapshot[inactive==1 and "accountBindings" or "characterBindings"]=captureBindings()
+                snapshot[inactive==1 and "accountBindings" or "characterBindings"]=captureBindings(probes)
             end)
             local loaded
             local restored,restoreError=pcall(function()
                 loadBindings(snapshot.bindingSet)
-                loaded=captureBindings()
+                loaded=captureBindings(probes)
             end)
             if not restored then
                 -- Loading the inactive set was itself a state change. If the
                 -- reload fails, do not cancel while leaving those controls
                 -- selected: the captured maps can drive bounded recovery.
-                local readable,current=pcall(captureBindings)
+                local readable,current=pcall(captureBindings,probes)
                 if readable then job.currentBindings=current end
                 job.changed=true; job.backupReady=true
                 job.entry.complete=snapshot.accountBindings~=nil and snapshot.characterBindings~=nil
@@ -297,25 +318,46 @@ local function settingsSteps(snapshot)
     end
     return steps
 end
+local mouseDefaults={BUTTON1="CAMERAORSELECTORMOVE",BUTTON2="TURNORACTION"}
+local function restoredBindingMap(snapshot,target,current)
+    local result=K.Copy(target)
+    if snapshot.mouseBindingsVersion~=1 then
+        -- Old backups never inspected hidden commands. Missing entries are
+        -- unknown, not evidence that the player wanted camera input unbound.
+        for key,command in pairs(current or {}) do
+            if K.API.HiddenMouseCommands[command] and result[key]==nil then result[key]=command end
+        end
+        for key,command in pairs(mouseDefaults) do
+            if result[key]==nil then result[key]=current and current[key] or command end
+        end
+    end
+    return result
+end
 local function restoreSteps(job,snapshot)
-    local steps={}
+    local steps={}; local activeExpected
     if snapshot.native and K.NativeBars and K.NativeBars.RestoreSteps then appendNative(steps,K.NativeBars:RestoreSteps(snapshot.native),"Restoring native action bars",true) end
     local other=snapshot.bindingSet==1 and 2 or 1
     for _,set in ipairs({other,snapshot.bindingSet}) do
         local bindingSet=set
         local target=set==snapshot.bindingSet and snapshot.bindings or snapshot[set==1 and "accountBindings" or "characterBindings"]
         if target then
-            addStep(steps,function() insertSteps(job,bindingSteps(job,target)) end,"Preparing saved bindings",true,false)
+            addStep(steps,function()
+                local before=job.before and (bindingSet==job.before.bindingSet and job.before.bindings or job.before[bindingSet==1 and "accountBindings" or "characterBindings"])
+                local resolved=restoredBindingMap(snapshot,target,before or job.currentBindings)
+                if bindingSet==snapshot.bindingSet then activeExpected=resolved end
+                insertSteps(job,bindingSteps(job,resolved))
+            end,"Preparing saved bindings",true,false)
             addStep(steps,function() saveBindings(bindingSet) end,"Saving restored bindings",true,true)
         end
     end
     addStep(steps,function() loadBindings(snapshot.bindingSet) end,"Selecting restored binding set",true,true)
     for _,step in ipairs(settingsSteps(snapshot)) do steps[#steps+1]=step end
     addStep(steps,function()
-        local read={}; local verify=readSteps(read)
+        local expected=activeExpected or snapshot.bindings
+        local read={}; local verify=readSteps(read,expected)
         addStep(verify,function()
-            for key,command in pairs(snapshot.bindings) do if read[key]~=command then error("Restore verification failed for "..key) end end
-            for key in pairs(read) do if not snapshot.bindings[key] then error("Unexpected restored key "..key) end end
+            for key,command in pairs(expected) do if read[key]~=command then error("Restore verification failed for "..key) end end
+            for key in pairs(read) do if not expected[key] then error("Unexpected restored key "..key) end end
         end,"Verifying restored bindings",true,false)
         insertSteps(job,verify)
     end,"Verifying restored bindings",true,false)
@@ -472,11 +514,37 @@ function E:ValidatePlanCommands(plan,layout,presetState)
     end
     for key,entry in pairs(layout.keys or {}) do
         local dynamic=entry.command and (entry.command:match("^CLICK ") or entry.command:match("^MACRO "))
-        if entry.command and not shortcuts[entry.command] and (dynamic or not commands[entry.command]) then
+        if entry.command and not shortcuts[entry.command] and (dynamic or not K.API:IsBindingCommandSupported(entry.command,commands)) then
             return false,"Cannot apply "..key..": "..tostring(actionLabel(plan,key,entry.command)).." ("..entry.command..") is unavailable on this client. No changes were made."
         end
     end
     return true
+end
+function E:MergeBindings(current,planned,previousPlan,baseline)
+    local result,ownership=K.Copy(current),{}
+    local previous=previousPlan and previousPlan.bindingOwnership
+    if not previous then
+        -- Migrate only keys we can identify as installed by an older version.
+        -- A changed live command is a personal edit and is never released.
+        previous={}
+        local actions={}; for _,a in ipairs(previousPlan and previousPlan.actions or {}) do actions[a.id]=a end
+        for key,entry in pairs(previousPlan and previousPlan.nativeLayout and previousPlan.nativeLayout.keys or {}) do
+            local action=actions[entry.macroAction]
+            local command=entry.command or (action and action.macroName and "MACRO "..action.macroName)
+            if command then previous[key]={command=command,previous=baseline and baseline.bindings and baseline.bindings[key] or false} end
+        end
+    end
+    for key,entry in pairs(previous) do
+        if planned[key]==nil and current[key]==entry.command then result[key]=entry.previous or nil end
+    end
+    for key,command in pairs(planned) do
+        local old=previous[key]
+        local displaced=current[key] or false
+        if old and current[key]==old.command then displaced=old.previous end
+        ownership[key]={command=command,previous=displaced or false}
+        result[key]=command
+    end
+    return result,ownership
 end
 function E:Apply(plan)
     if self.busy then return false,"Wait for the current operation to finish." end
@@ -499,7 +567,9 @@ function E:Apply(plan)
     addStep(job.steps,function()
         local bindings,err=K.NativeBars:BindingMap(plan)
         if not bindings then error(err or "Could not prepare native bindings.") end
-        job.expected=bindings; insertSteps(job,bindingSteps(job,bindings))
+        local expected,ownership=E:MergeBindings(job.currentBindings,bindings,job.previous.enabled and job.previous.appliedPlan,job.previous.baseline)
+        plan.bindingOwnership=ownership; job.expected=expected
+        insertSteps(job,bindingSteps(job,expected))
     end,"Preparing replacement bindings",true,false)
     addStep(job.steps,function()
         if SetModifiedClick then SetModifiedClick("SELFCAST","ALT"); SetModifiedClick("FOCUSCAST","NONE") end
@@ -509,7 +579,7 @@ function E:Apply(plan)
     end,"Setting Alt self-cast",true,true)
     addStep(job.steps,function() saveBindings(2); loadBindings(2) end,"Saving character bindings",true,true)
     addStep(job.steps,function()
-        local read={}; local checks=readSteps(read)
+        local read={}; local checks=readSteps(read,job.expected)
         addStep(checks,function()
             for key,command in pairs(job.expected) do if read[key]~=command then error("Verification failed for "..key) end end
             for key in pairs(read) do if not job.expected[key] then error("Unexpected binding remains on "..key) end end
@@ -519,12 +589,77 @@ function E:Apply(plan)
     job.commit=function()
         local baseline=K.Copy(K.db.backup or job.before)
         if not baseline.native then baseline.native=K.Copy(job.before.native) end
+        plan.mouseBindingsVersion=1
         K.db.backup=baseline; K.db.enabled=true; K.db.appliedPlan=K.Copy(plan); K.db.appliedPreset=K.db.activePreset
         K.db.settings.fallbackBindings=K.Copy(plan.fallbackBindings)
         K.db.history[#K.db.history+1]={at=time and time() or 0,build=plan.build,spells=plan.coverage.bound,preset=K.db.activePreset}
         if #K.db.history>10 then table.remove(K.db.history,1) end
         job.entry.status="applied"; K.db.lastBindingBackupID=job.entry.id
         return "Preset applied to the original action bars. Backup saved: "..job.entry.name
+    end
+    return self:StartJob(job)
+end
+function E:RepairMouseControls()
+    if not K.db or not K.db.enabled or not K.db.appliedPlan then return true end
+    if self.busy or inCombat() then
+        K.pendingMouseRepair=true
+        return "pending","Mouse-control recovery waits until the current operation and combat finish."
+    end
+    local current={}; local readable,why=K.API:ReadHiddenMouseBindings(current)
+    if not readable then return self:Reject(why,"mouse-repair") end
+    local missing={}
+    for key,command in pairs(mouseDefaults) do if current[key]==nil then missing[key]=command end end
+    K.pendingMouseRepair=nil
+    if not next(missing) then K.db.appliedPlan.mouseBindingsVersion=1; return true end
+    local plan=K.db.appliedPlan
+    local job={kind="mouse-repair",plan=plan,previous=runtimeState(),created={}}
+    job.steps=snapshotSteps(job)
+    job.rollback=function()
+        -- Keep the saved backup honest, but do not undo a personal mouse edit
+        -- that we explicitly observed after taking it during this repair.
+        local recovery=K.Copy(job.before)
+        for key,command in pairs(job.preservedMouseEdits or {}) do
+            recovery.bindings[key]=command
+            local map=recovery[recovery.bindingSet==1 and "accountBindings" or "characterBindings"]
+            if map then map[key]=command end
+        end
+        local before=job.before; job.before=recovery
+        local steps=rollbackJob(job); job.before=before
+        return steps
+    end
+    addStep(job.steps,function()
+        local expected=K.Copy(job.currentBindings); job.repaired={}
+        for key,command in pairs(missing) do
+            -- Recheck after the backup stages; never replace a new personal bind.
+            local actual=GetBindingAction(key)
+            if type(actual)~="string" then error("Could not recheck mouse control "..key) end
+            if actual=="" then expected[key]=command; job.repaired[key]=command
+            else
+                expected[key]=actual; job.currentBindings[key]=actual
+                job.preservedMouseEdits=job.preservedMouseEdits or {}; job.preservedMouseEdits[key]=actual
+            end
+        end
+        job.expected=expected; insertSteps(job,bindingSteps(job,expected))
+    end,"Restoring missing mouse controls",true,false)
+    addStep(job.steps,function() saveBindings(job.before.bindingSet); loadBindings(job.before.bindingSet) end,"Saving mouse controls",true,true)
+    addStep(job.steps,function()
+        local read={}; local checks=readSteps(read,job.expected)
+        addStep(checks,function()
+            for key,command in pairs(job.expected) do if read[key]~=command then error("Mouse recovery verification failed for "..key) end end
+            for key in pairs(read) do if not job.expected[key] then error("Unexpected mouse recovery binding on "..key) end end
+        end,"Verifying mouse controls",true,false)
+        insertSteps(job,checks)
+    end,"Verifying mouse controls",true,false)
+    job.commit=function()
+        -- Old plans have no ownership table. Leave their migration to Apply;
+        -- adding a partial table here would abandon ownership of their other keys.
+        for key,command in pairs(job.repaired) do
+            if plan.bindingOwnership then plan.bindingOwnership[key]={command=command,previous=false} end
+            if plan.nativeLayout then plan.nativeLayout.keys[key]={command=command} end
+        end
+        plan.mouseBindingsVersion=1
+        job.entry.status="repaired"; K.db.lastBindingBackupID=job.entry.id
+        return "Restored missing mouse camera and selection controls. Backup saved: "..job.entry.name
     end
     return self:StartJob(job)
 end
@@ -554,7 +689,7 @@ function E:RestoreBackup(id)
         K.db.appliedPlan=K.Copy(target.appliedPlan)
         job.entry.status="restored"; K.db.lastBindingBackupID=job.entry.id
         if K.Presets and K.Presets.HasUnappliedChanges then K.dirty=K.Presets:HasUnappliedChanges() end
-        return "Restored "..entry.name.."."..(K.db.enabled and K.dirty and " Saved draft edits remain unapplied." or "")
+        return "Restored "..entry.name.."."..(entry.snapshot.mouseBindingsVersion~=1 and " Older backup had no hidden mouse details; usable mouse controls were retained." or "")..(K.db.enabled and K.dirty and " Saved draft edits remain unapplied." or "")
     end
     return self:StartJob(job)
 end
@@ -573,7 +708,7 @@ function E:Restore()
         K.db.enabled=false; K.db.appliedPlan=nil; K.db.backup=nil; K.db.appliedPreset=nil; K.db.appliedPresetSignature=nil
         job.entry.status="restored"; K.db.lastBindingBackupID=job.entry.id
         if K.Presets and K.Presets.HasUnappliedChanges then K.dirty=K.Presets:HasUnappliedChanges() end
-        return "Original bindings, action bars and settings restored. Unedited generated macros removed."
+        return "Original bindings, action bars and settings restored. Unedited generated macros removed."..(target.mouseBindingsVersion~=1 and " Older backup had no hidden mouse details; usable mouse controls were retained." or "")
     end
     return self:StartJob(job)
 end

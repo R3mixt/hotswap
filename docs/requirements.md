@@ -1,4 +1,4 @@
-# Requirement map — 0.3.2 beta
+# Requirement map — 0.3.3 beta
 
 The final release targets WoW Forever. Classic Era / Hardcore is the temporary development target. Retail is not a supported release target. Automated tests use Lua 5.1 with mocked game APIs; a passing suite does not certify protected execution inside either client.
 
@@ -12,7 +12,9 @@ The final release targets WoW Forever. Classic Era / Hardcore is the temporary d
 | Optimize button | Creates and activates a new optimized preset while retaining the previous preset | Validation and named backup precede live mutation |
 | Complete preset modes | Create, duplicate, rename, delete, edit and activate complete layouts on Presets tab | No fixed preset count; individual layouts and import payloads have defensive size bounds |
 | Preset shortcuts | A global activation key per named preset | Out of combat; all saved modes participate in shortcut conflict checks |
-| Replace existing bindings safely | Bounded apply/rollback jobs, progress, named backups and original recovery | Combat pauses an active job; recovery errors retain the backup |
+| Preserve unrelated controls | Apply updates only keys explicitly assigned by the selected preset; unrelated bindings and mouse controls remain unchanged | An explicit new assignment takes precedence on that key |
+| Release previous Hot Swap keys | A key no longer used by the addon regains its prior binding only while its current command still matches Hot Swap's last assignment | Later manual changes are preserved |
+| Apply and recover safely | Bounded apply/rollback jobs, progress, named backups and original recovery | Combat pauses an active job; recovery errors retain the backup |
 | Named backups | Character-class-date-time names; bindings, native bars, visibility, settings and owned macro data | WoW persists SavedVariables on reload/logout |
 | Import/export page | Data-only transfer, duplicate-name merging and class validation | Copy/paste to a local file; addons cannot write arbitrary external files |
 | Professional native UI | Game fonts, frames, tooltips, tabs and action-slot artwork | Geometry previews approximate artwork; final alignment needs client verification |

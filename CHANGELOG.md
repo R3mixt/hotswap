@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.3.3 beta — 2026-11-01
+
+- Preserve bindings outside the keys assigned by the preset. When a key leaves Hot Swap control, restore its displaced binding only if the player has not changed it.
+- Recognize Blizzard's hidden left/right mouse commands without weakening unsupported-command checks. Capture and verify hidden aliases and custom mouse assignments in both binding sets.
+- Repair missing left/right controls once on reload for older active layouts, outside combat, with a named backup. Existing custom mouse assignments are preserved.
+- Restore old backups without interpreting uncaptured mouse state as an instruction to erase it; preserve each binding set's own mouse controls. New snapshots still restore intentionally unbound buttons exactly.
+- Add hidden-command, selective-update, dual-set recovery, legacy migration and rollback regressions.
+
 ## 0.3.2 beta — 2026-11-01
 
 - Fix fresh-character Optimize on Classic Era: omit unavailable default focus controls and validate actual registered commands before action-bar or macro writes. Explicit saved focus intent stays an actionable error.

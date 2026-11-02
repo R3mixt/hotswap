@@ -2,7 +2,7 @@
 ## Title: Hot Swap
 ## Notes: Original action bars, optimized class bindings, spellbook editing, presets and recovery.
 ## Author: Clay
-## Version: 0.3.2
+## Version: 0.3.3
 ## SavedVariablesPerCharacter: KeybindOptimizerDB
 ## Category: Action Bars
 

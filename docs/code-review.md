@@ -39,3 +39,15 @@ Diagnostics are modular, opt-in and bounded. Disabled operation records nothing;
 UI review checked persistent error details, explicit recovery outcomes, Escape handling, native slider support on Era/Forever, copy/clear controls and preferred-versus-fitted scale. Geometry previews were inspected for Settings, diagnostic log and failure details. Regression coverage includes fresh Era Optimize, no-write preflight, native recovery, disabled/enabled diagnostics, failure injection, handler chaining, capped storage, reload and appearance isolation.
 
 The final integrated suite passed **253/253** scenarios using actual Lua 5.1 modules and mocked WoW APIs. No unresolved blocking source issue was identified. Real-client protected execution, slider dragging, rendered textures and long-log scrolling/copy remain acceptance checks; mock and geometry results are not a live-client certification. Public CurseForge creation/upload is still unfinished after the dashboard returned a client error.
+
+## 0.3.3 follow-up — 1 November 2026
+
+The prior registry guard incorrectly treated Blizzard's active hidden mouse commands as unavailable. The mock had exposed them in visible enumeration and concealed this distinction. Source-backed handling is limited to CAMERAORSELECTORMOVE and TURNORACTION; unsupported focus commands still fail safely. Snapshot reads supplement enumeration with hidden command aliases and direct reads of affected keys, including custom mouse assignments.
+
+The user's revised requirement changes Apply from whole-map replacement to planned-key updates. A committed plan tracks each managed key's installed command and displaced binding. Releasing a key restores its displaced binding only while Hot Swap's command is still installed; personal changes remain untouched. Exact rollback and explicit backup restoration keep snapshot semantics.
+
+Independent review found that old backups lack hidden mouse state and cannot represent deliberate unbinding there. Their migration preserves each binding set's own current mouse controls, not whichever set was processed most recently. New versioned snapshots restore custom and intentionally empty mouse bindings exactly. A bounded, backup-first reload migration repairs only missing primary buttons in older active layouts and defers in combat; current layouts do not automatically undo intentional later unbinding.
+
+Regression coverage exercises default and custom mouse controls, additional hidden aliases, failed reads, closed-window Apply, selective updates, displaced/manual keys, dual-set recovery and rollback. Live-client retesting is still required for real camera/target/interact input delivery.
+
+Final 0.3.3 review also injected a personal mouse edit after recovery backup. Both successful repair and later-failure rollback preserve that edit without rewriting the original backup. The final integrated validation result is recorded in the generated release validation report.

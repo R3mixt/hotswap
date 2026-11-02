@@ -92,6 +92,10 @@ The implementation uses the actual registered command inventory as its capabilit
 
 Acceptance must include actual Era/Hardcore Optimize with no focus controls, preserved Forever focus support, unsupported imported focus choices producing no writes, and restore of both ordinary personal bindings and saved preset shortcuts. The mock suite exercises these paths but does not certify native focus casting or secure client behavior.
 
+Visible enumeration is not a complete list of valid native commands. The active hidden sections of [Era Vanilla bindings](https://github.com/Gethe/wow-ui-source/blob/classic_era/Interface/AddOns/Blizzard_FrameXML/Bindings_Vanilla.xml#L1449) and [Forever Camelot bindings](https://github.com/Gethe/wow-ui-source/blob/forever/Interface/AddOns/Blizzard_FrameXML/Bindings_Camelot.xml#L1517) define `TURNORACTION` and `CAMERAORSELECTORMOVE`, including their button-down and button-up handlers. These two source-backed exceptions stay supported without weakening focus validation or admitting arbitrary command strings. Direct key/action queries supplement snapshots and verification; hidden mouse state is never guessed from a missing visible entry.
+
+Apply now preserves unrelated live bindings and records the command displaced at each planned key. A released owned key restores that prior command only if the player has not changed it since installation. Explicit restore and rollback still recover full snapshots. New snapshots mark that hidden mouse details were captured; older backups preserve current mouse details separately for each binding set. Acceptance includes custom account/character mouse differences, intentional unbinding in new backups, failed setup rollback, and legacy recovery after combat.
+
 ## Item choices and targeting evidence
 
 Every item binding records its selected item and manual alternatives. A missing primary is shown as unavailable; an alternative is not substituted automatically. Slot-based trinkets continue to follow slots 13 and 14. Inventory/equipment updates refresh installed item macros from their applied snapshots, preserving any different editing draft.

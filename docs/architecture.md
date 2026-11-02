@@ -28,16 +28,23 @@ Each Lua module receives the shared `K` namespace through addon varargs. The TOC
 2. Planner resolves current-client metadata. Display metadata is separate from learned eligibility. Future actions reserve positions without becoming usable.
 3. NativeBars assigns main positions and available extra slots. A main position has one key across form pages. A spell edit changes the selected page; a key edit changes every linked page. Overflow uses ordinary macro bindings after capacity validation.
 4. Engine preflight checks combat, supported native commands/focus capability, capacity and shortcut overlap; snapshot preparation validates cursor state and restorable action types. Snapshot reads finish before the named backup is stored and live writes begin.
-5. A frame worker advances small steps with time and operation budgets: macros, native actions, new bindings, obsolete binding removal, settings save and completion verification. Recovery uses the same mechanism.
+5. A frame worker advances small steps with time and operation budgets: macros, native actions, planned bindings, release of previously owned keys, settings save and completion verification. Recovery uses the same mechanism.
 6. The applied plan is separate from the draft. Inventory and form maintenance use applied settings; an event cannot silently install an edited draft item choice.
 
 `bindingOverrides` maps action IDs to keys. `actionOverrides` holds rank, targeting and replacement edits. `customActions` contains typed spell/item/system/emote/macro-reference descriptors. `itemBindings` holds a selected item ID, ordered alternatives, target mode and explicit empty state. UI calls these domain methods rather than constructing executable text.
+
+Apply merges planned keys into the captured live binding map. `appliedPlan.bindingOwnership[key]` records the installed command and the command it displaced, with false representing an unbound key. If a later preset releases that key, the displaced command is restored only while the live command still matches Hot Swap's owned command. Personal edits and unrelated shortcuts remain. Explicit Restore and rollback continue to recover full saved binding maps; they are not scoped Apply operations.
+
+The visible binding registry omits some valid hidden commands. `API.HiddenMouseCommands` contains only the two source-verified native camera/turn commands. Captures supplement enumeration with all aliases from `GetBindingKey` and direct BUTTON1/BUTTON2 reads, preserving custom and unbound states. Expected/owned key probes also cover commands absent from enumeration. A read failure stops snapshot preparation rather than inventing bindings.
+
+Snapshots and applied plans use `mouseBindingsVersion=1` after hidden mouse state is handled. Older snapshots cannot distinguish uncaptured mouse defaults from intentional unbinding: restore retains the current mouse controls and hidden aliases separately for each account/character binding set, supplying native defaults only when needed. Legacy installed layouts can receive a bounded, backed-up recovery of missing BUTTON1/BUTTON2 controls after combat; existing custom mouse actions remain untouched. New snapshots preserve intentional unbinding exactly.
 
 `nativeBars` contains optional boolean visibility choices keyed by native toggle index 1–7 (displayed bars 2–8). Missing entries preserve unused bar visibility; planned occupancy always forces a required bar on. Visibility snapshots preserve every tuple position, including nil/legacy flags. Current Era/Forever proxy setters maintain a short-lived full-mask cache: capability-checked derived setters synchronize all bits before the final full-mask write. A bounded observer refreshes Blizzard frames from current mirrored values after server updates, pauses in combat, and never replays stale visibility writes.
 
 ## Invariants
 
-- Back up both binding sets, unsaved active bindings, native contents, page/visibility and managed settings before replacement. Never leave the inactive binding set selected across frames.
+- Back up both binding sets, unsaved active bindings, native contents, page/visibility and managed settings before mutation. Never leave the inactive binding set selected across frames.
+- Applying changes planned keys and releases only unchanged owned keys. Unrelated bindings survive; explicit full restore still recovers the saved maps.
 - Preserve a pre-existing player cursor payload. After failed owned placement, release only the payload acquired by that operation before rollback.
 - Preserve user-edited macros. Names and body fingerprints identify ownership; local macro references must still match at apply time.
 - Macro indices are transient lookup results. Creation, deletion and renaming can reorder a bank; resolve the stable name and verify exact contents again at placement, direct binding, maintenance and rollback.

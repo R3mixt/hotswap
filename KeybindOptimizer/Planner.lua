@@ -148,7 +148,7 @@ function P:Build(useCachedData)
         for _,def in ipairs(actions) do add(def) end
     end
     local function addSystem(id,key,command,label)
-        local supported=bindingCommands[command]~=nil or (not bindingCommandsReadable and command~="TARGETFOCUS")
+        local supported=K.API:IsBindingCommandSupported(command,bindingCommands) or (not bindingCommandsReadable and command~="TARGETFOCUS")
         if supported then
             local a=add({id=id,key=key,label=label,kind="system",command=command,known=true,category="System"})
             plan.system[#plan.system+1]=a
@@ -310,7 +310,7 @@ function P:Build(useCachedData)
     plan.warnings[#plan.warnings+1]="Talent, rank, and item changes are proposed for review; established keys are not moved automatically."
     plan.changes[#plan.changes+1]="Alt self-cast; focus-cast modifier cleared; automatic self fallback "..(settings.selfFallback and "enabled in helpful macros" or "disabled").."."
     plan.changes[#plan.changes+1]="Mouse wheel abilities "..(settings.wheel and "on; Alt-wheel zoom" or "off; normal wheel zoom restored").."."
-    plan.changes[#plan.changes+1]="A named backup is saved first. Applying replaces all character bindings with this complete preset."
+    plan.changes[#plan.changes+1]="A named backup is saved first. Applying updates planned keys and preserves unrelated bindings."
     table.sort(plan.actions,function(a,b)
         local x,y=pageOrder[a.form] or 9,pageOrder[b.form] or 9
         if x~=y then return x<y end

@@ -1,6 +1,6 @@
 local addonName, K = ...
 _G.KeybindOptimizer = K
-K.name, K.version = addonName or "KeybindOptimizer", "0.3.2"
+K.name, K.version = addonName or "KeybindOptimizer", "0.3.3"
 K.defaults = {
     wheel = true, middle = true, ctrl = true,
     mouseButtons = { BUTTON4 = true, BUTTON5 = true },
@@ -135,6 +135,15 @@ function K:OnApplyComplete(ok,message,plan,kind)
     end
     if self.pendingSpellMaintenance then self:MaintainLearnedActions() end
     if self.pendingItemMaintenance then self:MaintainItemBindings() end
+    if self.pendingMouseRepair then self:MaintainMouseControls() end
+end
+function K:MaintainMouseControls()
+    if not self.db or not self.db.enabled or not self.db.appliedPlan then self.pendingMouseRepair=nil; return end
+    if self.db.appliedPlan.mouseBindingsVersion==1 then self.pendingMouseRepair=nil; return end
+    if self.Engine.busy or (InCombatLockdown and InCombatLockdown()) then self.pendingMouseRepair=true; return end
+    self.pendingMouseRepair=nil
+    local ok,why=self.Engine:RepairMouseControls()
+    if not ok and why then self:Print(why) end
 end
 function K:OnRestoreComplete(ok,message,plan,kind) return self:OnApplyComplete(ok,message,plan,kind or "restore") end
 function K:MaintainLearnedActions()
@@ -271,6 +280,7 @@ if CreateFrame then
                     K:Print(err or "Could not activate the saved layout. Open /hotswap.")
                     if K.db.backup then local _,message=K.Engine:Restore(); if message then K:Print(message) end end
                 end
+                K:MaintainMouseControls()
             end
             if not K.db.welcomed then K:Print("Type /hotswap to review your layout. Nothing changes until you apply it."); K.db.welcomed=true end
         elseif K.db then
@@ -294,6 +304,7 @@ if CreateFrame then
                 K:Print("Your spells or forms changed. Open /hotswap to review the updated layout.")
                 K.needsRefresh=false
             end
+            if event=="PLAYER_REGEN_ENABLED" and K.pendingMouseRepair then K:MaintainMouseControls() end
             K:QueueRefresh()
         end
     end)

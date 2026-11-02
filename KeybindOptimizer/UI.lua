@@ -13,7 +13,7 @@ local C = {
 }
 local unpack = unpack or table.unpack
 local APPLY_LABEL="Apply & save"
-local APPLY_DETAIL="Back up your current setup, install this preset's keybinds, macros and action-bar settings, then save the game's bindings. Draft edits are already saved in this preset."
+local APPLY_DETAIL="Back up your current setup, update this preset's assigned keys, macros and action bars, then save the game's bindings. Unrelated bindings and mouse controls stay unchanged. Draft edits are already saved in this preset."
 local function color(fs, c) fs:SetTextColor(unpack(c or C.text)) end
 local function box(kind, parent, fill, name)
     local f = CreateFrame(kind or "Frame", name, parent, BackdropTemplateMixin and "BackdropTemplate" or nil)
@@ -1761,7 +1761,7 @@ function UI:OpenReview()
         f.expected:SetPoint("TOPLEFT",40,-110)
         f.list=scroll(f); f.list:SetPoint("TOPLEFT",40,-153); f.list:SetPoint("BOTTOMRIGHT",-40,85)
         local close=button(f,"Close",100,function() f:Hide() end); close:SetPoint("BOTTOMRIGHT",-40,40)
-        label(f,"Apply & save backs up and installs the bindings and Blizzard action bars.",11,C.muted):SetPoint("BOTTOMLEFT",40,48)
+        label(f,"Apply & save backs up, updates planned keys and bars, and keeps other controls.",11,C.muted):SetPoint("BOTTOMLEFT",40,48)
         f:SetScript("OnHide",function() UI:EndModal(f) end)
         self.review=f
     end
@@ -1777,7 +1777,10 @@ function UI:RenderReview()
     f.expected.text:SetText((self.reviewExpanded and "Hide" or "Show").." expected replacements ("..#replacements..")")
     for _,entry in ipairs(p.errors or {}) do lines[#lines+1]={text=message(entry),tone=C.error} end
     for _,entry in ipairs(coverage.missing or {}) do lines[#lines+1]={text="Unbound spell: "..message(entry),tone=C.error} end
-    if errors==0 then lines[#lines+1]={text="Apply & save replaces existing game bindings automatically after creating a backup.",tone=C.muted} end
+    if errors==0 then
+        lines[#lines+1]={text="Apply & save updates the keys assigned by this preset after creating a backup. Other bindings and mouse controls stay unchanged.",tone=C.muted}
+        lines[#lines+1]={text="Keys no longer used by Hot Swap regain their previous binding only if they still match Hot Swap's last assignment. Later manual changes are kept.",tone=C.muted}
+    end
     if self.reviewExpanded then
         for _,entry in ipairs(replacements) do
             lines[#lines+1]={text=keyName(entry.key)..": "..bindingLabel(entry.previous).." -> "..tostring(entry.label or "Preset action"),tone=C.muted}

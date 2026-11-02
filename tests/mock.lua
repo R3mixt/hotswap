@@ -2,7 +2,7 @@
 -- than permissive stubs, while combat-secure dispatch still needs client QA.
 Mock = {
   combat=false, class="DRUID", locale="enUS", build="1.60.1", buildNumber="70707",
-  frames={}, writes={}, messages={}, bindings={ F="ASSISTTARGET", T="ATTACKTARGET", ["MOUSEWHEELUP"]="CAMERAZOOMIN", ["MOUSEWHEELDOWN"]="CAMERAZOOMOUT" },
+  frames={}, writes={}, messages={}, bindings={ F="ASSISTTARGET", T="ATTACKTARGET", BUTTON1="CAMERAORSELECTORMOVE", BUTTON2="TURNORACTION", ["MOUSEWHEELUP"]="CAMERAZOOMIN", ["MOUSEWHEELDOWN"]="CAMERAZOOMOUT" },
   cvars={ autoSelfCast="1", enableMouseoverCast="0", ActionButtonUseKeyDown="1" },
   modified={ SELFCAST="NONE", FOCUSCAST="NONE", MOUSEOVERCAST="NONE" },
   macros={ [1]={name="UserMacro", icon=1, body="/say preserved"} },
@@ -385,6 +385,10 @@ for n=1,5 do for _,prefix in ipairs({"SETVIEW","SAVEVIEW","RESETVIEW"}) do bindi
 for n=1,8 do bindingCatalog["RAIDTARGET"..n]="BINDING_HEADER_RAID_TARGET" end
 bindingCatalog.RAIDTARGETNONE="BINDING_HEADER_RAID_TARGET"
 Mock.registeredBindingCommands={}; Mock.bindingCommandAvailability={}; Mock.observedBindingCommands={}
+-- Both active XML definitions are hidden=true/runOnUp=true. Hidden commands
+-- remain valid binding targets but need not appear in the public menu list.
+-- Do not invent an includeHidden argument: neither reviewed client documents it.
+Mock.hiddenBindingCommands={CAMERAORSELECTORMOVE=true,TURNORACTION=true}
 Mock.validEmoteCommands={WAVE=true,HELLO=true,CHEER=true,THANK=true}
 local function commandDenied(command)
   local available=Mock.bindingCommandAvailability[command]
@@ -430,7 +434,7 @@ local function bindingInventory()
       elseif dynamicCommand(command) then categories[command]="GENERAL" end
     end
   end
-  local commands={}; for command in pairs(categories) do commands[#commands+1]=command end; table.sort(commands)
+  local commands={}; for command in pairs(categories) do if not Mock.hiddenBindingCommands[command] then commands[#commands+1]=command end end; table.sort(commands)
   local rows={}; for _,command in ipairs(commands) do
     local keys={}; for key,assigned in pairs(Mock.bindings) do if assigned==command then keys[#keys+1]=key end end; table.sort(keys)
     local row={command,categories[command]}; for _,key in ipairs(keys) do row[#row+1]=key end; rows[#rows+1]=row

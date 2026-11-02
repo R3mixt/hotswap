@@ -1,8 +1,8 @@
-# Hot Swap 0.3.2
+# Hot Swap 0.3.3
 
 A configurable World of Warcraft addon for stable class bindings, druid form pages, mouseover/focus macros, Alt self-cast, and selectable on-use items.
 
-**Status: installable beta.** Version 0.3.2 fixes the Classic Era F6/Target focus failure, validates commands before applying, and adds diagnostic logging and window settings. It uses Blizzard's original action bars, a miniature spellbook editor, and bounded setup/recovery jobs. The actual Lua modules pass the regression suite using Lua 5.1 and mocked WoW APIs; real-client behavior still needs a retest. Geometry previews approximate artwork and fonts and are not game screenshots.
+**Status: installable beta.** Version 0.3.3 preserves bindings and mouse controls that the selected preset does not assign. It retains command validation, diagnostic logging, window settings, Blizzard's original action bars, a miniature spellbook editor, and bounded setup/recovery jobs. The actual Lua modules are checked using Lua 5.1 and mocked WoW APIs; real-client behavior still needs a retest. Geometry previews approximate artwork and fonts and are not game screenshots.
 
 ## Install and open
 
@@ -12,7 +12,9 @@ A configurable World of Warcraft addon for stable class bindings, druid form pag
 4. Open **Hot Swap** from the Escape menu or **Options → AddOns → Hot Swap → Open Hot Swap**. `/hotswap` also works. Select the client automatically or explicitly, record your side buttons, and choose whether to use the wheel and middle click.
 5. Click **Optimize** to create and use a new recommended preset with your selected mouse controls and items. The original preset remains saved. On **Presets**, you can also create or duplicate any custom mode, edit **Bindings**, **Setup**, and **Items**, then choose **Apply & save** outside combat.
 
-Opening the window or selecting a preset does not change live bindings. **Apply & save** records a named backup first, creates the needed macros, populates the original action bars, enables required extra bars, replaces the entire binding map, sets self-cast options and saves character bindings. Essential movement, mouse camera/selection, chat, targeting and menu controls are included. No outside application, subscription, or library is required to run the addon.
+Opening the window or selecting a preset does not change live bindings. **Apply & save** records a named backup first, creates the needed macros, populates the original action bars, enables required extra bars, updates the keys explicitly assigned by the preset, sets self-cast options and saves character bindings. Unrelated bindings and mouse controls remain unchanged. No outside application, subscription, or library is required to run the addon.
+
+When a new layout stops using a key previously assigned by Hot Swap, the addon restores that key's earlier binding only if its current binding still matches Hot Swap's last assignment. If you changed the key yourself afterward, that change is preserved. An explicitly assigned key in the new preset still takes precedence; Review lists those expected replacements.
 
 In **Setup → Action bars**, see which original bars the preset requires and choose whether to show other available bars. Required bars always turn on; an unchecked unused bar can be hidden. **Use defaults** clears optional choices so unused bars retain their current visibility. Changes are saved in the preset and take effect with **Apply & save** or **Optimize**. Hidden bars remain selectable; bars absent from the client are marked unavailable. Visibility may take a moment to update while WoW receives its settings from the server.
 
@@ -26,7 +28,7 @@ The **Presets** tab manages complete setups: spell and system bindings, mouse op
 
 Set a **Hot Swap key** for each preset, then use a preset to install updated shortcuts. Shortcuts stay available across modes and follow renames. A shortcut cannot overlap another preset shortcut or a planned action in any saved mode. Switching uses the same fresh validation, named backup and rollback process as the button. Switching is unavailable in combat and is not queued to fire later. Repeating an unchanged active mode does not create another backup.
 
-Normal existing game bindings are **expected replacements**, not errors. The optional **Review** window starts with those details collapsed and uses readable action names. Actual duplicate assignments or unavailable macro capacity still block installation.
+Existing game bindings on keys assigned by the selected preset are **expected replacements**, not errors. Other keys remain unchanged. The optional **Review** window starts with replacement details collapsed and uses readable action names. Actual duplicate assignments or unavailable macro capacity still block installation.
 
 ## Import, export and external files
 
@@ -126,7 +128,7 @@ Item spell information identifies candidates, not tactical suitability. Confirm 
 
 ## Recovery and removal
 
-- The **Backups** tab lists snapshots named Character-Class-YYYY-MM-DD HH:MM:SS. Each activation records bindings, original bar contents and visibility before replacement; restores record an undo snapshot. Same-second names receive a unique suffix. Account and character binding sets, self-cast settings and the previous Hot Swap layout are retained.
+- The **Backups** tab lists snapshots named Character-Class-YYYY-MM-DD HH:MM:SS. Each activation records bindings, original bar contents and visibility before its changes; restores record an undo snapshot. Same-second names receive a unique suffix. Account and character binding sets, self-cast settings and the previous Hot Swap layout are retained.
 - **Restore selected** restores a named snapshot. **Restore original setup** or `/hotswap restore` restores the original bindings and affected self-cast settings. Original restore removes generated macros only when their name and body still match the addon's ownership record. A macro you edited is preserved.
 - Backups are stored per character in SavedVariables. WoW writes them to disk on reload or logout. They are not silently pruned and are not included in shared exports.
 - Run Restore **before deleting or disabling the addon** to recover the pre-addon setup. Old custom-dock backups remain stored, but a snapshot requiring that retired dock cannot be activated directly. Restore the original setup, then use a native-bar preset. Saved presets remain available for editing.

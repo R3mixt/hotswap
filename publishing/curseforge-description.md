@@ -4,7 +4,7 @@ Build a comfortable keyboard layout, keep it consistent across your class, and s
 
 Hot Swap places spells and generated macros on **Blizzard's original action bars**. Its in-game keyboard editor shows what each key does, including Shift and Ctrl layers, mouse buttons, and optional wheel bindings. The interface uses WoW's own frames and controls.
 
-**0.3.2 beta:** Classic Era and Hardcore are the current test clients; Forever is the final release target. The automated suite passes **253 tests using the actual Lua modules with mocked WoW APIs**. Live-client acceptance testing is still pending. Retail and other Classic expansions are not supported release targets.
+**0.3.3 beta:** Classic Era and Hardcore are the current test clients; Forever is the final release target. Automated tests exercise the actual Lua modules with mocked WoW APIs. Live-client acceptance testing is still pending. Retail and other Classic expansions are not supported release targets.
 
 ## Set up your keys
 
@@ -23,7 +23,9 @@ Create, duplicate, rename, import, and export complete presets. Leveling, Dungeo
 
 ## Apply and recover
 
-**Apply & save replaces your entire binding map**, populates the original action bars, enables the extra bars it needs, and applies the selected self-cast settings. It records a named backup first, including bindings and affected bar contents. The Backups tab can restore a selected snapshot or the original setup.
+**Apply & save updates the keys assigned by your preset and preserves unrelated bindings and mouse controls.** It populates the original action bars, enables the extra bars it needs, and applies the selected self-cast settings. It records a named backup first, including bindings and affected bar contents. The Backups tab can restore a selected snapshot or the original setup.
+
+When Hot Swap stops using a key from the previous layout, it restores that key's earlier binding only if the key still has Hot Swap's last assignment. Manual changes you made afterward are kept. Keys explicitly assigned by the new preset use its chosen actions.
 
 Setup and recovery run in small steps with a progress indicator. They cannot start in combat; an operation already underway pauses if combat begins and resumes afterward. Wait for completion before testing the result. Restore your original setup before disabling or removing the addon.
 

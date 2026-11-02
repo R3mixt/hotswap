@@ -260,11 +260,51 @@ function A:ItemSpell(id)
     if fn then return fn(id) end
 end
 function A:BindingAction(key) return GetBindingAction and GetBindingAction(key) or "" end
+-- These active native commands are explicitly hidden in both supported XMLs:
+-- classic_era/Blizzard_FrameXML/Bindings_Vanilla.xml lines 1449/1456 and
+-- forever/Blizzard_FrameXML/Bindings_Camelot.xml lines 1517/1524.
+-- Visible command enumeration alone cannot establish their availability.
+A.HiddenMouseCommands={CAMERAORSELECTORMOVE=true,TURNORACTION=true}
+function A:IsBindingCommandSupported(command,visibleCommands)
+    if type(command)~="string" then return false end
+    local visible=visibleCommands or self:GetBindingCommands()
+    return self.HiddenMouseCommands[command]==true or visible[command]~=nil
+end
+local function packBindings(...) return {n=select("#",...),...} end
+function A:ReadHiddenMouseBindings(result)
+    if type(result)~="table" or type(GetBindingKey)~="function" or type(GetBindingAction)~="function" then
+        return false,"The game's mouse-binding APIs are not ready. No binding snapshot was guessed."
+    end
+    local aliases,buttons={},{}
+    for _,command in ipairs({"CAMERAORSELECTORMOVE","TURNORACTION"}) do
+        local ok,keys=pcall(function() return packBindings(GetBindingKey(command)) end)
+        if not ok or keys.n>10000 then return false,"Could not read the mouse bindings for "..command.."." end
+        for index=1,keys.n do
+            local key=keys[index]
+            if key~=nil then
+                if type(key)~="string" or key=="" then return false,"The game returned an unreadable mouse-binding key." end
+                aliases[key]=command
+            end
+        end
+    end
+    for _,key in ipairs({"BUTTON1","BUTTON2"}) do
+        local ok,command=pcall(GetBindingAction,key)
+        if not ok or type(command)~="string" then return false,"Could not read "..key..". No mouse binding was guessed." end
+        buttons[key]=command
+    end
+    -- Commit only after every read succeeds. Direct button reads preserve a
+    -- custom action or an intentionally unbound button instead of assuming
+    -- that the native camera command still owns its usual mouse button.
+    for key,command in pairs(result) do if self.HiddenMouseCommands[command] then result[key]=nil end end
+    for key,command in pairs(aliases) do result[key]=command end
+    for key,command in pairs(buttons) do result[key]=command~="" and command or nil end
+    return true
+end
 function A:InvalidateBindingCommands()
     self.bindingCommands=nil; self.bindingCommandCount=nil; self.bindingCommandLocale=nil
 end
 function A:GetBindingCommands(forceRefresh)
-    -- This is the client's command registry, including commands with no key.
+    -- This is the client's visible registry, including commands with no key.
     -- A flavor preference or a localized binding label does not prove support.
     if forceRefresh then self:InvalidateBindingCommands() end
     if type(GetNumBindings)~="function" or type(GetBinding)~="function" then self:InvalidateBindingCommands(); return {},false end
@@ -303,7 +343,7 @@ function A:BindingLabel(command)
     if command:match("^CLICK KBO_") then return "Hot Swap spell binding" end
     local localized=_G["BINDING_NAME_"..command]
     if type(localized)=="string" and localized~="" then return localized end
-    local labels={MOVEFORWARD="Move forward",MOVEBACKWARD="Move backward",STRAFELEFT="Strafe left",STRAFERIGHT="Strafe right",JUMP="Jump",TOGGLEAUTORUN="Auto-run",OPENCHAT="Open chat",OPENCHATSLASH="Open command chat",REPLY="Reply to whisper",ASSISTTARGET="Assist target",ATTACKTARGET="Attack target",TARGETNEARESTENEMY="Target next enemy",TARGETPREVIOUSENEMY="Target previous enemy",CAMERAZOOMIN="Zoom in",CAMERAZOOMOUT="Zoom out",TOGGLEGAMEMENU="Game menu",TOGGLECHARACTER0="Character",TOGGLEACHIEVEMENT="Achievements",OPENALLBAGS="Open all bags"}
+    local labels={MOVEFORWARD="Move forward",MOVEBACKWARD="Move backward",STRAFELEFT="Strafe left",STRAFERIGHT="Strafe right",JUMP="Jump",TOGGLEAUTORUN="Auto-run",OPENCHAT="Open chat",OPENCHATSLASH="Open command chat",REPLY="Reply to whisper",ASSISTTARGET="Assist target",ATTACKTARGET="Attack target",TARGETNEARESTENEMY="Target next enemy",TARGETPREVIOUSENEMY="Target previous enemy",CAMERAORSELECTORMOVE="Select / camera",TURNORACTION="Turn / interact",CAMERAZOOMIN="Zoom in",CAMERAZOOMOUT="Zoom out",TOGGLEGAMEMENU="Game menu",TOGGLECHARACTER0="Character",TOGGLEACHIEVEMENT="Achievements",OPENALLBAGS="Open all bags"}
     if labels[command] then return labels[command] end
     local frame=command:match("^CLICK ([^:]+)")
     if frame then return "Addon button: "..frame end
