@@ -59,7 +59,7 @@ function UI:HoverBindingInput(key)
     f.assigning=true
     self:Call(self,"AssignBinding",row.action,keyWithModifiers)
     f.assigning=nil
-    f.feedback:SetText(self.notice or "Choose a free key, or review the proposed swap.")
+    f.feedback:SetText(self.notice or "Choose a valid key to stage the binding.")
     W.color(f.feedback,self.noticeError and C.error or C.text)
 end
 function UI:HoverBindingEnter(row)

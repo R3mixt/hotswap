@@ -180,3 +180,29 @@ function Tests.current_edit_temporary_slot_outside_backup_is_not_mutated()
  local ok,why=k.CurrentBindings:StageEntry({spellID=116,label='Frostbolt'},'F')
  assert(not ok and why:find('temporary') and not k.CurrentBindings:HasEdits() and #Mock.writes==0)
 end
+function Tests.current_edit_hover_rebind_occupied_key_is_immediate_but_normal_capture_confirms()
+ local k=currentMage(); k.UI:Open(); k.UI:OpenHoverBindings(); local f=k.UI.hoverBindings
+ local row; for _,candidate in pairs(f.rows) do if candidate.action.spellID==133 then row=candidate; break end end
+ assert(row and row.action.currentBinding)
+ k.UI:HoverBindingEnter(row); k.UI:HoverBindingInput('F')
+ assert(not k.UI.confirm or not k.UI.confirm:IsShown())
+ assert(f.active and f:IsShown() and k.UI.hoverInput:IsShown())
+ assert(k.UI.bindingPlan.byKey.F.command=='ACTIONBUTTON1' and not k.UI.bindingPlan.byKey['1'])
+ assert(GetBindingAction('F')=='OPENCHAT' and #Mock.writes==0)
+ k.UI:CloseHoverBindings(); k.UI:AssignBinding(k.UI.bindingPlan.byKey.F,'G')
+ assert(k.UI.confirm:IsShown() and GetBindingAction('G')=='TARGETSELF')
+end
+function Tests.current_edit_hover_new_ability_replaces_occupied_slot_without_confirmation()
+ local k=currentMage()
+ for _,a in ipairs(k.Profiles:Get('MAGE','era')) do for _,id in ipairs(a.spellIDs or {}) do Mock.catalog[id]={id=id,name=a.name,icon=id} end end
+ k:GetSettings().flavor='era'; k.UI:Open(); k.UI:OpenHoverBindings(); local f=k.UI.hoverBindings
+ local row; for _,candidate in pairs(f.rows) do if candidate.action.known==false and candidate.action.spellID and not candidate.action.currentBinding then row=candidate; break end end
+ assert(row); local id=row.action.spellID
+ k.UI:HoverBindingEnter(row); k.UI:HoverBindingInput('2')
+ assert(not k.UI.confirm or not k.UI.confirm:IsShown())
+ assert(f.active and f:IsShown() and k.UI.bindingPlan.byKey['2'].spellID==id)
+ assert(Mock.actions[2][2]==133 and #Mock.writes==0)
+ k.UI:HoverBindingInput('F9')
+ assert(f.active and k.UI.bindingPlan.byKey.F9.spellID==id and not k.UI.bindingPlan.byKey['2'])
+ assert(#Mock.writes==0)
+end

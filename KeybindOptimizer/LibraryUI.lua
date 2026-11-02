@@ -248,7 +248,7 @@ function UI:DropLibraryEntry(key)
             self.currentBindingPlan=nil; self:Refresh(); self:Notice(why,not ok)
             return ok
         end
-        if destination then
+        if destination and not (self.hoverBindings and self.hoverBindings.active and self.hoverBindings.assigning) then
             local scope=destination.liveSlot and "This replaces the live action-bar slot, including other keys that use that slot." or "This replaces this key's current command."
             self:Confirm("Replace "..keyName(key).."?",(entry.label or entry.name or "This action").." will replace "..destination.label..". "..scope.." Apply changes installs the edit.",stage)
             return false

@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.4.8 beta — 2026-11-02
+
+- Stage hover-bind replacements and supported preset swaps immediately without confirmation dialogs. Keep hover input active for successive edits. Ordinary click/drag editing retains its confirmation flow; Apply still installs the staged layout.
+
+
 ## 0.4.7 beta — 2026-11-02
 
 - Make Current a full editable layout seeded only from live controls, with an independent spell catalog instead of the selected preset's replacements.

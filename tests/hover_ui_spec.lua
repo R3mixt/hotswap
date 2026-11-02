@@ -54,17 +54,13 @@ function Tests.hover_ui_reserves_movement_alt_and_primary_mouse_buttons_but_supp
     assert(#Mock.writes==0 and #Mock.propagatedKeys==0)
 end
 
-function Tests.hover_ui_linked_form_slots_and_swap_confirmation_use_existing_rules_then_resume()
+function Tests.hover_ui_linked_form_slots_swap_immediately_without_confirmation()
     local k,f=hoverUI(); Mock:ResetWrites()
     hover(k,"druid.claw.cat"); press("NUMPAD8")
     for _,action in ipairs(k.UI.plan.actions) do if action.barSlot==1 then assert(action.key=="NUMPAD8","Linked form position did not follow hover binding") end end
     hover(k,"druid.claw.cat"); press("2")
-    assert(k.UI.confirm:IsShown() and f.active and not f:IsShown(),"Collision bypassed the existing confirmation")
-    press("1"); assert(not k:GetSettings().bindingOverrides["druid.claw.cat"] or k:GetSettings().bindingOverrides["druid.claw.cat"]=="NUMPAD8","Confirmation captured an unrelated key")
-    press("ESCAPE"); Mock:Advance(0.1)
-    assert(f:IsShown() and f.active and not k.UI.confirm:IsShown(),"Cancelling a swap did not return to hover mode")
-    hover(k,"druid.claw.cat"); press("2"); k.UI.confirm.acceptButton:Click(); Mock:Advance(0.1)
-    assert(f:IsShown() and f.active,"Accepted swap ended hover mode")
+    assert(not k.UI.confirm or not k.UI.confirm:IsShown(),"Hover swap required confirmation")
+    assert(f:IsShown() and f.active and k.UI.hoverInput:IsShown(),"Immediate swap ended hover mode")
     for _,action in ipairs(k.UI.plan.actions) do
         if action.barSlot==1 then assert(action.key=="2","Swap failed to move every first position")
         elseif action.barSlot==2 then assert(action.key=="NUMPAD8","Swap failed to move every second position") end

@@ -592,6 +592,7 @@ end
 function UI:AssignBinding(action, key)
     if K.Engine and K.Engine.busy then self:UpdateBusyState(); return false end
     if not action then return false end
+    local immediate=self.hoverBindings and self.hoverBindings.active and self.hoverBindings.assigning
     if self.bindingSource=="current" then
         if action.libraryEntry and not action.currentBinding then
             self.libraryEntry=action.libraryEntry; return self:DropLibraryEntry(key)
@@ -604,7 +605,7 @@ function UI:AssignBinding(action, key)
         end
         local normalized=K.API:NormalizeKey(key)
         local other=normalized and K.CurrentBindings:EditingView().byKey[normalized]
-        if other and other.key~=action.key then
+        if other and other.key~=action.key and not immediate then
             self:EndCapture()
             self:Confirm("Replace "..keyName(normalized).."?","Move "..(action.label or action.command).." here and replace "..other.label.."? Apply changes installs this edit.",stage)
             return false
@@ -658,14 +659,16 @@ function UI:AssignBinding(action, key)
             local linked=#group>1 or #otherGroup>1
             local detail=keyName(key).." -> "..(action.label or action.id).."\n"..keyName(oldKey).." -> "..(other.label or other.id)
                 ..(linked and "\n\nBoth action-bar positions change in every form." or "\n\nBoth changes will be saved together in this preset.")
-            self:Confirm(linked and "Swap these action-bar positions?" or "Swap these bindings?",detail,function()
+            local function swap()
                 local overrides=copy(settings().bindingOverrides)
                 for _,candidate in ipairs(group) do overrides[candidate.id]=key end
                 for _,candidate in ipairs(otherGroup) do overrides[candidate.id]=oldKey end
                 UI.selectedAction=action
                 UI:Stage("bindingOverrides",overrides)
                 UI:Notice(linked and "Positions swapped in every form. Apply & save installs them." or "Bindings swapped in this preset. Apply & save installs them.")
-            end)
+            end
+            if immediate then swap(); return true end
+            self:Confirm(linked and "Swap these action-bar positions?" or "Swap these bindings?",detail,swap)
             return false
         end
         local why=keyName(key).." is used by "..(other.label or other.id)..". Choose a free key, or rebind that action first."
