@@ -69,7 +69,7 @@ local function saveBindings(set)
     if SaveBindings(set)==false then error("Could not save binding set "..tostring(set)) end
 end
 local function runtimeState()
-    return {enabled=K.db.enabled and true or false,dirty=K.dirty,appliedPlan=K.Copy(K.db.appliedPlan),ownedMacros=K.Copy(K.db.ownedMacros or {}),baseline=K.Copy(K.db.backup),settings=K.Copy(K.db.settings),activePreset=K.db.activePreset,appliedPreset=K.db.appliedPreset,presetState=K.Presets and K.Presets.SnapshotState and K.Presets:SnapshotState() or nil}
+    return {currentLayout=K.Copy(K.db.currentLayout),enabled=K.db.enabled and true or false,dirty=K.dirty,appliedPlan=K.Copy(K.db.appliedPlan),ownedMacros=K.Copy(K.db.ownedMacros or {}),baseline=K.Copy(K.db.backup),settings=K.Copy(K.db.settings),activePreset=K.db.activePreset,appliedPreset=K.db.appliedPreset,presetState=K.Presets and K.Presets.SnapshotState and K.Presets:SnapshotState() or nil}
 end
 local function restoreRuntime(state,mergePresets)
     if state.presetState then
@@ -81,6 +81,7 @@ local function restoreRuntime(state,mergePresets)
             if K.db.presets and K.db.presets[K.db.activePreset] then K.db.presets[K.db.activePreset].settings=K.db.settings end
         end
     else K.db.settings=K.Copy(state.settings); K.db.activePreset=state.activePreset; K.db.appliedPreset=state.appliedPreset end
+    K.db.currentLayout=K.Copy(state.currentLayout)
     K.db.enabled=state.enabled; K.db.appliedPlan=K.Copy(state.appliedPlan)
     K.dirty=state.dirty
     K.db.ownedMacros=K.Copy(state.ownedMacros or {}); K.db.backup=K.Copy(state.baseline)
@@ -622,12 +623,28 @@ function E:ApplyCurrentEdits()
         for at,expected in pairs(edits.expectedSlots) do if not K.NativeBars:SameContent(K.NativeBars:ReadSlot(at),expected or nil) then error("Current action slot changed: "..at..". Discard pending edits and try again.") end end
     end
     local ok,why=pcall(validate); if not ok then return self:Reject(why,"current-edit") end
+    local macroPlan={actions={},settings={allowAccountMacros=false}}
+    for _,map in ipairs({edits.slots,edits.entries or {}}) do
+        for _,entry in pairs(map) do
+            if entry.body then entry.nativeMacro=true; macroPlan.actions[#macroPlan.actions+1]=entry end
+        end
+    end
+    local needed,available=K.Macros:Budget(macroPlan)
+    if needed>available then return self:Reject("Need "..needed.." free character macro slots for these reservations; only "..available.." are available. Free character macro slots and try again. Your Current edits are kept.","current-edit") end
     local job={kind="current-edit",previous=runtimeState(),created={},probeKeys=edits.expectedKeys}
     job.steps=snapshotSteps(job); job.rollback=rollbackJob
     addStep(job.steps,validate,"Rechecking current controls",true,false)
+    for _,step in ipairs(macroSteps(macroPlan,job.created)) do job.steps[#job.steps+1]=step end
+    addStep(job.steps,function()
+        for _,entry in ipairs(macroPlan.actions) do
+            entry.content={kind="macro",name=entry.macroName,body=entry.body}
+            entry.command="MACRO "..entry.macroName
+        end
+        for key,entry in pairs(edits.entries or {}) do if entry.body then edits.keys[key]=entry.command end end
+    end,"Preparing current actions",true,false)
     for at,entry in pairs(edits.slots) do
-        local index,content=at,entry.content
-        addStep(job.steps,function() K.NativeBars:WriteSlot(index,content) end,"Editing current action slots",false,true)
+        local index,change=at,entry
+        addStep(job.steps,function() K.NativeBars:WriteSlot(index,change.content) end,"Editing current action slots",false,true)
     end
     addStep(job.steps,function()
         local expected=captureBindings(edits.expectedKeys)
@@ -643,7 +660,13 @@ function E:ApplyCurrentEdits()
     job.commit=function()
         -- Existing installed-plan ownership checks treat these as personal edits.
         -- Do not activate, replace or select a recommended preset.
-        K.CurrentBindings.edits=nil; K.CurrentBindings:Invalidate()
+        local saved=K.db.currentLayout or {keys={},slots={}}
+        for key,command in pairs(edits.keys) do
+            saved.keys[key]=K.Copy(edits.entries[key]); if saved.keys[key] then saved.keys[key].command=command end
+        end
+        for at,entry in pairs(edits.slots) do saved.slots[at]=K.Copy(entry) end
+        K.db.currentLayout=saved
+        K.CurrentBindings:Discard()
         job.entry.status="applied"; K.db.lastBindingBackupID=job.entry.id
         return "Current binding changes applied. Backup saved: "..job.entry.name
     end
@@ -750,17 +773,26 @@ function E:RestoreBackup(id)
     if target.enabled then
         local valid,why=self:ValidatePlanCommands(target.appliedPlan,target.appliedPlan.nativeLayout,target.presetState)
         if not valid then return self:Reject(why,"restore") end
-        local current=K.db.ownedMacros; K.db.ownedMacros=owned
-        local needed,available=K.Macros:Budget(target.appliedPlan); K.db.ownedMacros=current
-        if needed>available then return false,K.Macros:CapacityMessage(target.appliedPlan,needed,available,"restore").." No changes were made." end
     end
+    local restorePlan={actions={},settings=target.enabled and target.appliedPlan.settings or {allowAccountMacros=false}}
+    for _,a in ipairs(target.enabled and target.appliedPlan.actions or {}) do restorePlan.actions[#restorePlan.actions+1]=a end
+    for _,map in ipairs({target.currentLayout and target.currentLayout.keys or {},target.currentLayout and target.currentLayout.slots or {}}) do
+        for _,a in pairs(map) do
+            if a.body and a.macroName and (target.ownedMacros or {})[a.macroName]==a.body then
+                a.nativeMacro=true; restorePlan.actions[#restorePlan.actions+1]=a
+            end
+        end
+    end
+    local current=K.db.ownedMacros; K.db.ownedMacros=owned
+    local needed,available=K.Macros:Budget(restorePlan); K.db.ownedMacros=current
+    if needed>available then return false,K.Macros:CapacityMessage(restorePlan,needed,available,"restore").." No changes were made." end
     local job={kind="restore",plan=target.appliedPlan,previous=runtimeState(),created={}}
     job.steps=snapshotSteps(job); job.rollback=rollbackJob
     addStep(job.steps,function() E:Deactivate(); restoreRuntime(target,true); K.db.ownedMacros=owned end,"Restoring saved preset state",true,false)
-    for _,step in ipairs(macroSteps(target.enabled and target.appliedPlan,job.created)) do job.steps[#job.steps+1]=step end
+    for _,step in ipairs(macroSteps(restorePlan,job.created)) do job.steps[#job.steps+1]=step end
     local snapshot=K.Copy(entry.snapshot)
     local identities={}
-    for _,a in ipairs(target.appliedPlan and target.appliedPlan.actions or {}) do
+    for _,a in ipairs(restorePlan.actions) do
         if a.macroName and a.body and (target.ownedMacros or {})[a.macroName]==a.body then identities[a.macroName]={action=a,body=a.body} end
     end
     addStep(job.steps,function()
@@ -776,12 +808,23 @@ function E:RestoreBackup(id)
         for _,record in pairs(target.appliedPlan and target.appliedPlan.bindingOwnership or {}) do
             record.command=remap(record.command)
         end
+        for _,map in ipairs({target.currentLayout and target.currentLayout.keys or {},target.currentLayout and target.currentLayout.slots or {}}) do
+            for _,record in pairs(map) do
+                record.command=remap(record.command)
+                if record.content and record.content.kind=="macro" then
+                    local identity=identities[record.content.name]
+                    if identity then record.content.name=identity.action.macroName end
+                end
+            end
+        end
+        K.db.currentLayout=K.Copy(target.currentLayout)
     end,"Resolving restored macro bindings",true,false)
     for _,step in ipairs(restoreSteps(job,snapshot)) do job.steps[#job.steps+1]=step end
     job.commit=function()
         if K.Presets and K.Presets.EnsureButtons then K.Presets:EnsureButtons() end
         K.db.appliedPlan=K.Copy(target.appliedPlan)
         job.entry.status="restored"; K.db.lastBindingBackupID=job.entry.id
+        K.CurrentBindings:Discard()
         if K.Presets and K.Presets.HasUnappliedChanges then K.dirty=K.Presets:HasUnappliedChanges() end
         return "Restored "..entry.name.."."..(entry.snapshot.mouseBindingsVersion~=1 and " Older backup had no hidden mouse details; usable mouse controls were retained." or "")..(K.db.enabled and K.dirty and " Saved draft edits remain unapplied." or "")
     end

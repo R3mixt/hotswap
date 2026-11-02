@@ -23,7 +23,7 @@ function Tests.hover_ui_all_planned_spells_include_unlearned_talents_and_repeate
     for _,action in ipairs(k.UI.plan.actions) do if not action.kind and not action.builtin then
         assert(f.rows[action.id] and f.rows[action.id]:IsVisible(),"Hover editor omitted "..action.id); count=count+1
     end end
-    assert(f.subtitle:GetText():find(tostring(count).." spell bindings",1,true))
+    assert(f.subtitle:GetText():find(tostring(count).." spells",1,true))
     local talent=hover(k,"druid.form_moonkin")
     assert(talent.state:GetText():find("Talent not learned",1,true) and talent.icon:GetTexture(),"Unlearned talent lost its name/icon/state")
     press("NUMPAD9")

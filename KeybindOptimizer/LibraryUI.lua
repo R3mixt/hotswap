@@ -202,7 +202,7 @@ function UI:FitWindows()
     self.frame:ClearAllPoints(); self.frame:SetPoint("CENTER",UIParent,"CENTER",wide and -160 or 0,0)
 end
 function UI:CancelLibraryDrag()
-    self.libraryDrag=nil; self.libraryEntry=nil
+    self.libraryDrag=nil; self.libraryEntry=nil; self.libraryTargetKey=nil
     if self.libraryGhost then self.libraryGhost:Hide() end
     if self.library then self.library.note:SetText("Drag an icon onto a key, or click an ability and then a key.") end
 end
@@ -321,14 +321,15 @@ function UI:BuildLibrary()
     for i,tab in ipairs({{"spells","Spells"},{"items","Items"},{"game","Game"},{"chat","Chat"},{"emotes","Emotes"},{"macros","Macros"}}) do
         local name=tab[1]
         local b=button(f,tab[2],91,function()
-            UI.libraryTab=name; UI.libraryCategory=nil; UI:CancelLibraryDrag(); f.search:SetText(""); UI:RenderLibrary()
+            local target=UI.libraryTargetKey
+            UI.libraryTab=name; UI.libraryCategory=nil; UI:CancelLibraryDrag(); UI.libraryTargetKey=target; f.search:SetText(""); UI:RenderLibrary()
         end)
         b:SetHeight(24); b:SetPoint("TOPLEFT",12+((i-1)%3)*97,i<=3 and -34 or -62)
         f.tabs[name]=b
     end
     f.category=button(f,"All categories",151,function(self)
         local opts={{value=false,label="All categories"}}
-        for _,name in ipairs(K.Library and K.Library:Categories(UI.libraryTab or "spells") or {}) do opts[#opts+1]={value=name,label=name} end
+        for _,name in ipairs(K.Library and K.Library:Categories(UI.libraryTab or "spells",UI.bindingSource=="current") or {}) do opts[#opts+1]={value=name,label=name} end
         UI:Menu(self,opts,UI.libraryCategory,function(value) UI.libraryCategory=value or nil; UI:CancelLibraryDrag(); UI:RenderLibrary() end)
     end); f.category:SetPoint("TOPLEFT",12,-97)
     f.ranks=CreateFrame("CheckButton",nil,f,"UICheckButtonTemplate"); f.ranks:SetSize(24,24); f.ranks:SetPoint("TOPLEFT",167,-98)
@@ -336,6 +337,15 @@ function UI:BuildLibrary()
     f.rankLabel=label(f.ranks,"Show ranks",10,C.text); f.rankLabel:SetPoint("LEFT",25,0)
     f.ranks:SetScript("OnClick",function(self) UI.libraryRanks=self:GetChecked(); UI:CancelLibraryDrag(); UI:RenderLibrary() end)
     tooltip(f.ranks,"Show spell ranks","List individual ranks so you can bind a lower rank separately.")
+    f.addItem=button(f,"Add item ID",126,function()
+        UI:PromptPresetName("Add an item by ID","",function(text)
+            local id=tonumber(text)
+            if not id or id<1 or id%1~=0 or id>2147483647 then return false,"Enter a positive item ID." end
+            K.db.currentItems=K.db.currentItems or {}; K.db.currentItems[id]=true
+            K.Items:Invalidate(); UI.libraryCategory=nil; UI.libraryOpen=true
+            return true
+        end)
+    end); f.addItem:SetPoint("TOPLEFT",168,-97)
     local shell,search=edit(f,286,28); shell:SetPoint("TOPLEFT",12,-132); f.search=search
     search:SetScript("OnTextChanged",function(_,user) if user then UI:CancelLibraryDrag(); UI:RenderLibrary() end end)
     tooltip(shell,"Search the spellbook","Find an ability, command, emote or macro.")
@@ -353,9 +363,10 @@ function UI:RenderLibrary()
     local tab=self.libraryTab or "spells"
     for name,b in pairs(f.tabs) do color(b.text,name==tab and C.accent or C.muted) end
     f.category.text:SetText(self.libraryCategory or "All categories"); truncate(f.category.text,133)
+    f.addItem:SetShown(tab=="items" and self.bindingSource=="current")
     f.ranks:SetShown(tab=="spells"); f.ranks:SetChecked(self.libraryRanks and true or false)
-    f.entries=K.Library and K.Library:List({tab=tab,category=self.libraryCategory,showRanks=self.libraryRanks and true or false,query=f.search:GetText()}) or {}
-    if K.db.preferences and K.db.preferences.showUnavailableBindings==false then
+    f.entries=K.Library and K.Library:List({tab=tab,current=self.bindingSource=="current",category=self.libraryCategory,showRanks=self.libraryRanks and true or false,query=f.search:GetText()}) or {}
+    if self.bindingSource~="current" and K.db.preferences and K.db.preferences.showUnavailableBindings==false then
         local visible={}; for _,entry in ipairs(f.entries) do if not self:IsEditorHidden(entry) then visible[#visible+1]=entry end end
         f.entries=visible
     end
@@ -390,6 +401,7 @@ function UI:RenderLibraryRows()
             row:SetScript("OnClick",function(self)
                 if self.dragged then return end
                 UI.libraryEntry=self.entry
+                if UI.libraryTargetKey then UI:DropLibraryEntry(UI.libraryTargetKey); return end
                 f.note:SetText("Placing: "..self.entry.label..". Click a key, or press Escape to cancel.")
             end)
             list.rows[n]=row

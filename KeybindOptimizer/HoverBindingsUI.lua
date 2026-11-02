@@ -74,7 +74,20 @@ function UI:RenderHoverBindings()
     local f=self.hoverBindings
     if not f or not f.active then return end
     local actions={}
-    for _,action in ipairs((self.plan or {}).actions or {}) do if spell(action) then actions[#actions+1]=action end end
+    if self.bindingSource=="current" then
+        local live=K.CurrentBindings:EditingView()
+        for _,entry in ipairs(K.Library:List({tab="spells",current=true})) do
+            local action=K.Copy(entry); action.id="catalog:"..entry.id; action.libraryEntry=entry; action.current=true; action.form="all"
+            for _,bound in ipairs(live.actions) do
+                if (bound.currentEntry and bound.currentEntry.sourceID==entry.id) or (bound.spellID and bound.spellID==entry.spellID) or (entry.name and bound.spellName==entry.name) then
+                    action.key=bound.key; action.currentBinding=bound; break
+                end
+            end
+            actions[#actions+1]=action
+        end
+    else
+        for _,action in ipairs((self.plan or {}).actions or {}) do if spell(action) then actions[#actions+1]=action end end
+    end
     local function group(action)
         local form=action.form or "all"
         local category=f.categories[action.id] or f.categories[action.name] or action.category or "General"
@@ -123,7 +136,7 @@ function UI:RenderHoverBindings()
         local state,status,tone=self:SpellAvailability(action)
         if row.icon.SetDesaturated then row.icon:SetDesaturated(state~=nil and state~="ready") end
         row.name:SetText(action.label or action.displayName or action.name or action.id); W.truncate(row.name,width-53)
-        row.binding:SetText(W.keyName(action.key)); W.truncate(row.binding,width-53)
+        row.binding:SetText(action.key and W.keyName(action.key) or "Unbound"); W.truncate(row.binding,width-53)
         row.state:SetText(state=="talent" and "T - Talent not learned" or state=="unlearned" and "L - Not learned" or "Learned")
         W.color(row.state,state and state~="ready" and tone or C.muted); W.truncate(row.state,width-53)
         W.tooltip(row,action.label or action.name,"Current key: "..W.keyName(action.key)..". Hover and press a key to stage a new binding.",action.displaySpellID or action.spellID,state and state~="ready" and status)
@@ -139,12 +152,15 @@ function UI:RenderHoverBindings()
     if column>0 then y=y+59 end
     for id,row in pairs(f.rows) do if not displayed[id] then row:Hide() end end
     f.list:UpdateHeight(math.max(40,y))
-    f.subtitle:SetText(tostring(#actions).." spell bindings, including future abilities. Changes stay in preset: "..tostring(K.db.activePreset))
-    f.apply:SetEnabled(#((self.plan or {}).errors or {})==0 and not inCombat())
+    local current=self.bindingSource=="current"
+    f.subtitle:SetText(tostring(#actions).." spells, including future abilities. "..(current and "Editing your Current layout." or "Editing preset: "..tostring(K.db.activePreset)))
+    f.done.text:SetText(current and "Done - keep edits" or "Done - keep draft")
+    f.apply.text:SetText(current and "Apply changes" or "Apply & save")
+    f.apply:SetEnabled(not inCombat() and (current and K.CurrentBindings:HasEdits() or not current and #((self.plan or {}).errors or {})==0))
     if f.hoveredID and f.rows[f.hoveredID] then self:HoverBindingEnter(f.rows[f.hoveredID]) end
 end
 function UI:OpenHoverBindings()
-    if self.bindingSource~="draft" then self:Notice("Choose Preset draft for the all-spells hover grid. Use the spellbook to edit Current bindings."); return end
+    if self.bindingSource=="recommendation" then self:Notice("Save the recommendation before editing it."); return end
     if inCombat() then self:Notice("Hover binding is unavailable during combat.",true); return end
     if K.Engine and K.Engine.busy then self:UpdateBusyState(); return end
     self:CloseMenu(); self:ClearInputFocus(); self:EndCapture(); self:CancelLibraryDrag()
@@ -156,7 +172,7 @@ function UI:OpenHoverBindings()
         local backing=f:CreateTexture(nil,"BACKGROUND",nil,-8); backing:SetAllPoints(); backing:SetColorTexture(C.bg[1],C.bg[2],C.bg[3],1)
         W.label(f,"Hover bind",22):SetPoint("TOPLEFT",32,-31)
         f.subtitle=W.label(f,"",11,C.muted); f.subtitle:SetPoint("TOPLEFT",32,-65); W.truncate(f.subtitle,790)
-        local instructions=W.label(f,"Hover an ability, then press a key. Shift / Ctrl work; Alt stays reserved. No casting.\nWheel over an ability binds it. Scroll over blank space or use the scrollbar to browse.",11,C.text)
+        local instructions=W.label(f,"Hover an ability, then press a key. Use modifiers for additional keys. No casting.\nWheel over an ability binds it. Scroll over blank space or use the scrollbar to browse.",11,C.text)
         instructions:SetPoint("TOPLEFT",32,-89); instructions:SetSize(790,32)
         f.list=W.scroll(f); f.list:SetPoint("TOPLEFT",32,-136); f.list:SetPoint("BOTTOMRIGHT",-32,131)
         f:SetScript("OnMouseDown",function() f.hoveredID=nil end)
@@ -207,11 +223,11 @@ function UI:OpenHoverBindings()
         self.hoverMouseShield=shield
     end
     f.categories={}
-    for _,entry in ipairs(K.Library:List({tab="spells"})) do
+    for _,entry in ipairs(K.Library:List({tab="spells",current=self.bindingSource=="current"})) do
         f.categories[entry.actionID or entry.id]=entry.category; if entry.name then f.categories[entry.name]=entry.category end
     end
     f.active=true; f.resumeAfterModal=nil; f.hoveredID=nil
     self.hoverInput.held={}; self.hoverInput.dismiss=nil
-    f.feedback:SetText("Hover binding edits only the draft. Apply & save installs it after creating a backup."); W.color(f.feedback,C.muted)
+    f.feedback:SetText(self.bindingSource=="current" and "Only chosen keys change. Apply changes installs your layout after creating a backup." or "Hover binding edits only the draft. Apply & save installs it after creating a backup."); W.color(f.feedback,C.muted)
     self:BeginModal(f,"KeybindOptimizerHoverBindings"); f:Show(); self:RenderHoverBindings(); self:UpdateBindingTester()
 end

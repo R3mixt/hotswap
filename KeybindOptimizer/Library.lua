@@ -129,10 +129,19 @@ local function categoryFor(class,def,spell)
     if K.LibraryData then category,talent=K.LibraryData:Classify(class,def,K.API:GetFlavor()) end
     return (spell and spell.category) or category or "General",talent
 end
+function L:CurrentCatalog()
+    local book=K.API:GetCachedSpellbook(); local _,class=UnitClass("player")
+    if not self.currentCatalog or self.currentCatalogBook~=book or self.currentCatalogRevision~=K.previewRevision or self.currentCatalog.class~=class then
+        local plan,why=K.Presets:PreviewRecommendations(true)
+        if type(plan)~="table" then error(why or "Could not read the spell catalog.") end
+        self.currentCatalog=plan; self.currentCatalogBook=book; self.currentCatalogRevision=K.previewRevision
+    end
+    return self.currentCatalog
+end
 function L:List(options)
     options=options or {}; local tab=options.tab or "spells"; local entries={}
     if tab=="spells" then
-        local plan=K:PreviewCached(); local book=K.API:GetCachedSpellbook(); local seen={}
+        local plan=options.current and self:CurrentCatalog() or K:PreviewCached(); local book=K.API:GetCachedSpellbook(); local seen={}
         if self.spellListPlan~=plan then self.spellListPlan=plan; self.spellLists={} end
         local cacheKey=options.showRanks and "ranks" or "families"
         if self.spellLists[cacheKey] then entries=self.spellLists[cacheKey]
@@ -159,7 +168,15 @@ function L:List(options)
         end
         self.spellLists[cacheKey]=entries
         end
-    elseif tab=="items" then entries=K.Items.LibraryEntries and K.Items:LibraryEntries() or {}
+    elseif tab=="items" then
+        entries=K.Items.LibraryEntries and K.Items:LibraryEntries() or {}
+        if options.current then
+            local seen={}; for _,entry in ipairs(entries) do seen[entry.itemID]=true end
+            for id in pairs(K.db.currentItems or {}) do if not seen[id] then
+                local item=K.Items:Resolve(id)
+                entries[#entries+1]={id="item."..id,itemID=id,label=item.name or "Item "..id,icon=item.icon,known=not item.missing,category="Saved items",descriptor={kind="item",itemID=id}}
+            end end
+        end
     elseif tab=="game" or tab=="chat" then
         for command,info in pairs(self:Commands()) do if info.tab==tab then entries[#entries+1]={id="command."..command,label=info.label,category=info.category,known=true,descriptor={kind="system",command=command,name=info.label}} end end
     elseif tab=="emotes" then
@@ -182,8 +199,8 @@ function L:List(options)
     table.sort(filtered,function(a,b) if a.category~=b.category then return a.category<b.category end; if a.label~=b.label then return a.label<b.label end; return a.id<b.id end)
     return filtered
 end
-function L:Categories(tab)
-    local categories={}; for _,entry in ipairs(self:List({tab=tab})) do categories[entry.category]=true end
+function L:Categories(tab,current)
+    local categories={}; for _,entry in ipairs(self:List({tab=tab,current=current})) do categories[entry.category]=true end
     local result={}; for name in pairs(categories) do result[#result+1]=name end; table.sort(result); return result
 end
 function L:CurrentTargetMode(action) return action.targetMode or "default" end

@@ -1,6 +1,6 @@
 local addonName, K = ...
 _G.KeybindOptimizer = K
-K.name, K.version = addonName or "KeybindOptimizer", "0.4.6"
+K.name, K.version = addonName or "KeybindOptimizer", "0.4.7"
 K.defaults = {
     wheel = true, middle = true, ctrl = true,
     mouseButtons = { BUTTON4 = true, BUTTON5 = true },
@@ -61,6 +61,7 @@ function K:Init()
     end
     self.db.ownedMacros = self.db.ownedMacros or {}
     self.db.history = self.db.history or {}
+    if self.CurrentBindings then self.CurrentBindings:Initialize() end
     self.dirty=self.Presets:HasUnappliedChanges()
     if self.Diagnostics then self.Diagnostics:Init() end
 end

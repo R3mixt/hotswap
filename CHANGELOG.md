@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.4.7 beta — 2026-11-02
+
+- Make Current a full editable layout seeded only from live controls, with an independent spell catalog instead of the selected preset's replacements.
+- Allow unlearned spells, specific future ranks, missing items and emotes; reserve future actions with verified character macros. Preserve existing unrelated keys and native slots.
+- Enable all-spells Hover bind, Change action, Clear key, and adding items by ID in Current. Future abilities remain visible in the Current spellbook.
+- Keep pending Current edits across reloads until applied or discarded; retain readable future-action labels after Apply and learning. Named backups recreate owned Current macros safely, including name collisions.
+
+
 ## 0.4.6 beta — 2026-11-02
 
 - Open Current bindings in edit mode with the spellbook visible. Stage key changes and learned-spell/item/macro replacements, then apply only those edits with a named backup. Discard pending edits without game writes.

@@ -18,11 +18,11 @@ function Tests.current_ui_default_warlock_reads_actual_bindings_without_building
     assert(keys["1"].action.spellID==686 and keys["2"].action.liveEmpty and not keys["2"].icon:IsShown(),"Live slots were replaced with recommended icons")
     assert(keys.F.action.command=="OPENCHAT" and keys.BUTTON1.action.command=="CAMERAORSELECTORMOVE" and keys.BUTTON2.action.command=="TURNORACTION")
     assert(keys.BUTTON8 and keys.BUTTON8.action.command=="TARGETSELF","Actual side button was omitted because the draft did not enable it")
-    assert(not k.UI.apply:IsEnabled() and not k.UI.pages.Bindings.hoverBind:IsEnabled() and k.UI.pages.Bindings.libraryToggle:IsEnabled() and k.UI.library:IsShown())
+    assert(not k.UI.apply:IsEnabled() and k.UI.pages.Bindings.hoverBind:IsEnabled() and k.UI.pages.Bindings.libraryToggle:IsEnabled() and k.UI.library:IsShown())
     keys["1"]:Click(); assert(k.UI.capture and k.UI.capture:IsShown())
     k.UI:EndCapture()
     k.UI:OpenHoverBindings(); k.UI.apply:Click()
-    assert(not k.UI.hoverBindings and not k.db.enabled and k:Export()==presets and #Mock.writes==0,"Inspecting Current modified a preset or live game state")
+    assert(k.UI.hoverBindings.active and not k.db.enabled and k:Export()==presets and #Mock.writes==0,"Inspecting Current modified a preset or live game state")
     Mock.alt=true; k.UI:RenderKeyboard()
     assert(not k.UI.pages.Bindings.layerHint:GetText():find("self-cast",1,true),"Current Alt view claims a recommended self-cast binding")
 end

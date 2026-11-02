@@ -101,13 +101,13 @@ cases.extend([('Setup','action-bars',None,None),('Settings','settings',None,None
 cases.extend([('Settings','settings-controls',None,None),('Settings','settings-bars',None,None),('Settings','settings-window',None,None),('Settings','settings-diagnostics',None,None),('Bindings','talent-choices','caster',''),('Bindings','talent-own','caster','')])
 cases.append(('Bindings','hover-bind','caster',''))
 cases.append(('Bindings','save-preset','caster',''))
-cases.extend([('Bindings','bindings-current',None,''),('Bindings','bindings-recommendation','caster','')])
+cases.extend([('Bindings','bindings-current',None,''),('Bindings','current-hover',None,''),('Bindings','bindings-recommendation','caster','')])
 for page,filename,form,layer in cases:
     lua.execute('for _,name in ipairs({"nativeBarsDialog","diagnosticLogDialog","operationErrorDialog","talentDialog","saveDialog"}) do local f=K.UI[name]; if f then f:Hide() end end')
     if filename.startswith('settings-') or filename.startswith('talent-'):
         lua.execute('K.UI:ClearOperationError()')
     lua.globals().K.UI.libraryOpen=filename.startswith('library-') or filename=='bindings-current'
-    if filename == 'bindings-current':
+    if filename in ('bindings-current','current-hover'):
         lua.execute('Mock.bindings["1"]="ACTIONBUTTON1"; Mock.actions[1]={"spell",5176}; K.UI:ClearOperationError(); K.UI:Open()')
     elif filename == 'bindings-recommendation':
         lua.execute('K.UI:ClearOperationError(); K.UI:PreviewRecommendations()')
@@ -125,6 +125,8 @@ for page,filename,form,layer in cases:
         lua.execute('K.TalentBindings:SetMode("druid.form_moonkin","separate"); K.UI:Refresh(); for _,a in ipairs(K.UI.plan.actions) do if a.id=="druid.form_moonkin" then K.UI:OpenTalentChoices(a); break end end')
     if filename == 'save-preset':
         lua.execute('K.UI:ClearOperationError(); K.UI:PromptSavePreset(nil,true)')
+    if filename == 'current-hover':
+        lua.execute('K.UI:OpenHoverBindings()')
     if filename == 'hover-bind':
         lua.execute('K.UI:ClearOperationError(); K.UI:OpenHoverBindings()')
     if filename == 'action-bars':

@@ -985,7 +985,7 @@ function Tests.hidden_options_do_not_build_plans_for_inventory_or_spell_events()
   equal(spells.count,0,"Hidden options scanned the spellbook")
   equal(items.count,0,"Hidden options scanned inventory")
   k.UI:Toggle(); if k.UI.frame:IsShown() then k.UI:SetBindingSource("draft") end
-  equal(builds.count,1,"Opening options did not consume the invalidated state exactly once")
+  equal(builds.count,2,"Opening Current and then a preset should build one independent catalog and one draft")
 end
 
 function Tests.failed_item_info_notification_does_not_create_a_query_refresh_loop()

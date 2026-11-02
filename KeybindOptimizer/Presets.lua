@@ -338,10 +338,11 @@ local function recommendation()
     for _,key in ipairs({"bindingOverrides","fallbackBindings","actionOverrides","customActions"}) do preset.settings[key]={} end
     return preset
 end
-function P:PreviewRecommendations()
+function P:PreviewRecommendations(cleanCatalog)
     if busy() or self.activating then return false,waitMessage end
     if not K.db then K:Init() end
     local preset=recommendation()
+    if cleanCatalog then preset.settings=K.Copy(K.defaults); preset.settings.flavor=K:GetSettings().flavor; preset.items={}; preset.equipment={} end
     -- The planner's existing collaborators read the selected preset. Give
     -- them a detached view for this synchronous, read-only build, then restore
     -- it even on failure. Never insert a draft or consume a preset ID here.

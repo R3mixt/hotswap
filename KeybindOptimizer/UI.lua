@@ -593,6 +593,10 @@ function UI:AssignBinding(action, key)
     if K.Engine and K.Engine.busy then self:UpdateBusyState(); return false end
     if not action then return false end
     if self.bindingSource=="current" then
+        if action.libraryEntry and not action.currentBinding then
+            self.libraryEntry=action.libraryEntry; return self:DropLibraryEntry(key)
+        end
+        action=action.currentBinding or action
         local function stage()
             local ok,why=self:Call(K.CurrentBindings,"Rebind",action,key)
             if ok then self:EndCapture(); self.currentBindingPlan=nil; self:Refresh() end
@@ -951,9 +955,9 @@ local function actionIcon(action)
 end
 function UI:SpellAvailability(action)
     if not action then return nil end
-    if action.current then return nil end
+    if action.current and not action.currentEntry and not action.libraryEntry then return nil end
     local descriptor=action.descriptor
-    local spell=descriptor and descriptor.kind=="spell" or (not descriptor and isSpellAction(action))
+    local spell=action.kind=="spell" or descriptor and descriptor.kind=="spell" or (not descriptor and isSpellAction(action))
     if not spell then return nil end
     local state=action.availabilityState or (action.known==false and (action.talent and "talent" or "unlearned") or "ready")
     local text=action.availabilityLabel or (state=="talent" and "Talent not learned" or state=="unlearned" and "Not learned" or "Ready")
@@ -1329,7 +1333,7 @@ function UI:KeyboardKeyClick(base)
     if not cap then return end
     if self.bindingSource=="current" then
         if cap.action then self.selectedAction=cap.action; self:BindingDetail(cap.action); self:BeginActionCapture(cap.action)
-        else self.libraryOpen=true; self:SyncLibrary(); self:Notice("Choose an action in the spellbook, then click this key.") end
+        else self:OpenActionPicker(cap.fullKey) end
         return
     end
     if self.bindingSource~="draft" then
@@ -1353,6 +1357,12 @@ function UI:KeyboardKeyClick(base)
     else self:OpenActionPicker(cap.fullKey) end
 end
 function UI:OpenActionPicker(key)
+    if self.bindingSource=="current" then
+        self.libraryOpen=true; self.libraryTab="spells"; self:SyncLibrary()
+        self.libraryTargetKey=key
+        self.library.note:SetText("Choose an action for "..keyName(key)..". Future spells can be reserved too.")
+        return
+    end
     if self.bindingSource~="draft" then return end
     if K.Engine and K.Engine.busy then self:UpdateBusyState(); return end
     self:CloseMenu(); self:ClearInputFocus()
@@ -1564,8 +1574,13 @@ function UI:BuildBindings(page)
     detail.change:SetPoint("TOPRIGHT", -112, -12)
     detail.change:SetEnabled(false)
     detail.reset = button(detail, "Reset key", 94, function()
-        if UI.bindingSource~="draft" then return end
         if not UI.selectedAction then return end
+        if UI.bindingSource=="current" then
+            UI:Confirm("Clear this key?","Remove this key assignment from your Current layout. Other keys and the action-bar slot stay unchanged until you apply your edits.",function()
+                UI:Call(K.CurrentBindings,"ClearKey",UI.selectedAction); UI.currentBindingPlan=nil; UI:Refresh()
+            end); return
+        end
+        if UI.bindingSource~="draft" then return end
         if UI.selectedAction.presetName then UI:Call(K.Presets,"ClearHotkey",UI.selectedAction.presetName); UI:Refresh(); return end
         local overrides = copy(settings().bindingOverrides)
         for _,action in ipairs(UI:LinkedBindings(UI.selectedAction)) do overrides[action.id]=nil end
@@ -1589,7 +1604,7 @@ function UI:RenderBindings(reusePageCache)
     page.source.text:SetText(current and "Current bindings" or editable and "Preset draft" or "Recommendations")
     local readErrors={}; for _,entry in ipairs((self.bindingPlan or {}).errors or {}) do readErrors[#readErrors+1]=message(entry) end
     tooltip(page.source,current and "Current character bindings" or "Binding view",current and #readErrors>0 and table.concat(readErrors,"\n") or "Current bindings reads the live character. Preset draft is editable. Recommendations are an unsaved preview until you choose Save as new preset.")
-    page.libraryToggle:SetEnabled(editable); page.hoverBind:SetEnabled(self.bindingSource=="draft" and not (InCombatLockdown and InCombatLockdown()))
+    page.libraryToggle:SetEnabled(editable); page.hoverBind:SetEnabled(editable and not (InCombatLockdown and InCombatLockdown()))
     local filter=current and "all" or (self.followForm~=false and self:CurrentActionPage() or self.formFilter or "caster")
     if filter~="all" and not self.availableActionPages[filter] then filter="caster" end
     self.formFilter = filter
@@ -1704,11 +1719,11 @@ function UI:BindingDetail(a)
     local pinned=false
     for _,action in ipairs(linked) do if (settings().bindingOverrides or {})[action.id]~=nil then pinned=true; break end end
     local editable=self.bindingSource~="recommendation"
-    d.reset:SetEnabled(not a.current and editable and not a.preserved and (a.presetName~=nil or pinned))
+    d.reset:SetEnabled(editable and not a.preserved and (a.current or a.presetName~=nil or pinned))
     d.note:SetText(a.current and "Apply changes installs only your edits. Drag from the spellbook to replace an action." or not editable and (self.bindingSource=="current" and "Current character bindings are read-only. Choose Preset draft to edit." or "Recommendation preview only. Save a preset to edit this layout.") or #linked>1 and "This action-bar position changes in every form." or "Apply & save installs your changes.")
-    d.reset.text:SetText(a.presetName and "Clear key" or "Reset key")
+    d.reset.text:SetText((a.current or a.presetName) and "Clear key" or "Reset key")
     d.rebind:SetEnabled(editable and not a.preserved)
-    d.change:SetEnabled(not a.current and editable and not a.preserved and a.key ~= nil and a.kind ~= "system" and not a.presetName)
+    d.change:SetEnabled(editable and not a.preserved and a.key~=nil and (a.current or a.kind~="system" and not a.presetName))
     d.talents:SetEnabled(not a.current and editable and self.CanEditTalentChoices and self:CanEditTalentChoices(a) or false)
     tooltip(d, a.label or a.id, self:MacroDetail(a),a.displaySpellID or a.spellID,state and state~="ready" and status,a.itemID)
     d:EnableMouse(true)
@@ -2166,7 +2181,7 @@ function UI:Create()
     preview:SetPoint("RIGHT", -282, 0)
     self.discard=button(footer,"Discard edits",106,function()
         UI:Confirm("Discard current edits?","Your game controls stay unchanged. Remove all pending Current binding edits?",function()
-            K.CurrentBindings.edits=nil; UI.currentBindingPlan=nil; UI:Refresh()
+            K.CurrentBindings:Discard(); UI.currentBindingPlan=nil; UI:Refresh()
         end)
     end)
     self.discard:SetPoint("RIGHT",-282,0)
