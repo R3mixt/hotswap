@@ -20,17 +20,48 @@ Version **1.0.0** is prepared for Classic Era / Hardcore user testing. Forever i
 - Imports copy/paste profiles as additional presets without replacing your current settings.
 - Offers independent replacement/swap confirmations, control protection and default-key restoration.
 
-![Hot Swap Current keyboard editor](review/1.0-evidence/bindings-current.png)
-
-*Layout preview generated from the actual Lua UI with sample data and substitute artwork. This is not an in-game screenshot.*
-
-### Theme previews (development)
+## Screenshots
 
 Choose **Classic** or **Modern** under **Settings → Window → Theme**. Classic remains the default. The choice applies immediately, stays local to your character, and preserves pending binding edits.
 
-![Modern theme offline preview](review/themes/modern-current.png)
+*These development previews are generated from the actual addon UI without running WoW. Both themes show the same sample bindings and real spell icons; fonts and frame artwork are approximate. The theme selector is in development after the 1.0 release.*
 
-*Rendered from the actual addon UI without running WoW. Sample bindings and real spell artwork; fonts and frame artwork are approximate. See the [theme guide](docs/themes.md), [Classic comparison](review/themes/classic-current.png), and [preview generation instructions](ui-qa/README.md). This feature is in development after the 1.0 release.*
+### Modern
+
+Slate panels and cool accents, with the original spell artwork.
+
+![Modern theme: Current keyboard layout and spellbook with recognizable spell icons](review/themes/modern-current.png)
+
+### Classic
+
+Familiar Warcraft styling, warm borders and gold highlights.
+
+![Classic theme: the same Current keyboard layout and spellbook with recognizable spell icons](review/themes/classic-current.png)
+
+<details>
+<summary>More screenshots: presets, appearance settings and the spellbook</summary>
+
+### Presets
+
+![Modern theme: saved presets and recommendation controls](review/themes/modern-presets.png)
+
+![Classic theme: saved presets and recommendation controls](review/themes/classic-presets.png)
+
+### Appearance settings
+
+![Modern theme: Window settings with the theme selector, opacity, scale and confirmation switches](review/themes/modern-settings.png)
+
+![Classic theme: Window settings with the same appearance and confirmation controls](review/themes/classic-settings.png)
+
+### Editing a preset
+
+![Modern theme: draft keyboard bindings and spellbook with learned and unlearned spell icons](review/themes/modern-spellbook.png)
+
+![Classic theme: the same draft keyboard bindings and spellbook](review/themes/classic-spellbook.png)
+
+</details>
+
+[Compare both themes](review/themes/theme-comparison.png) · [Theme guide](docs/themes.md) · [Generate previews without WoW](ui-qa/README.md)
 
 ## Install
 
