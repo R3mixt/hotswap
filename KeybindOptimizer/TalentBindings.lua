@@ -36,6 +36,28 @@ function T:GetChoices(actionID,settings)
  settings=settings or K:GetSettings()
  return K.Copy((settings.talentAlternatives or {})[actionID] or {actionID})
 end
+function T:GetMode(actionID,settings)
+ settings=settings or K:GetSettings()
+ return (settings.talentAlternatives or {})[actionID] and "shared" or "separate"
+end
+function T:SetMode(actionID,mode)
+ if mode~="separate" and mode~="shared" then return false,"Choose Own key or Shared key." end
+ if K.Engine and K.Engine.busy then return false,"Wait for the current operation to finish." end
+ local settings=K:GetSettings()
+ local definitions=self:Definitions(settings)
+ if not self:IsEligible(definitions[actionID]) then return false,"Choose a class ability with a shared utility position." end
+ if self:GetMode(actionID,settings)==mode then return true,"This key mode is already selected." end
+ -- Separate keys are the default catalog layout. Switching back removes only
+ -- this destination's choice policy; individual key overrides are untouched.
+ local choices=mode=="shared" and self:GetChoices(actionID,settings) or {}
+ local ok,why=self:SetChoices(actionID,choices)
+ if not ok then return false,why end
+ if mode=="separate" then
+  local targeting=why and why:find("Default targeting",1,true) and " Targeting reset to Default." or ""
+  return true,"Own key selected. This ability stays on its custom key and is inactive until learned."..targeting.." Apply & save to use it."
+ end
+ return true,"Shared key selected. Add abilities in priority order, then Apply & save."
+end
 function T:ValidateSettings(settings)
  if type(settings.talentAlternatives or {})~="table" then return false,"Talent choices must be a table." end
  local definitions,class,flavor=self:Definitions(settings)

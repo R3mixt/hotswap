@@ -734,12 +734,16 @@ function E:Activate(plan)
     return self:RepairLearnedActions(plan)
 end
 function E:RepairLearnedActions(plan,itemsOnly)
-    if not itemsOnly and K.AvailabilityEngine and K.AvailabilityEngine:Handles(plan) then return K.AvailabilityEngine:Repair(plan) end
+    if not itemsOnly and K.AvailabilityEngine and (K.AvailabilityEngine:Handles(plan) or K.AvailabilityEngine:RequiresTalentPlacement(plan)) then return K.AvailabilityEngine:Repair(plan) end
     if self.busy then return "pending","Form maintenance is already queued." end
     if inCombat() then return false,"Form maintenance waits until combat ends." end
     local forms=itemsOnly and {} or K.API:GetForms(); local changes={}; local book
     for _,action in ipairs(plan.actions or {}) do
         local form=action.formType and forms[action.formType]
+        local talent=action.talent
+        if not itemsOnly and not action.kind and not action.builtin and K.Availability then
+            talent=K.Availability:Annotate(K.Copy(action),plan.class,plan.flavor).talent
+        end
         local updated
         if action.kind=="item" and action.itemBinding and action.macroName then
             updated=K.Copy(action)
@@ -762,17 +766,23 @@ function E:RepairLearnedActions(plan,itemsOnly)
             if learned~=action.known then
                 updated=K.Copy(action); updated.known=learned; updated.nativePending=not learned or nil
             end
+        elseif not itemsOnly and talent and action.macroName and K.AvailabilityEngine then
+            book=book or K.API:GetCachedSpellbook()
+            local why
+            updated,why=K.AvailabilityEngine:Resolve(action,plan,book,forms)
+            if not updated then return false,why end
         end
         if updated then
+            if not itemsOnly and K.Availability then K.Availability:Annotate(updated,plan.class,plan.flavor) end
             local body,why=K.Macros:Build(updated,plan.settings)
-            if updated.kind=="item" then
+            if updated.kind=="item" or updated.talent then
                 updated.body=body
                 local prepared,prepareError=K.NativeBars:MakeMacro(updated,plan.settings,true)
                 if not prepared then return false,prepareError end
                 body=updated.body
             end
             if why then return false,why end
-            if body~=action.body or (updated.kind=="item" and (updated.icon~=action.icon or updated.label~=action.label or updated.known~=action.known)) then
+            if body~=action.body or ((updated.kind=="item" or updated.talent) and (updated.icon~=action.icon or updated.label~=action.label or updated.known~=action.known or updated.talent~=action.talent)) then
                 local index,name=K.Macros:FindExact(action.macroName,action.body)
                 if not index or K.db.ownedMacros[name]~=action.body then return false,"A managed macro was edited or removed. Review and apply your preset." end
                 changes[#changes+1]={action=action,updated=updated,name=name,oldBody=action.body,newBody=body}
@@ -782,12 +792,31 @@ function E:RepairLearnedActions(plan,itemsOnly)
     if #changes==0 then if not itemsOnly then plan.formSignature=K.API:FormSignature() end; return true end
     -- Reused macros can appear on several keys/pages. Edit each shared body
     -- once, while committing metadata to every referring action afterward.
-    local operations,byName={},{}
+    local operations,byName,byAction={},{},{}
     for _,change in ipairs(changes) do
+        byAction[change.action]=change
         local previous=byName[change.name]
         if previous then
-            if previous.oldBody~=change.oldBody or previous.newBody~=change.newBody then return false,"A shared ability now needs different macros. Use your preset to update these bindings safely." end
+            if previous.oldBody~=change.oldBody or previous.newBody~=change.newBody then
+                -- Base/focus/custom variants can share an inert reservation,
+                -- then need different learned targeting bodies. Split only
+                -- their still-owned native slots before any in-place edits.
+                if not itemsOnly and K.AvailabilityEngine then return K.AvailabilityEngine:Repair(plan) end
+                return false,"A shared ability now needs different macros. Use your preset to update these bindings safely."
+            end
         else byName[change.name]=change; operations[#operations+1]=change end
+    end
+    if not itemsOnly and K.AvailabilityEngine then
+        for _,action in ipairs(plan.actions or {}) do
+            local operation=action.macroName and byName[action.macroName]
+            local ownChange=byAction[action]
+            local nextBody=ownChange and ownChange.newBody or action.body
+            if operation and nextBody~=operation.newBody then
+                -- An unchanged alias (for example an unavailable explicit
+                -- rank) must not inherit another key's newly executable body.
+                return K.AvailabilityEngine:Repair(plan)
+            end
+        end
     end
     local job={kind=itemsOnly and "item-maintenance" or "maintenance",plan=plan,steps={},backupReady=true,created={},previous=runtimeState()}
     for _,change in ipairs(operations) do local c=change

@@ -17,6 +17,9 @@ function Tests.settings_ui_talent_choices_order_remove_reset_and_escape_are_stag
     k.UI.pages.Bindings.detail.talents:Click()
     local f=k.UI.talentDialog
     assert(f and f:IsShown() and f.rows[1].choiceID==primary.id,"Talent choices did not open on the selected key")
+    assert(f.mode=="separate" and f.ownInfo:IsShown() and not f.add:IsEnabled() and not f.list:IsShown(),"An unconfigured ability did not start in Own key mode")
+    f.modeButtons.shared:Click()
+    assert(f.mode=="shared" and f.list:IsShown() and f.add:IsEnabled() and not f.ownInfo:IsShown(),"Shared key mode did not reveal its choices")
     assert(not f.rows[1].remove:IsEnabled(),"The last talent choice could be removed")
     f.add:Click()
     local option
@@ -35,9 +38,33 @@ function Tests.settings_ui_talent_choices_order_remove_reset_and_escape_are_stag
     choices=k.TalentBindings:GetChoices(primary.id)
     assert(#choices==1 and choices[1]==primary.id,"Reset did not restore the original primary choice")
     assert(not k:GetSettings().talentAlternatives[primary.id],"Reset retained a configured group that would block future rank or replacement edits")
+    assert(f.mode=="separate" and f.ownInfo:IsShown(),"Reset did not return to Own key mode")
     assert(#Mock.writes==0 and k.dirty,"Talent choices applied game changes before Apply & save")
     Mock:KeyDown("ESCAPE"); Mock:Advance(0.1)
     assert(not f:IsShown() and k.UI.frame:IsShown(),"Talent-choice Escape closed the whole addon")
+end
+
+function Tests.settings_ui_own_talent_key_retains_independent_overrides_and_opens_primary_rebind()
+    local k=settingsUI()
+    local primary,other="druid.form_moonkin","druid.natures_swiftness"
+    k:UpdateSetting("bindingOverrides",{[primary]="CTRL-9",[other]="CTRL-F12"})
+    assert(k.TalentBindings:SetChoices(primary,{primary,other}))
+    k.UI:ShowPage("Bindings")
+    local chosen
+    for _,entry in ipairs(k.UI.plan.actions) do if entry.id==primary then chosen=entry end end
+    Mock:ResetWrites(); k.UI:OpenTalentChoices(chosen)
+    local f=k.UI.talentDialog
+    assert(f.mode=="shared","An existing shared group reopened as Own key")
+    f.modeButtons.separate:Click()
+    assert(k.TalentBindings:GetMode(primary)=="separate" and not k:GetSettings().talentAlternatives[primary],"Own key did not remove shared choices")
+    assert(k:GetSettings().bindingOverrides[primary]=="CTRL-9" and k:GetSettings().bindingOverrides[other]=="CTRL-F12","Switching mode discarded independent custom keys")
+    assert(f.note:GetText():find("inactive until learned",1,true),"Own key mode omitted its unavailable-talent behavior")
+    f.ownInfo.rebind:Click()
+    assert(not f:IsShown() and k.UI.capture:IsShown() and k.UI.captureAction.id==primary,"Change key did not capture only the primary ability")
+    Mock:KeyDown("NUMPAD9"); Mock:Advance(0.05)
+    assert(k:GetSettings().bindingOverrides[primary]=="NUMPAD9","Own key rebind was not saved in the draft")
+    assert(k:GetSettings().bindingOverrides[other]=="CTRL-F12","Own key rebind moved another talent ability")
+    assert(k.TalentBindings:GetMode(primary)=="separate" and #Mock.writes==0,"Own key editing configured a group or wrote live game state")
 end
 function Tests.settings_ui_appearance_is_local_immediate_and_fits_the_keyboard_with_spellbook()
     local k,page=settingsUI(); Mock:ResetWrites()

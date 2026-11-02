@@ -88,13 +88,18 @@ function N:MakeMacro(action,settings,force)
   action.nativePending=nil; action.macroName=nil; action.macroIndex=nil
   return true
  end
- if action.talentChoices and not action.known then
+ if (action.talent or action.talentChoices) and not action.known then
   -- A choice list is resolved from learned spells outside combat. A partial
   -- or unknown choice must not execute a stale cast/cancelform fallback.
   action.nativeMacro=true; action.nativePending=true
   action.body="#showtooltip "..tostring(action.displayName or action.name or action.label or "")
+  if #action.body>255 then return false,"Talent tooltip exceeds 255 bytes: "..tostring(action.label) end
   return true
  end
+ -- Independent talent keys also need an owned macro from the first install.
+ -- This lets learning and respec replace the inert body in place while keeping
+ -- the user's native slot and personal binding unchanged.
+ if action.talent then action.nativeMacro=true end
  if action.kind=="macroref" then
   if action.nativeBlockAlt then
    return false,"This macro shares a main-bar position with an Alt self-cast spell. Put the macro on a shared utility key to preserve its text and safe self-casting."

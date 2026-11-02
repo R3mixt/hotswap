@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.4.1 beta — 2026-11-01
+
+- Add explicit Own key / Shared key selection in the talent-key editor, with a direct Change key action.
+- Preserve individual custom bindings when changing between independent and shared talent choices.
+- Keep unlearned talent buttons inert, including form cancellation, and refresh independent talent macros when learned or removed.
+
 ## 0.4.0 beta — 2026-11-01
 
 - Add preset protections for movement, camera/selection, chat, targeting, other game controls and casting settings; Spells only enables all six.

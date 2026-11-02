@@ -65,3 +65,9 @@ Settings has four native subsections. Geometry previews for Controls, Action bar
 The release packaging step reruns the integrated Lua 5.1 suite and records its exact result. Source review, failure injection and geometry previews are complete; real-client protected execution, font rendering, event timing, camera input and talent-respec behavior still require the acceptance checks in compatibility.md.
 
 Final integrated validation: **331/331 scenarios passed** using the actual Lua 5.1 modules and mocked WoW APIs. The package contains 21 runtime modules; ZIP integrity and explicit manifest checks passed.
+
+## 0.4.1 follow-up — 1 November 2026
+
+The talent editor now explicitly distinguishes Own key (default independent binding) from Shared key (ordered learned alternatives). Mode changes retain independent key overrides and use the existing validated preset format. Own key has a direct Change key action. Both native UI layouts were rendered and inspected.
+
+Unknown catalog talents are strictly inert tooltip macros. Known talents also keep managed macro identities so ordinary learn/respec transitions can edit owned bodies without moving keys or slots. Earlier raw-spell talent placements upgrade through the ownership-checked slot worker. When shared placeholders need different target/rank bodies, or an unchanged alias must remain inactive, maintenance delegates before any writes to the existing transaction worker. Tests cover normal/focus variants and an unavailable fixed rank that must not activate with its spell family.

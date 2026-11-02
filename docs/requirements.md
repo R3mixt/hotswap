@@ -1,4 +1,4 @@
-# Requirement map — 0.4.0 beta
+# Requirement map — 0.4.1 beta
 
 The final release targets WoW Forever. Classic Era / Hardcore is the temporary development target. Retail is not a supported release target. Automated tests use Lua 5.1 with mocked game APIs; a passing suite does not certify protected execution inside either client.
 
@@ -16,7 +16,7 @@ The final release targets WoW Forever. Classic Era / Hardcore is the temporary d
 | Protect game controls | Preset checkboxes for movement, camera, chat, targeting, interface and casting settings; Spells only enables all | Protects current custom keys; pinned conflicts block Apply rather than overriding the control |
 | Macro display | Separate native macro-name and tooltip-code switches | Character-local; cosmetic native fontstrings only, deferred during combat |
 | Unavailable abilities | L/T badges, native tooltips, editor filter and optional empty native positions | Native empty-grid borders follow Blizzard settings; keys remain reserved |
-| Talent-aware shared keys | Explicit ordered class talent choices; first learned wins | Outside combat; no rotation decisions or guessed dominant specialization; separate existing keys remain |
+| Talent key modes | Own key per ability (default), or explicit ordered shared choices; first learned wins | Outside combat; no rotation decisions or guessed dominant specialization; separate existing keys remain |
 | Release previous Hot Swap keys | A key no longer used by the addon regains its prior binding only while its current command still matches Hot Swap's last assignment | Later manual changes are preserved |
 | Apply and recover safely | Bounded apply/rollback jobs, progress, named backups and original recovery | Combat pauses an active job; recovery errors retain the backup |
 | Named backups | Character-class-date-time names; bindings, native bars, visibility, settings and owned macro data | WoW persists SavedVariables on reload/logout |

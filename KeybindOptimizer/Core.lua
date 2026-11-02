@@ -1,6 +1,6 @@
 local addonName, K = ...
 _G.KeybindOptimizer = K
-K.name, K.version = addonName or "KeybindOptimizer", "0.4.0"
+K.name, K.version = addonName or "KeybindOptimizer", "0.4.1"
 K.defaults = {
     wheel = true, middle = true, ctrl = true,
     mouseButtons = { BUTTON4 = true, BUTTON5 = true },
@@ -170,7 +170,9 @@ end
 function K:OnRestoreComplete(ok,message,plan,kind) return self:OnApplyComplete(ok,message,plan,kind or "restore") end
 function K:RefreshAvailabilityStatus()
     local plan=self.db and self.db.enabled and self.db.appliedPlan
-    if not plan or not self.AvailabilityEngine:Handles(plan) then return end
+    if not plan then return end
+    local automatic=self.AvailabilityEngine:Handles(plan) or self.AvailabilityEngine:HasTalentActions(plan)
+    if not automatic then return end
     self.needsRefresh=self.AvailabilityEngine:HasUnboundLearnedSpells(plan)
     self.dirty=self.Presets:HasUnappliedChanges() or self.needsRefresh
 end

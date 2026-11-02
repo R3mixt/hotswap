@@ -7,6 +7,22 @@ function A:Handles(plan)
  local settings=plan and plan.settings or {}
  return settings.hideUnavailableSpells==true or settings.adaptTalents==true or next(settings.talentAlternatives or {})~=nil
 end
+function A:HasTalentActions(plan)
+ for _,action in ipairs(plan and plan.actions or {}) do if spell(action) and action.key then
+  local annotated=K.Availability:Annotate(K.Copy(action),plan.class,plan.flavor)
+  if annotated.talent then return true end
+ end end
+ return false
+end
+function A:RequiresTalentPlacement(plan)
+ -- Upgrade earlier applied plans that installed an already-learned talent as
+ -- a raw spell. New plans always reserve a managed macro for independent keys.
+ for _,action in ipairs(plan and plan.actions or {}) do if spell(action) and action.key and action.nativeSlot and not action.macroName then
+  local annotated=K.Availability:Annotate(K.Copy(action),plan.class,plan.flavor)
+  if annotated.talent and not action.nativeHidden then return true end
+ end end
+ return false
+end
 function A:HasUnboundLearnedSpells(plan,book)
  book=book or K.API:GetCachedSpellbook()
  local covered,definitions={},nil

@@ -230,7 +230,7 @@ function Tests.native_respec_away_from_moonkin_removes_the_old_cancel_form_macro
   Mock:Fire("PLAYER_TALENT_UPDATE")
   local ok,why=Mock:Drain(); assert(ok,why)
   assert(not moonkin.known and not moonkin.spellID and moonkin.nativePending,"Lost Moonkin talent still appears learned")
-  assert(not moonkin.body:find("/cancelform",1,true) and moonkin.body:find("[noform]",1,true),"Removed Moonkin talent can drop the current form")
+  assert(not moonkin.body:find("/cast",1,true) and not moonkin.body:find("/use",1,true) and not moonkin.body:find("/cancelform",1,true),"Unlearned talent form must stay entirely inactive")
   local _,_,body=GetMacroInfo(GetMacroIndexByName(moonkin.macroName))
   equal(body,moonkin.body,"Removed form metadata and installed macro disagree")
 end

@@ -52,7 +52,9 @@ function P:Build(useCachedData)
             else plan.errors[#plan.errors+1]=why end
         end
         local slots={ ["1"]=1,["2"]=2,["3"]=3,["4"]=4,["5"]=5,["SHIFT-1"]=6,["SHIFT-2"]=7,["SHIFT-3"]=8,["SHIFT-4"]=9,["SHIFT-5"]=10,["R"]=11,["SHIFT-R"]=12 }
-        action.barSlot=(not def.kind or (override and override.replacement)) and slots[def.key] or nil
+        -- A copied spell family supplies cast metadata, not ownership of its
+        -- original main-bar position. Replacements keep the destination slot.
+        action.barSlot=not def.id:match("^custom%.") and (not def.kind or (override and override.replacement)) and slots[def.key] or nil
         action.form=action.form or "all"
         if action.kind=="item" and settings.itemBindings and settings.itemBindings[action.id] and K.Items.ApplyToAction then K.Items:ApplyToAction(action,action.itemID,settings.itemBindings[action.id]) end
         action.category=action.category or "Utility"

@@ -1,8 +1,8 @@
-# Hot Swap 0.4.0
+# Hot Swap 0.4.1
 
 A configurable World of Warcraft addon for stable class bindings, druid form pages, mouseover/focus macros, Alt self-cast, and selectable on-use items.
 
-**Status: installable beta.** Version 0.4.0 adds protected game-control categories, macro display preferences, unavailable-spell visibility, and ordered talent choices on shared keys. Bindings and mouse controls outside the selected preset remain unchanged. It retains command validation, diagnostic logging, window settings, Blizzard's original action bars, a miniature spellbook editor, and bounded setup/recovery jobs. The actual Lua modules are checked using Lua 5.1 and mocked WoW APIs; real-client behavior still needs a retest. Geometry previews approximate artwork and fonts and are not game screenshots.
+**Status: installable beta.** Version 0.4.1 adds protected game-control categories, macro display preferences, unavailable-spell visibility, and ordered talent choices on shared keys. Bindings and mouse controls outside the selected preset remain unchanged. It retains command validation, diagnostic logging, window settings, Blizzard's original action bars, a miniature spellbook editor, and bounded setup/recovery jobs. The actual Lua modules are checked using Lua 5.1 and mocked WoW APIs; real-client behavior still needs a retest. Geometry previews approximate artwork and fonts and are not game screenshots.
 
 ## Install and open
 
@@ -64,7 +64,9 @@ The interface reuses its preview between relevant changes, updates only the visi
 
 The same section has character-local display controls: **Show macro names on action buttons**, **Show macro code in Hot Swap tooltips**, and **Show unavailable spells in the editor**. They apply immediately and do not travel in shared presets. Macro-name changes defer while in combat. Hiding editor entries does not delete their bindings. All options retain prior behavior until changed.
 
-To share a key between talents, select a shared utility binding in **Bindings** and open **Talent choices**. Add and order up to eight choices; the first learned ability wins. For example, a key can offer Moonkin Form, then Nature's Swiftness. If neither is learned, it stays inactive. Changes follow actual learned spells, not a guessed specialization. Other keys remain unchanged, including any separate binding for a chosen ability. Choices are saved per preset and included in imports/exports. Fixed-rank or replacement edits are separate choices; use Default targeting when alternatives have different target capabilities. **Apply & save** installs the list; later talent changes update owned positions outside combat.
+**Bindings → Talent keys** offers **Own key** and **Shared key** for each eligible utility position. **Own key** is the default: every ability keeps its separate custom key, and a talent button stays inactive until the ability is learned. Choose **Change key** to set that ability's binding. **Shared key** uses an ordered list of up to eight abilities; the first learned choice wins. For example, a key can offer Moonkin Form, then Nature's Swiftness. If neither is learned, it stays inactive. Choices use actual learned abilities, not a guessed specialization. Switching back to Own key restores the original ability and retains every custom key override. Other independent bindings remain unchanged.
+
+The choice is per binding and saved with each preset, so independent and shared keys can coexist. Import/export preserves both. Fixed-rank or replacement edits are separate choices; Default targeting supports alternatives with different target capabilities. **Apply & save** installs your choices. Learning or removing a talent updates its managed action outside combat without changing keys. Unlearned talent buttons contain no cast or form-cancellation command.
 
 **Settings → Window** controls this character's window opacity (40–100%) and preferred scale (70–130%). Changes take effect immediately. The window reduces its effective scale when necessary to fit the screen and spellbook. **Reset appearance** restores the defaults. These preferences stay local when importing or switching binding presets.
 

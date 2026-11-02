@@ -20,10 +20,25 @@ end
 function UI:SaveTalentChoices(ids)
     local f=self.talentDialog
     if not f or not f.actionID then return false end
+    if K.TalentBindings:GetMode(f.actionID)~="shared" then return false end
     local ok,why=self:Call(K.TalentBindings,"SetChoices",f.actionID,ids)
     if ok then self:Refresh(); self:RenderTalentChoices()
     elseif why then f.note:SetText(why); color(f.note,C.error) end
     return ok
+end
+function UI:SetTalentKeyMode(mode)
+    local f=self.talentDialog; if not f then return false end
+    local ok,why=self:Call(K.TalentBindings,"SetMode",f.actionID,mode)
+    if ok then self:Refresh(); self:RenderTalentChoices()
+    elseif why then f.note:SetText(why); color(f.note,C.error) end
+    return ok
+end
+function UI:RebindOwnTalentKey()
+    local f=self.talentDialog
+    if not f or K.TalentBindings:GetMode(f.actionID)~="separate" then return end
+    for _,action in ipairs((self.plan or {}).actions or {}) do
+        if action.id==f.actionID then f:Hide(); self.selectedAction=action; self:BeginActionCapture(action); return end
+    end
 end
 function UI:MoveTalentChoice(index,delta)
     local f=self.talentDialog; if not f then return end
@@ -41,14 +56,25 @@ function UI:RemoveTalentChoice(index)
 end
 function UI:RenderTalentChoices()
     local f=self.talentDialog; if not f then return end
+    local shared=K.TalentBindings:GetMode(f.actionID)=="shared"
+    f.mode=shared and "shared" or "separate"
+    for mode,control in pairs(f.modeButtons) do color(control.text,mode==f.mode and C.accent or C.muted) end
+    f.list:SetShown(shared); f.add:SetShown(shared); f.reset:SetShown(shared); f.ownInfo:SetShown(not shared)
     local choices=K.TalentBindings:GetChoices(f.actionID)
     f.choices=choices
     local byID={}
     for _,candidate in ipairs(f.candidates or {}) do byID[candidate.id]=candidate end
     for _,action in ipairs((self.plan or {}).actions or {}) do if not byID[action.id] then byID[action.id]=action end end
+    local primary=byID[f.actionID] or {label=f.actionID}
+    local current
+    for _,action in ipairs((self.plan or {}).actions or {}) do if action.id==f.actionID then current=action; break end end
+    f.title:SetText("Talent keys: "..tostring(primary.label or f.actionID).." / "..keyName(current and current.key))
+    f.ownInfo.name:SetText(primary.label or f.actionID)
+    f.ownInfo.binding:SetText("Own key: "..keyName(current and current.key).."  |  "..(primary.known and "Learned" or "Inactive until learned"))
+    f.ownInfo.rebind:SetEnabled(current~=nil and current.preserved~=true)
     local active
     for _,id in ipairs(choices) do if byID[id] and byID[id].known then active=id; break end end
-    f.note:SetText("First learned choice wins when applied. If none are learned, the slot stays inactive. Other bindings remain unchanged."); color(f.note,C.muted)
+    f.note:SetText(shared and "Use one key for ordered talent choices. The first learned choice is used; if none are learned, it stays inactive. Other keys remain unchanged." or "Keep this ability on its own custom key. It stays inactive until learned. Other talent abilities keep their independent keys."); color(f.note,C.muted)
     for _,row in ipairs(f.rows) do row:Hide() end
     for index,id in ipairs(choices) do
         local row=f.rows[index]
@@ -73,21 +99,28 @@ function UI:RenderTalentChoices()
         row.up:SetEnabled(index>1); row.down:SetEnabled(index<#choices); row.remove:SetEnabled(#choices>1)
         row:Show()
     end
-    f.list:UpdateHeight(math.max(45,#choices*40)); f.add:SetEnabled(#choices<8)
+    f.list:UpdateHeight(math.max(45,#choices*40)); f.add:SetEnabled(shared and #choices<8)
 end
 function UI:OpenTalentChoices(action)
     if not self:CanEditTalentChoices(action) then return end
     if K.Engine and K.Engine.busy then self:UpdateBusyState(); return end
     local candidates=K.TalentBindings:ListCandidates(action) or {}
-    if #candidates==0 then self:Notice("Talent choices are available for shared class utility bindings."); return end
+    if #candidates==0 then self:Notice("Talent-key options are available for class utility bindings."); return end
     self:CloseMenu(); self:ClearInputFocus()
     local f=self.talentDialog
     if not f then
         f=box("Frame",self.frame,C.bg,"KeybindOptimizerTalentChoices")
         f:SetAllPoints(self.frame); f:SetFrameStrata("DIALOG"); f:SetFrameLevel(self.frame:GetFrameLevel()+55); f:EnableMouse(true)
-        f.title=label(f,"Talent choices",22); f.title:SetPoint("TOPLEFT",40,-40); f.title:SetWidth(770)
-        f.note=label(f,"",12,C.muted); f.note:SetPoint("TOPLEFT",40,-82); f.note:SetSize(765,40)
+        f.title=label(f,"Talent keys",22); f.title:SetPoint("TOPLEFT",40,-40); f.title:SetWidth(770)
+        f.modeButtons={}
+        for index,entry in ipairs({{"separate","Own key"},{"shared","Shared key"}}) do
+            local mode=entry[1]
+            local control=button(f,entry[2],132,function() UI:SetTalentKeyMode(mode) end)
+            control:SetPoint("TOPLEFT",40+(index-1)*140,-82); f.modeButtons[mode]=control
+        end
+        f.note=label(f,"",12,C.muted); f.note:SetPoint("TOPLEFT",40,-124); f.note:SetSize(765,40)
         f.add=button(f,"Add talent choice",180,function(self)
+            if K.TalentBindings:GetMode(f.actionID)~="shared" then return end
             local used={}; for _,id in ipairs(K.TalentBindings:GetChoices(f.actionID)) do used[id]=true end
             local options={}
             for _,candidate in ipairs(f.candidates or {}) do if not used[candidate.id] then options[#options+1]={value=candidate.id,label=candidate.label or candidate.id} end end
@@ -96,17 +129,20 @@ function UI:OpenTalentChoices(action)
                 local ids={}; for _,value in ipairs(K.TalentBindings:GetChoices(f.actionID)) do ids[#ids+1]=value end
                 ids[#ids+1]=id; UI:SaveTalentChoices(ids)
             end)
-        end); f.add:SetPoint("TOPLEFT",40,-129)
-        f.list=scroll(f); f.list:SetPoint("TOPLEFT",40,-174); f.list:SetPoint("BOTTOMRIGHT",-40,105); f.rows={}
-        local help=label(f,"Choices are saved to this preset's draft. Apply & save installs them.",11,C.muted)
+        end); f.add:SetPoint("TOPLEFT",40,-174)
+        f.list=scroll(f); f.list:SetPoint("TOPLEFT",40,-215); f.list:SetPoint("BOTTOMRIGHT",-40,105); f.rows={}
+        f.ownInfo=box("Frame",f,C.field); f.ownInfo:SetPoint("TOPLEFT",40,-179); f.ownInfo:SetPoint("TOPRIGHT",-40,-179); f.ownInfo:SetHeight(161)
+        f.ownInfo.name=label(f.ownInfo,"",17); f.ownInfo.name:SetPoint("TOPLEFT",18,-18); f.ownInfo.name:SetWidth(720)
+        f.ownInfo.binding=label(f.ownInfo,"",12,C.muted); f.ownInfo.binding:SetPoint("TOPLEFT",18,-53); f.ownInfo.binding:SetWidth(720)
+        f.ownInfo.rebind=button(f.ownInfo,"Change key",135,function() UI:RebindOwnTalentKey() end); f.ownInfo.rebind:SetPoint("TOPLEFT",18,-96)
+        local help=label(f,"Key mode and edits are saved to this preset's draft. Apply & save installs them.",11,C.muted)
         help:SetPoint("BOTTOMLEFT",40,73); help:SetWidth(760)
-        f.reset=button(f,"Reset choices",135,function() UI:SaveTalentChoices({}) end); f.reset:SetPoint("BOTTOMLEFT",40,32)
+        f.reset=button(f,"Reset to own key",160,function() UI:SetTalentKeyMode("separate") end); f.reset:SetPoint("BOTTOMLEFT",40,32)
         f.close=button(f,"Done",105,function() f:Hide() end,true); f.close:SetPoint("BOTTOMRIGHT",-40,32)
         f:SetScript("OnHide",function() UI:CloseMenu(); UI:EndModal(f) end)
         self.talentDialog=f
     end
     f.actionID=action.id; f.candidates=candidates
-    f.title:SetText("Talent choices: "..tostring(action.label or action.id).." / "..keyName(action.key))
     self:BeginModal(f,"KeybindOptimizerTalentChoices"); f:Show(); self:RenderTalentChoices()
 end
 
