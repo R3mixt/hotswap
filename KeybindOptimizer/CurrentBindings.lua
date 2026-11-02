@@ -171,7 +171,12 @@ function C:Describe(command,key,page,pageType,labels)
  local slot=self:ActionSlot(command,page,pageType)
  if slot then
   a.nativeSlot=slot; a.liveSlot=slot
-  local typ,id,subtype=read(GetActionInfo,slot)
+  local readable,typ,id,subtype=pcall(GetActionInfo,slot)
+  if not readable then
+   a.known=false; a.label="Action details unavailable"; a.category="Unreadable actions"
+   a.readError="Could not read native action slot "..slot.." for "..key.."."
+   return a
+  end
   a.liveActionType=typ; a.liveActionID=id; a.liveActionSubtype=subtype
   local texture=read(GetActionTexture,slot)
   if not typ then empty(a)
@@ -234,6 +239,7 @@ function C:Build()
    local normalized=K.API:NormalizeKey(key) or key
    local a=self:Describe(command,normalized,page,pageType,labels)
    plan.actions[#plan.actions+1]=a; plan.byID[a.id]=a; plan.byKey[normalized]=a
+   if a.readError then plan.errors[#plan.errors+1]=a.readError end
    if a.known then known=known+1 end
   end
  end

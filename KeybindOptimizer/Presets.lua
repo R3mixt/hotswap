@@ -93,7 +93,8 @@ function P:Select(name)
     local previous=K.db.presets[K.db.activePreset]
     if previous then previous.settings=K.db.settings end
     K.db.activePreset=name; K.db.settings=preset.settings
-    self:Changed()
+    K.dirty=self:HasUnappliedChanges(); K:InvalidatePreview()
+    if K.QueueRefresh then K:QueueRefresh() end
     return true,"Editing draft: "..name..". Apply & save activates it."
 end
 function P:Create(name,copyCurrent)

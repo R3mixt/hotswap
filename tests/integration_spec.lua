@@ -101,7 +101,7 @@ function Tests.preset_tab_creates_names_and_activates_complete_layout_with_named
   assert(backups[1].name:find("Tester",1,true),"Backup label omits character")
   k.UI:ShowPage("Safety")
   assert(k.UI.pages.Safety.restoreSelected:IsEnabled(),"Named backup cannot be selected for restore")
-  k.UI.pages.Safety.restoreSelected:Click(); Mock:Advance(0.2)
+  k.UI.pages.Safety.restoreSelected:Click(); k.UI.confirm.acceptButton:Click(); Mock:Advance(0.2)
   assert(not k.db.enabled,"Restoring initial backup did not restore pre-addon state")
   assert(k.db.presets["Healing dungeon"],"Restoring bindings deleted the custom preset")
 end

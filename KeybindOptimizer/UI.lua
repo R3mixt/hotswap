@@ -1429,6 +1429,7 @@ function UI:BuildBindings(page)
     for i, mode in ipairs({"Keyboard", "List"}) do
         local b = button(page, mode, i==1 and 73 or 56, function()
             UI.bindingView = mode == "List" and "list" or "keyboard"
+            if UI.bindingView=="keyboard" and UI.formFilter=="all" then UI.formFilter="caster" end
             UI:RenderBindings()
         end)
         b:SetPoint("TOPLEFT", i==1 and 184 or 263, 3)
@@ -1455,6 +1456,7 @@ function UI:BuildBindings(page)
     page.tabs = {}
     page.form = button(page, "Action page: Base", 175, function(self)
         local options={}
+        if UI.bindingView=="list" then options[#options+1]={value="all",label="All pages"} end
         for _,value in ipairs({"caster","cat","bear","moonkin"}) do
             if (UI.availableActionPages or {})[value] then options[#options+1]={value=value,label=actionPageNames[value]} end
         end
@@ -1843,10 +1845,16 @@ function UI:BuildSafety(page)
     page.selected=label(page,"",11,C.muted); page.selected:SetPoint("BOTTOMLEFT",0,61); page.selected:SetWidth(795)
     page.restoreSelected=button(page,"Restore selected",152,function()
         if not UI.selectedBackup then return end
-        local ok,why=UI:Call(K.Engine,"RestoreBackup",UI.selectedBackup)
-        if K.InvalidatePreview then K:InvalidatePreview() end
-        if K.QueueRefresh then K:QueueRefresh() end
-        if ok then UI:Notice(why or "Backup restored.") end
+        local id=UI.selectedBackup
+        local entry=K.db.bindingBackups and K.db.bindingBackups[id]
+        if not entry then return end
+        UI:Confirm("Restore "..tostring(entry.name or "selected backup").."?",
+            "Replace the saved binding sets, native action bars and settings with this backup. Later personal binding and bar changes can be replaced. Your current setup is backed up first.",function()
+            local ok,why=UI:Call(K.Engine,"RestoreBackup",id)
+            if K.InvalidatePreview then K:InvalidatePreview() end
+            if K.QueueRefresh then K:QueueRefresh() end
+            if ok then UI:Notice(why or "Backup restored.") end
+        end)
     end,true); page.restoreSelected:SetPoint("BOTTOMRIGHT",0,17)
     page.original=button(page,"Restore original setup",195,function()
         UI:Confirm("Restore the original game setup?","Restore the bindings and action bars saved before Hot Swap first changed them. Presets and named backups are kept.",function()
