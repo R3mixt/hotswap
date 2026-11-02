@@ -4,7 +4,7 @@ Build a comfortable keyboard layout, keep it consistent across your class, and s
 
 Hot Swap places spells and generated macros on **Blizzard's original action bars**. Its in-game keyboard editor shows what each key does, including Shift and Ctrl layers, mouse buttons, and optional wheel bindings. The interface uses WoW's own frames and controls.
 
-**0.3.3 beta:** Classic Era and Hardcore are the current test clients; Forever is the final release target. Automated tests exercise the actual Lua modules with mocked WoW APIs. Live-client acceptance testing is still pending. Retail and other Classic expansions are not supported release targets.
+**0.4.2 beta:** Classic Era and Hardcore are the current test clients; Forever is the final release target. Automated tests exercise the actual Lua modules with mocked WoW APIs. Live-client acceptance testing is still pending. Retail and other Classic expansions are not supported release targets.
 
 ## Set up your keys
 
@@ -14,6 +14,10 @@ Hot Swap places spells and generated macros on **Blizzard's original action bars
 - Test key combinations in the keyboard view without casting spells.
 - Record the mouse buttons your client receives and choose whether to use the wheel and middle click. Alt stays reserved for self-casting, with separate camera and movement shortcuts.
 - Generate mouseover, focus, self, or cursor macros where the action and client support them. Your existing personal macro text is not imported or overwritten.
+
+Generated macros use **character-specific slots by default**. Each preset can opt into **Settings → Action bars → Allow account-wide macro overflow** when it needs extra shared slots. Existing owned account macros are reused without being moved; personal macros are never overwritten.
+
+If space is limited, future spell keys, icons and tooltips stay reserved in the editor while their native bar positions remain empty. Managed positions fill outside combat as you learn spells, subject to available macro space. This does not change your visibility preferences. Fully learned layouts can still exceed the character bank: free macro slots or explicitly enable account-wide overflow when needed.
 
 ## Keep items and modes organized
 
@@ -31,7 +35,7 @@ Setup and recovery run in small steps with a progress indicator. They cannot sta
 
 ## Window settings and troubleshooting
 
-The **Settings** tab offers window opacity and scale, plus optional diagnostic logging that starts off. Logs stay local, retain the latest 200 entries, and can be viewed, copied or cleared. Full failure details explain whether nothing changed, recovery succeeded, or a backup needs attention.
+The **Settings** tab offers window opacity and scale, plus optional diagnostic logging that starts off. Logs stay local, retain the latest 200 entries, and can be viewed, copied or cleared. Opaque failure details remain readable independently of window transparency and explain whether nothing changed, recovery succeeded, or a backup needs attention.
 
 ## Get started
 

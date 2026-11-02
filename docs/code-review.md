@@ -71,3 +71,14 @@ Final integrated validation: **331/331 scenarios passed** using the actual Lua 5
 The talent editor now explicitly distinguishes Own key (default independent binding) from Shared key (ordered learned alternatives). Mode changes retain independent key overrides and use the existing validated preset format. Own key has a direct Change key action. Both native UI layouts were rendered and inspected.
 
 Unknown catalog talents are strictly inert tooltip macros. Known talents also keep managed macro identities so ordinary learn/respec transitions can edit owned bodies without moving keys or slots. Earlier raw-spell talent placements upgrade through the ownership-checked slot worker. When shared placeholders need different target/rank bodies, or an unchanged alias must remain inactive, maintenance delegates before any writes to the existing transaction worker. Tests cover normal/focus variants and an unavailable fixed rank that must not activate with its spell family.
+
+
+## 0.4.2 follow-up — 2 November 2026
+
+Reproduced the reported starting Warrior failure with 120 personal account macros and 30 empty character slots: the original layout requested 40 generated macros, mostly future placeholders. Capacity fitting now defers unlearned ordinary spell macros while retaining their keys, native positions and editor metadata. The installed plan records this execution policy separately from visibility settings and uses the existing owned-slot worker when spell knowledge changes. Learned actions are never silently discarded to fit.
+
+New macro creation is character-only unless the preset explicitly enables account overflow. Budget checks, asynchronous creation, maintenance and named restoration use the applicable saved plan's policy. Reusable owned account macros remain valid for upgrades; no migration or cross-character ownership claim is attempted. Full learned/custom layouts can still exceed the client's character capacity, and stop safely with a bank-specific message.
+
+Independent runtime review checked storage policy propagation, restoration, macro ownership and manual-edit preservation. Existing full-catalog test fixtures now explicitly enable overflow where capacity is unrelated to their assertions; fresh-character/default-policy tests retain the real character-only default. New regressions exercise all nine starting classes at 30 free slots, distinct character databases sharing one account bank, explicit character-first overflow, future spell activation across Warrior stance pages, exhausted-bank no-write failures and recovery.
+
+The error Details panel now has an opaque native backing independent of main-window opacity. Focused UI tests and geometry checks cover the new staged checkbox, readable failure details and reservation notice. The final suite count and ZIP integrity result are recorded by release packaging. Actual client security, input routing and rendering remain subject to compatibility.md.

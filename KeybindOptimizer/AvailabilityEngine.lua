@@ -5,7 +5,7 @@ local function combat() return InCombatLockdown and InCombatLockdown() end
 local function spell(a) return a and not a.kind and not a.builtin end
 function A:Handles(plan)
  local settings=plan and plan.settings or {}
- return settings.hideUnavailableSpells==true or settings.adaptTalents==true or next(settings.talentAlternatives or {})~=nil
+ return (plan and plan.deferFutureMacros==true) or settings.hideUnavailableSpells==true or settings.adaptTalents==true or next(settings.talentAlternatives or {})~=nil
 end
 function A:HasTalentActions(plan)
  for _,action in ipairs(plan and plan.actions or {}) do if spell(action) and action.key then
@@ -112,7 +112,8 @@ function A:Resolve(action,plan,book,forms)
  end
  if updated.explicitRank and updated.selectedRank then updated.label=(updated.label or updated.name).." · "..updated.selectedRank end
  K.Availability:Annotate(updated,plan.class,plan.flavor)
- updated.nativeHidden=K.Availability:IsHidden(updated,plan.settings) or nil
+ updated.nativeDeferred=plan.deferFutureMacros and not updated.known or nil
+ updated.nativeHidden=K.Availability:IsHidden(updated,plan.settings) or updated.nativeDeferred or nil
  local body,why=K.Macros:Build(updated,plan.settings)
  if why then return nil,why end
  updated.body=body
@@ -194,10 +195,10 @@ function A:Repair(plan)
   end
  end end
  if #changes==0 then plan.formSignature=K.API:FormSignature(); return true end
- local prospective={actions={}}
+ local prospective={actions={},settings=plan.settings,deferFutureMacros=plan.deferFutureMacros}
  for _,change in ipairs(changes) do if #change.slots>0 or #change.keys>0 then prospective.actions[#prospective.actions+1]=change.updated end end
  local required,available=K.Macros:Budget(prospective)
- if required>available then return false,"Not enough free macro slots to update newly learned abilities. Free a macro slot and try again." end
+ if required>available then return false,"Newly learned abilities could not be placed. "..K.Macros:CapacityMessage(prospective,required,available) end
  local job={kind="maintenance",plan=plan,steps={},backupReady=true,created={},bindingSet=GetCurrentBindingSet and GetCurrentBindingSet() or 2}
  local touchedSlots,touchedKeys={},{}
  for _,step in ipairs(R.macroSteps(prospective,job.created)) do job.steps[#job.steps+1]=step end
@@ -289,6 +290,8 @@ function A:Repair(plan)
    copyInto(change.action,change.updated)
   end
   plan.nativeLayout=layout; plan.formSignature=K.API:FormSignature()
+  plan.capacityDeferredCount=0
+  for _,action in ipairs(plan.actions) do if action.nativeDeferred then plan.capacityDeferredCount=plan.capacityDeferredCount+1 end end
   N:ApplyMacroTextPreference()
   A:QueueCleanup(cleanup)
   return "Available abilities updated on the original action bars."

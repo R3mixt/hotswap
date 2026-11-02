@@ -1,7 +1,8 @@
+-- These fixtures exercise full catalogs/visible reservations with account overflow explicitly enabled.
 -- Assertions exercise real modules. Added as public module APIs stabilize.
 Tests={}
 local function init()
-  TestAddon:Init()
+  TestAddon:Init(); TestAddon:GetSettings().allowAccountMacros=true
   return TestAddon
 end
 local function contains(s,needle) return type(s)=="string" and s:find(needle,1,true)~=nil end
@@ -210,7 +211,7 @@ end
 
 function Tests.macro_budget_deduplicates_and_counts_both_banks()
   local k=init()
-  local plan={actions={{known=true,body="/use 13"},{known=true,body="/use 13"},{known=true,body="/use 14"},{known=false,body="/use 15"}}}
+  local plan={settings={allowAccountMacros=true},actions={{known=true,body="/use 13"},{known=true,body="/use 13"},{known=true,body="/use 14"},{known=false,body="/use 15"}}}
   local needed,available=k.Macros:Budget(plan)
   equal(needed,2,"distinct macros")
   equal(available,149,"free macro slots")

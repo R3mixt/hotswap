@@ -11,6 +11,9 @@ local function ready()
   Mock.catalog[2912]={id=2912,name="Starfire",icon=135753}
   Mock.catalog[16689]={id=16689,name="Nature's Grasp",icon=136063}
   TestAddon:Init(); Mock.async=true
+  -- These scenarios test availability policy with room for visible future
+  -- placeholders; character-only budget compaction has separate regressions.
+  TestAddon:GetSettings().allowAccountMacros=true
   return TestAddon
 end
 local function finish()

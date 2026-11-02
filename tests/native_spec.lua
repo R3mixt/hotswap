@@ -5,6 +5,7 @@ local function same(a,b,label)
 end
 local function initNative()
   TestAddon:Init(); Mock.async=true
+  TestAddon:GetSettings().allowAccountMacros=true -- Native paging/identity tests need the full Druid reservation set.
   return TestAddon
 end
 local function applyNative(k)

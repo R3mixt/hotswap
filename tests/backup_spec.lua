@@ -1,5 +1,11 @@
 -- Preset activation, binding ownership and named rollback regression coverage.
-local function ready() TestAddon:Init(); return TestAddon end
+local function ready()
+  TestAddon:Init()
+  -- Every backup scenario installs the artificial Druid fixture with talents
+  -- from multiple specs/versions. Explicitly allow its oversized macro set.
+  for _,preset in pairs(TestAddon.db.presets) do preset.settings.allowAccountMacros=true end
+  return TestAddon
+end
 local function equal(a,b,label) assert(a==b,(label or "value")..": expected "..tostring(b)..", got "..tostring(a)) end
 local function same(a,b,label)
   for key,value in pairs(a) do equal(b[key],value,(label or "map").."["..tostring(key).."]") end

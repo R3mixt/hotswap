@@ -53,6 +53,7 @@ end
 
 function Tests.talent_bindings_no_learned_choice_stays_inert_or_hidden_with_reservation()
  local k=ready(); choose(k,{primary,alternate})
+ k:GetSettings().allowAccountMacros=true -- Exercise visible placeholders when there is room for them.
  local a=action(preview(k),primary)
  assert(not a.known and not a.talentSelectionID and a.nativeSlot and a.key)
  assert(a.body and not a.body:find("/cast",1,true) and not a.body:find("/use",1,true),"Unlearned shared choice contains an executable cast")

@@ -141,14 +141,17 @@ function N:MakeMacro(action,settings,force)
 end
 function N:Prepare(plan)
  local layout={version=1,placements={},keys={},usedBars={},mainKeys={},overflow=0}
+ plan.capacityDeferredCount=0
  local main,extra={},{}
  local druid=plan.class=="DRUID"
  for _,a in ipairs(plan.actions or {}) do
   a.nativeSlot=nil; a.nativeCommand=nil; a.nativeOverflow=nil
+  a.nativeDeferred=plan.deferFutureMacros and not a.known and not a.kind and not a.builtin or nil
+  if a.nativeDeferred then plan.capacityDeferredCount=plan.capacityDeferredCount+1 end
   if K.Availability then
    K.Availability:Annotate(a,plan.class,plan.flavor or (plan.settings and plan.settings.flavor))
-   a.nativeHidden=K.Availability:IsHidden(a,plan.settings) or nil
-  else a.nativeHidden=nil end
+   a.nativeHidden=K.Availability:IsHidden(a,plan.settings) or a.nativeDeferred or nil
+  else a.nativeHidden=a.nativeDeferred end
   if a.kind=="system" then
    if a.key then layout.keys[a.key]={command=a.command} end
   elseif a.key and a.form~="prowl" then

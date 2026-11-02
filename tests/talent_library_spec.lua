@@ -69,6 +69,7 @@ end
 
 function Tests.talent_library_reset_restores_primary_and_default_targeting_when_alternate_mode_is_incompatible()
     local k=TestAddon; k:Init()
+    k:GetSettings().allowAccountMacros=true -- Full Druid catalog; target validation is independent of capacity.
     assert(k.TalentBindings:SetChoices("druid.form_moonkin",{"druid.swiftmend"}))
     assert(k.Library:SetTargetMode("druid.form_moonkin","mouseover"))
     assert(action(k,"druid.form_moonkin").spellName=="Swiftmend")

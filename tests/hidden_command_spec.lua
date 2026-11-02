@@ -6,6 +6,7 @@ end
 local function ready()
   Mock.build="1.15.9"; Mock.buildNumber="70576"
   TestAddon:Init(); Mock.async=true
+  TestAddon:GetSettings().allowAccountMacros=true -- Keep the full Druid layout available for mouse-control recovery.
   return TestAddon
 end
 local function nativeMouse()

@@ -1,3 +1,4 @@
+-- These fixtures exercise full catalogs/visible reservations with account overflow explicitly enabled.
 local function eq(a,b,message) assert(a==b,(message or "value")..": expected "..tostring(b)..", got "..tostring(a)) end
 local function find(plan,id) for _,a in ipairs(plan.actions) do if a.id==id then return a end end; error("Missing "..id) end
 local function inert(body)
@@ -9,7 +10,7 @@ local function ready()
  Mock:Learn(5176,"Wrath"); Mock:Learn(5185,"Healing Touch"); Mock:Learn(774,"Rejuvenation")
  Mock.catalog[18562]={id=18562,name="Swiftmend",icon=134914}
  Mock.catalog[24858]={id=24858,name="Moonkin Form",icon=136036}
- TestAddon:Init(); return TestAddon
+ TestAddon:Init(); TestAddon:GetSettings().allowAccountMacros=true; return TestAddon
 end
 local function changed(event)
  Mock:Fire(event or "SPELLS_CHANGED")

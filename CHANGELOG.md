@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.4.2 beta — 2026-11-02
+
+- Use character-specific slots for new generated macros by default. Account-wide overflow is an explicit preset option under Settings > Action bars.
+- Fix the low-level Warrior setup failure when only 30 macro slots are available. If future placeholders exceed capacity, keep their keys and native positions reserved without allocating individual macros. Learned abilities populate owned positions outside combat.
+- Preserve personal macros and reuse existing unchanged owned macros. Existing account macros are not migrated or automatically reclaimed.
+- Keep real future spell metadata in the editor and explain capacity reservations in Review. Report which macro bank needs space when learned abilities or backup restoration cannot fit.
+- Make failure Details opaque so the page behind it cannot obscure error text.
+
 ## 0.4.1 beta — 2026-11-01
 
 - Add explicit Own key / Shared key selection in the talent-key editor, with a direct Change key action.

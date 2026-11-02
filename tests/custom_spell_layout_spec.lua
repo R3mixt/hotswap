@@ -1,3 +1,4 @@
+-- These fixtures exercise full catalogs/visible reservations with account overflow explicitly enabled.
 local function equal(a,b,label) assert(a==b,(label or "value")..": expected "..tostring(b)..", got "..tostring(a)) end
 local function find(plan,id)
  for _,a in ipairs(plan.actions) do if a.id==id then return a end end
@@ -7,7 +8,7 @@ local function ready()
  Mock.build="1.60.1"; Mock.class="PRIEST"; Mock.spells={}; Mock.petSpells={}; Mock.forms={}; Mock.catalog={}
  Mock:Learn(585,"Smite")
  Mock.catalog[15487]={id=15487,name="Silence",icon=136164}
- local k=TestAddon; k:Init()
+ local k=TestAddon; k:Init(); k:GetSettings().allowAccountMacros=true
  local ok,id,why=k.Library:Stage({descriptor={kind="spell",sourceID="priest.silence"}})
  assert(ok,why); k:GetSettings().bindingOverrides[id]="CTRL-F22"
  ok,why=k.Library:SetTargetMode(id,"mouseover"); assert(ok,why)

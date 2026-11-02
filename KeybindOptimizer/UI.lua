@@ -232,6 +232,13 @@ function UI:OpenOperationError()
     if not self.operationErrorDialog then
         local f=box("Frame",self.frame,C.bg,"KeybindOptimizerOperationError")
         f:SetAllPoints(self.frame); f:SetFrameStrata("DIALOG"); f:SetFrameLevel(self.frame:GetFrameLevel()+55); f:EnableMouse(true)
+        -- Error details must remain readable over the page, even when the
+        -- ordinary window is translucent. Native backdrop art has its own alpha.
+        f:SetAlpha(1)
+        if f.SetIgnoreParentAlpha then f:SetIgnoreParentAlpha(true) end
+        f.opaqueBackground=f:CreateTexture(nil,"BACKGROUND",nil,-8)
+        f.opaqueBackground:SetAllPoints(f)
+        f.opaqueBackground:SetColorTexture(C.bg[1],C.bg[2],C.bg[3],1)
         label(f,"Setup could not finish",22):SetPoint("TOPLEFT",40,-40)
         f.summary=label(f,"",14,C.error); f.summary:SetPoint("TOPLEFT",40,-80); f.summary:SetWidth(770); f.summary:SetHeight(42)
         f.explanation=label(f,"",12,C.muted); f.explanation:SetPoint("TOPLEFT",40,-130); f.explanation:SetWidth(770); f.explanation:SetHeight(64)
@@ -1840,6 +1847,10 @@ function UI:RenderReview()
     f.expected.text:SetText((self.reviewExpanded and "Hide" or "Show").." expected replacements ("..#replacements..")")
     for _,entry in ipairs(p.errors or {}) do lines[#lines+1]={text=message(entry),tone=C.error} end
     for _,entry in ipairs(coverage.missing or {}) do lines[#lines+1]={text="Unbound spell: "..message(entry),tone=C.error} end
+    local reserved=tonumber(p.capacityDeferredCount) or 0
+    if reserved>0 then
+        lines[#lines+1]={text=reserved.." future spells reserved to save macro slots. Their keys stay assigned and become available when the spells are learned.",tone=C.muted}
+    end
     if errors==0 then
         lines[#lines+1]={text="Apply & save updates the keys assigned by this preset after creating a backup. Other bindings and mouse controls stay unchanged.",tone=C.muted}
         lines[#lines+1]={text="Keys no longer used by Hot Swap regain their previous binding only if they still match Hot Swap's last assignment. Later manual changes are kept.",tone=C.muted}
@@ -2099,7 +2110,13 @@ function UI:Refresh()
     else
         local cov = self.plan.coverage or {}
         local active=K.db.enabled and K.db.appliedPreset
-        self.status:SetText(string.format("%s / %s spells  |  %s expected replacements%s", tostring(cov.bound or 0), tostring(cov.total or 0), tostring(#(self.plan.conflicts or {})), (K.dirty or K.db.activePreset~=active) and "  |  Draft (unapplied)" or "  |  Active"))
+        local state=(K.dirty or K.db.activePreset~=active) and "Draft (unapplied)" or "Active"
+        local reserved=tonumber(self.plan.capacityDeferredCount) or 0
+        if reserved>0 then
+            self.status:SetText(string.format("%s / %s spells  |  %s\n%s future spells reserved; see Review.",tostring(cov.bound or 0),tostring(cov.total or 0),state,tostring(reserved)))
+        else
+            self.status:SetText(string.format("%s / %s spells  |  %s expected replacements  |  %s", tostring(cov.bound or 0), tostring(cov.total or 0), tostring(#(self.plan.conflicts or {})), state))
+        end
         color(self.status,C.muted)
     end
 end

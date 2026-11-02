@@ -1,5 +1,7 @@
-local function presetInit()
+local function presetInit(allowFixtureOverflow)
     TestAddon:Init()
+    -- Only installation scenarios opt in for the all-talents Druid fixture.
+    if allowFixtureOverflow then TestAddon:GetSettings().allowAccountMacros=true end
     Mock:ResetWrites()
     return TestAddon
 end
@@ -119,7 +121,7 @@ function Tests.preset_state_restore_retains_modes_created_after_snapshot()
 end
 
 function Tests.repeated_mode_hotkey_skips_unchanged_layout_but_detects_saved_draft_changes()
-    local k=presetInit()
+    local k=presetInit(true)
     local apply=k.Engine.Apply; local calls=0
     k.Engine.Apply=function(self,plan) calls=calls+1; return apply(self,plan) end
     assert(k.Presets:Activate('Leveling'))
@@ -132,7 +134,7 @@ function Tests.repeated_mode_hotkey_skips_unchanged_layout_but_detects_saved_dra
 end
 
 function Tests.initialization_derives_unapplied_drafts_from_saved_preset_signature()
-    local k=presetInit()
+    local k=presetInit(true)
     assert(k:Apply())
     k.dirty=nil; k:Init()
     assert(k.dirty==false and not k.Presets:HasUnappliedChanges(),'Unchanged saved preset was marked unapplied')

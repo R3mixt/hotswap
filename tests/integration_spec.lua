@@ -1,5 +1,8 @@
-local function initUI()
-  TestAddon:Init(); TestAddon.UI:Open()
+local function initUI(allowFixtureOverflow)
+  TestAddon:Init()
+  -- These activation scenarios need all spells in the cross-spec Druid fixture.
+  if allowFixtureOverflow then TestAddon:GetSettings().allowAccountMacros=true end
+  TestAddon.UI:Open()
   return TestAddon
 end
 local function eq(a,b,why) assert(a==b,(why or "value")..": expected "..tostring(b)..", got "..tostring(a)) end
@@ -23,7 +26,7 @@ function Tests.full_presets_keep_independent_binding_settings_and_item_choices()
 end
 
 function Tests.mode_hotkeys_survive_switches_and_renaming_and_never_apply_in_combat()
-  local k=initUI()
+  local k=initUI(true)
   assert(k.Presets:Create("Raid night",true))
   assert(k.Presets:SetHotkey("Leveling","CTRL-F11"))
   assert(k.Presets:SetHotkey("Raid night","CTRL-F12"))
@@ -46,7 +49,7 @@ function Tests.mode_hotkeys_survive_switches_and_renaming_and_never_apply_in_com
 end
 
 function Tests.sharing_selected_preset_merges_without_replacing_current_active_layout()
-  local k=initUI()
+  local k=initUI(true)
   assert(k.Presets:Activate("Leveling"))
   assert(k.Presets:Create("Shared healer",true))
   k:UpdateSetting("bindingOverrides",{["druid.rejuvenation"]="NUMPAD9"})
@@ -89,6 +92,8 @@ function Tests.preset_tab_creates_names_and_activates_complete_layout_with_named
   Mock.ctrl=true; Mock:KeyDown("F11"); Mock.ctrl=false; Mock:Advance(0.03)
   eq(k.db.presets["Healing dungeon"].hotkey,"CTRL-F11","Preset shortcut was not captured")
   assert(not k.db.enabled,"Binding a shortcut applied the preset")
+  -- A new preset starts with safe defaults; explicitly permit this oversized fixture.
+  k:UpdateSetting("allowAccountMacros",true)
   page.usePreset:Click(); Mock:Advance(0.2)
   eq(k.db.appliedPreset,"Healing dungeon","Use preset did not activate the selected mode")
   assert(k.db.enabled,"Preset was not enabled")
@@ -102,7 +107,7 @@ function Tests.preset_tab_creates_names_and_activates_complete_layout_with_named
 end
 
 function Tests.import_export_has_own_page_and_import_never_activates_bindings()
-  local k=initUI(); assert(k.Presets:Activate("Leveling"))
+  local k=initUI(true); assert(k.Presets:Activate("Leveling"))
   k.UI.nav.Share:Click()
   local page=k.UI.pages.Share
   eq(k.UI.activePage,"Share","Import/export tab did not open")

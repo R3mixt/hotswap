@@ -1,5 +1,6 @@
+-- These fixtures exercise full catalogs/visible reservations with account overflow explicitly enabled.
 local function capabilityEngine()
-    TestAddon:Init(); return TestAddon
+    TestAddon:Init(); TestAddon:GetSettings().allowAccountMacros=true; return TestAddon
 end
 local function unsupportedAction(plan,command)
     local action={id="test.command",kind="system",key="CTRL-F24",command=command,known=true,label="Test command",category="System",form="all"}

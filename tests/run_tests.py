@@ -69,7 +69,7 @@ def lua_table(lua, value):
 
 def reload_from_saved_variables():
     first = environment()
-    first.execute("TestAddon:Init(); assert(TestAddon:Apply())")
+    first.execute("TestAddon:Init(); TestAddon:GetSettings().allowAccountMacros=true; assert(TestAddon:Apply())")
     saved = plain(first.globals().KeybindOptimizerDB)
     persistent = {
         field: plain(first.globals().Mock[field])

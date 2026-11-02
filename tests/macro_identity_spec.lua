@@ -1,3 +1,4 @@
+-- These fixtures exercise full catalogs/visible reservations with account overflow explicitly enabled.
 local function equal(a,b,label) assert(a==b,(label or "value")..": expected "..tostring(b)..", got "..tostring(a)) end
 local function body(name)
   local found,_,text=GetMacroInfo(GetMacroIndexByName(name))
@@ -8,7 +9,7 @@ local function sameMap(actual,expected)
   for key in pairs(actual) do assert(expected[key],"Unexpected binding "..key) end
 end
 local function ready()
-  local k=TestAddon; k:Init(); Mock.async=true
+  local k=TestAddon; k:Init(); k:GetSettings().allowAccountMacros=true; Mock.async=true
   CreateMacro("ZZZ test personal",1,"/say character original",true)
   return k
 end

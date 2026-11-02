@@ -367,8 +367,9 @@ function P:Build(useCachedData)
         local layout,why=K.NativeBars:Prepare(plan)
         if not layout then plan.errors[#plan.errors+1]=why or "Native action bars could not be prepared." end
     end
-    plan.macrosNeeded,plan.macrosAvailable=K.Macros:Budget(plan)
-    if plan.macrosNeeded>plan.macrosAvailable then plan.errors[#plan.errors+1]="Need "..plan.macrosNeeded.." free macro slots; only "..plan.macrosAvailable.." are available. No macros will be overwritten." end
+    local needed,available,capacityError=K.Macros:FitBudget(plan)
+    if capacityError then plan.errors[#plan.errors+1]=capacityError
+    elseif needed>available then plan.errors[#plan.errors+1]=K.Macros:CapacityMessage(plan,needed,available) end
     if plan.coverage.total==0 then plan.warnings[#plan.warnings+1]="No active spells found. Open your spellbook and refresh before applying." end
     if settings.hideUnavailableSpells or settings.adaptTalents or next(settings.talentAlternatives or {}) then
         plan.changes[#plan.changes+1]="Learned spells and talent choices update owned slots outside combat. Keys stay in place; personal bar edits are preserved."

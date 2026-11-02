@@ -1,6 +1,7 @@
+-- These fixtures exercise full catalogs/visible reservations with account overflow explicitly enabled.
 local flags={"preserveMovement","preserveCamera","preserveChat","preserveInterface","preserveTargeting","preserveGameSettings"}
 local function equal(a,b,label) assert(a==b,(label or "value")..": expected "..tostring(b)..", got "..tostring(a)) end
-local function ready() TestAddon:Init(); return TestAddon end
+local function ready() TestAddon:Init(); TestAddon:GetSettings().allowAccountMacros=true; return TestAddon end
 local function apply(k) local ok,why=k:Apply(); assert(ok,why) end
 local function controls()
   local map={E="MOVEFORWARD",Q="OPENCHAT",F="TOGGLECHARACTER0",R="TARGETNEARESTENEMY",G="TURNORACTION",MOUSEWHEELUP="CAMERAZOOMIN",MOUSEWHEELDOWN="CAMERAZOOMOUT"}

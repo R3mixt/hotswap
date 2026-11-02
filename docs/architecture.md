@@ -1,4 +1,4 @@
-# Hot Swap architecture
+# Hot Swap architecture — 0.4.2
 
 Hot Swap prepares a binding layout, then installs it onto Blizzard's original bars outside combat. Planning and editing never mutate live game bindings. There are no custom combat bars or rotation decisions.
 
@@ -44,6 +44,12 @@ Snapshots and applied plans use `mouseBindingsVersion=1` after hidden mouse stat
 
 `nativeBars` contains optional boolean visibility choices keyed by native toggle index 1–7 (displayed bars 2–8). Missing entries preserve unused bar visibility; planned occupancy always forces a required bar on. Visibility snapshots preserve every tuple position, including nil/legacy flags. Current Era/Forever proxy setters maintain a short-lived full-mask cache: capability-checked derived setters synchronize all bits before the final full-mask write. A bounded observer refreshes Blizzard frames from current mirrored values after server updates, pauses in combat, and never replays stale visibility writes.
 
+## Macro capacity
+
+`allowAccountMacros` is a per-preset boolean, default false, transferred through the validated settings format. Engine creates new generated macros in character-specific slots first. Account-wide slots are available only when this option is enabled; existing fingerprint-verified owned account macros remain reusable without migration. Personal macros and edited generated macros are never overwritten to free space.
+
+`Macros:FitBudget` counts deduplicated new bodies against available slots. If the full plan exceeds that budget, `plan.deferFutureMacros` rebuilds native placements with unavailable spell slots empty and overflow reservations inert. Stable action IDs, keys and editor metadata remain intact; `capacityDeferredCount` supplies the informational Review/footer message. This does not mutate `hideUnavailableSpells`, `adaptTalents` or the local editor filter. AvailabilityEngine tracks this applied policy and populates owned positions outside combat when spells are learned, subject to capacity checks. A fully learned layout may still exceed the character bank; preflight rejects it before mutation rather than assuming every class fits 30 macros.
+
 ## Invariants
 
 - Back up both binding sets, unsaved active bindings, native contents, page/visibility and managed settings before mutation. Never leave the inactive binding set selected across frames.
@@ -82,4 +88,4 @@ Protection classifies the currently bound command, not a hard-coded default key.
 
 Local `showMacroNames`, `showMacroCode` and `showUnavailableBindings` preferences default true and stay outside presets. Native macro labels use only original button fontstring alpha with post-update hooks; disabling labels never hides a secure action button. Settings is split into four native subsections while the main tab count stays unchanged.
 
-Talent-key mode uses the existing data model: no `talentAlternatives` entry means Own key; an entry means Shared key. Switching to Own key removes only that choice policy, retaining independent `bindingOverrides`. Unknown catalog talents use inert tooltip-only managed macros, and separate learned talent transitions retain macro identity through bounded owned updates.
+Talent-key mode uses the existing data model: no `talentAlternatives` entry means Own key; an entry means Shared key. Switching to Own key removes only that choice policy, retaining independent `bindingOverrides`. Unknown catalog talents use inert tooltip-only managed macros or empty native reservations under visibility/capacity policy. Separate learned talent transitions use bounded owned updates.

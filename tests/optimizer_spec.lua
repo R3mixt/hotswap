@@ -1,5 +1,6 @@
 function Tests.optimize_preserves_original_draft_and_hardware_but_rebuilds_bindings()
     local k=TestAddon; k:Init()
+    k:GetSettings().allowAccountMacros=true
     k.db.settings.wheel=false; k.db.settings.mouseButtons={BUTTON4=true}
     k.db.settings.bindingOverrides['druid.rejuvenation']='SHIFT-F24'
     k.db.settings.fallbackBindings.stale='CTRL-F23'
@@ -20,6 +21,7 @@ end
 
 function Tests.optimize_failure_keeps_new_draft_and_restores_original_selection()
     local k=TestAddon; k:Init(); local source=k.db.settings
+    k:GetSettings().allowAccountMacros=true
     local apply=k.Engine.Apply; k.Engine.Apply=function() return false,'injected failure' end
     local ok,why,name=k.Presets:Optimize(); assert(not ok and why:find('injected failure',1,true))
     assert(k.db.activePreset=='Leveling' and k.db.settings==source and k.db.presets[name])
@@ -30,6 +32,7 @@ end
 
 function Tests.optimize_installs_native_layout_with_backup_and_keeps_global_mode_hotkeys()
     local k=TestAddon; k:Init(); k.db.settings.flavor='era'
+    k:GetSettings().allowAccountMacros=true
     k.db.settings.bindingOverrides['druid.rejuvenation']='SHIFT-F24'
     assert(k.Presets:SetHotkey('PvP','SHIFT-F23'))
     local modeID=k.db.presets.PvP.id
@@ -45,6 +48,7 @@ end
 
 function Tests.pending_preset_activation_does_not_claim_success_or_allow_edits()
     local k=TestAddon; k:Init(); Mock.async=true; local original=k.db.settings
+    k.db.presets.Dungeon.settings.allowAccountMacros=true
     local apply=k.Engine.Apply
     k.Engine.Apply=function(self,plan) self.busy=true; self.testPlan=plan; return 'pending','Installing' end
     local ok=k.Presets:Activate('Dungeon'); assert(ok=='pending')
@@ -60,6 +64,7 @@ end
 
 function Tests.pending_success_records_signature_only_after_install_completes()
     local k=TestAddon; k:Init(); Mock.async=true
+    k.db.presets.Dungeon.settings.allowAccountMacros=true
     local apply=k.Engine.Apply; local pending
     k.Engine.Apply=function(self,plan) self.busy=true; pending=plan; return 'pending','Installing' end
     assert(k.Presets:Activate('Dungeon')=='pending')
@@ -117,6 +122,7 @@ function Tests.all_nine_class_future_catalogs_install_on_four_native_extra_bars(
     for _,flavor in ipairs({'era','forever'}) do
         for _,class in ipairs(k.Profiles.classes) do
             KeybindOptimizerDB={}; k.db=nil; k:Init(); k.db.settings.flavor=flavor
+            k:GetSettings().allowAccountMacros=true -- This matrix verifies visible future placeholders on four native extra bars.
             Mock.class=class; Mock.spells={}; Mock.petSpells={}; Mock.forms={}; Mock.catalog={}
             for _,def in ipairs(k.Profiles:Get(class,flavor)) do
                 local id=def.spellIDs and def.spellIDs[1]

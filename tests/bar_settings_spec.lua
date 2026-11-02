@@ -1,8 +1,9 @@
+-- These fixtures exercise full catalogs/visible reservations with account overflow explicitly enabled.
 local function equal(actual,expected,label)
  assert(actual==expected,(label or "value")..": expected "..tostring(expected)..", got "..tostring(actual))
 end
 local function init()
- TestAddon:Init(); return TestAddon
+ TestAddon:Init(); TestAddon:GetSettings().allowAccountMacros=true; return TestAddon
 end
 function Tests.native_bar_settings_distinguish_hidden_from_unsupported()
  local k=init(); local plan=k:Preview()

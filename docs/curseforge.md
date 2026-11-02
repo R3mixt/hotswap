@@ -1,6 +1,6 @@
 # CurseForge submission
 
-Status: prepared locally; the author dashboard was opened, but its project-creation page returned a client error. Creation and upload remain unfinished. There is no assigned project ID or public project URL yet. This file must not be mistaken for proof of publication.
+Status: the author reports that the CurseForge project has been created. The project ID and public URL have not been supplied here, and upload/publication of this release is not verified. The files below are prepared locally for that existing project.
 
 ## Prepared materials
 
@@ -8,15 +8,15 @@ Status: prepared locally; the author dashboard was opened, but its project-creat
 - `publishing/curseforge-description.md`: player-facing description.
 - `publishing/logo.png`: original project logo; `logo.svg` is its editable source.
 - `CHANGELOG.md`: release notes.
-- `dist/HotSwap-0.4.1.zip`: game installation ZIP produced by `python package.py`.
-- `dist/HotSwap-0.4.1-source.zip`: separate development archive; do not use as the primary game-install file.
+- `dist/HotSwap-0.4.2.zip`: game installation ZIP produced by `python package.py`.
+- `dist/HotSwap-0.4.2-source.zip`: separate development archive; do not use as the primary game-install file.
 - SHA-256 manifests: verify the file you upload matches the reviewed build.
 
 The default license is All Rights Reserved with permission for personal gameplay. It does not grant others permission to republish modified copies. A broader open-source license can be chosen deliberately later.
 
 ## Submission steps
 
-1. Sign in at the [author dashboard](https://authors.curseforge.com/#/projects/create/choose-game). Select World of Warcraft and the addon project type.
+1. Sign in at the [author dashboard](https://authors.curseforge.com/) and open the existing Hot Swap project.
 2. Use Hot Swap as the title. Confirm available slug/category values in the current dashboard; metadata contains no invented numeric IDs. Add the prepared summary, description, license and original logo.
 3. Upload the install ZIP as **Beta** with the changelog. Select only the exact supported game flavor/version offered in the dashboard. Era is the present test target; do not mark Retail or claim a Forever client acceptance run that has not occurred.
 4. Submit for moderation, then record the assigned project ID, project URL and file URL. A created draft or uploaded file is not yet a publicly approved release.

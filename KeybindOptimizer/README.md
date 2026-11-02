@@ -1,8 +1,8 @@
-# Hot Swap 0.4.1
+# Hot Swap 0.4.2
 
 A configurable World of Warcraft addon for stable class bindings, druid form pages, mouseover/focus macros, Alt self-cast, and selectable on-use items.
 
-**Status: installable beta.** Version 0.4.1 adds protected game-control categories, macro display preferences, unavailable-spell visibility, and ordered talent choices on shared keys. Bindings and mouse controls outside the selected preset remain unchanged. It retains command validation, diagnostic logging, window settings, Blizzard's original action bars, a miniature spellbook editor, and bounded setup/recovery jobs. The actual Lua modules are checked using Lua 5.1 and mocked WoW APIs; real-client behavior still needs a retest. Geometry previews approximate artwork and fonts and are not game screenshots.
+**Status: installable beta.** Version 0.4.2 creates generated macros in character-specific slots by default and reserves future spell positions when macro space is limited. Account-wide overflow is an explicit preset option. Bindings and mouse controls outside the selected preset remain unchanged. The actual Lua modules are checked using Lua 5.1 and mocked WoW APIs; real-client behavior still needs a retest. Geometry previews approximate artwork and fonts and are not game screenshots.
 
 ## Install and open
 
@@ -60,7 +60,11 @@ The interface reuses its preview between relevant changes, updates only the visi
 
 **Settings → Controls** lets each preset preserve movement, camera/selection, chat, targeting, other interface controls, and casting settings. **Spells only** checks all six. Checked categories keep their existing keys, including custom remaps; automatic spell assignments choose another free key. A manually pinned spell on a protected key must be changed before Apply. Unrelated keys are preserved regardless of these checkboxes. Protection takes effect with **Apply & save** and travels with preset exports.
 
-**Settings → Action bars** provides two preset options: **Hide unavailable spells on action bars** leaves unknown spell slots empty, and **Adapt to learned talents** does this for talent abilities only. Slots and keys stay reserved. Learning or resetting talents refreshes the applied layout outside combat, without applying draft edits or overwriting personal bar changes. Blizzard's **Always Show Action Bars** setting may still show empty button borders; Hot Swap does not hide protected native button frames.
+**Settings → Action bars** includes **Hide unavailable spells on action bars**, which leaves unknown spell slots empty, and **Adapt to learned talents**, which does this for talent abilities only. Slots and keys stay reserved. Learning or resetting talents refreshes the applied layout outside combat, without applying draft edits or overwriting personal bar changes. Blizzard's **Always Show Action Bars** setting may still show empty button borders; Hot Swap does not hide protected native button frames.
+
+Generated macros use character-specific slots by default. **Allow account-wide macro overflow** permits additional macros in the shared account bank when character slots are full. This is a per-preset option, saved in exports and installed with **Apply & save**. Existing owned account macros can still be reused; they are not automatically moved into character slots. Personal macros are never overwritten to make room.
+
+When macro space is limited, Hot Swap first reserves future spell keys without creating a separate macro for every unlearned ability. Their icons and tooltips remain available in the editor unless you hide unavailable entries, while their native bar positions stay empty. Managed positions fill outside combat as spells are learned, subject to available macro space. Review explains the reservation count. This does not change your visibility preferences. A fully learned layout may still need more than 30 macros: free character slots or explicitly enable account-wide overflow if preflight reports insufficient capacity.
 
 The same section has character-local display controls: **Show macro names on action buttons**, **Show macro code in Hot Swap tooltips**, and **Show unavailable spells in the editor**. They apply immediately and do not travel in shared presets. Macro-name changes defer while in combat. Hiding editor entries does not delete their bindings. All options retain prior behavior until changed.
 
@@ -87,7 +91,7 @@ Classic Era omits unavailable default focus controls. Command support comes from
 - Runtime form indices are discovered. Form and combination macros receive bounded maintenance outside combat when learned abilities change. If stale form guards cannot be repaired, original recovery is attempted. Native bar paging remains owned by Blizzard.
 - Form selection uses a `noform` guard. Intentional Classic Era powershifting has a separate control; it is never triggered by repeatedly scrolling into the same form.
 - Helpful spells use Alt-self, friendly mouseover, then friendly target. The optional final self fallback is off by default. Spells that cannot target self are excluded. Focus and resurrection macros have explicit target conditions.
-- Simple learned spells use native spell actions. Targeting, exact ranks, future reservations, forms and shared actions use stored macros when needed. Macros are deduplicated and checked against capacity and body-length limits. Personal macros are never overwritten to make room.
+- Simple learned spells use native spell actions. Targeting, exact ranks, forms and shared actions use stored macros when needed; future reservations can retain empty native slots to save macro space. Macros are deduplicated and checked against capacity and body-length limits. Personal macros are never overwritten to make room.
 - Macro contents and the resulting bindings are verified. Applying a changed layout keeps the original rollback baseline.
 
 ## Your default controls

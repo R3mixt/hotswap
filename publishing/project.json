@@ -1,14 +1,14 @@
 {
   "format": "Hot Swap manual publishing worksheet",
   "formatVersion": 1,
-  "publishingState": "draft-local-only",
+  "publishingState": "project-created-by-author-file-not-verified",
   "name": "Hot Swap",
   "summary": "Build and switch class keybind presets on Blizzard's original action bars, with a visual keyboard editor, generated macros, item choices, and named backups.",
   "release": {
-    "version": "0.4.1",
-    "displayName": "Hot Swap 0.4.1 beta",
+    "version": "0.4.2",
+    "displayName": "Hot Swap 0.4.2 beta",
     "releaseType": "beta",
-    "automatedTests": 345,
+    "automatedTests": 367,
     "testMethod": "Actual Lua modules executed under Lua 5.1 with mocked WoW APIs",
     "liveClientAcceptance": "pending"
   },
@@ -49,8 +49,8 @@
   },
   "publishingNotes": [
     "This file is a local worksheet, not a CurseForge API payload.",
-    "No project has been created or uploaded by preparing these files.",
-    "Check project-name availability before creating the project.",
+    "The author reports the project was created; no project ID, URL or verified file upload has been recorded here.",
+    "Open the existing Hot Swap project for this file upload.",
     "Category labels are verified on CurseForge; numeric category, game-version, and project IDs are deliberately omitted.",
     "Do not label this beta as live-client verified until acceptance checks pass.",
     "Keep the name Hot Swap without a version number; use the release display name for file uploads.",

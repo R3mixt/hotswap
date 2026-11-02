@@ -134,6 +134,7 @@ end
 function E:CreateMacros(plan,created)
     local bodies={}
     local _,_,maxAccount,maxCharacter=K.Macros:Budget(plan)
+    local allowAccount=(plan.settings or K:GetSettings()).allowAccountMacros==true
     for _,a in ipairs(plan.actions) do
         if (a.known or a.nativeMacro) and a.body then
             if not bodies[a.body] then
@@ -147,6 +148,7 @@ function E:CreateMacros(plan,created)
                     end
                     local account,character=GetNumMacros()
                     local perCharacter=character<maxCharacter
+                    if not perCharacter and not allowAccount then error("No free character-specific macro slots remain. Account-wide overflow is disabled.") end
                     if not perCharacter and account>=maxAccount then error("No free macro slots remain.") end
                     index=CreateMacro(name,a.icon or "INV_MISC_QUESTIONMARK",a.body,perCharacter)
                     if not index or index==0 then error("Could not create "..a.label.." macro.") end
@@ -368,7 +370,7 @@ local function macroSteps(plan,created)
     for _,action in ipairs(plan and plan.actions or {}) do
         if (action.known or action.nativeMacro) and action.body then
             local current=action
-            addStep(steps,function() E:CreateMacros({actions={current}},created) end,"Preparing spell macros",true,true)
+            addStep(steps,function() E:CreateMacros({actions={current},settings=plan.settings},created) end,"Preparing spell macros",true,true)
         end
     end
     return steps
@@ -558,8 +560,10 @@ function E:Apply(plan)
         if protected[key] then return self:Reject("The protected control on "..key.." changed. Review the layout before applying.") end
     end
     plan.protectedKeys=protected
-    local needed,available=K.Macros:Budget(plan)
-    if needed>available then return self:Reject("Not enough free macro slots. No changes were made.") end
+    local needed,available,capacityError=K.Macros:FitBudget(plan)
+    if capacityError then return self:Reject(capacityError) end
+    layout=plan.nativeLayout
+    if needed>available then return self:Reject(K.Macros:CapacityMessage(plan,needed,available)) end
     local job={kind="apply",plan=plan,previous=runtimeState(),created={}}
     job.steps=snapshotSteps(job); job.rollback=rollbackJob
     for _,step in ipairs(macroSteps(plan,job.created)) do job.steps[#job.steps+1]=step end
@@ -687,7 +691,7 @@ function E:RestoreBackup(id)
         if not valid then return self:Reject(why,"restore") end
         local current=K.db.ownedMacros; K.db.ownedMacros=owned
         local needed,available=K.Macros:Budget(target.appliedPlan); K.db.ownedMacros=current
-        if needed>available then return false,"Not enough free macro slots to restore this backup. No changes were made." end
+        if needed>available then return false,K.Macros:CapacityMessage(target.appliedPlan,needed,available,"restore").." No changes were made." end
     end
     local job={kind="restore",plan=target.appliedPlan,previous=runtimeState(),created={}}
     job.steps=snapshotSteps(job); job.rollback=rollbackJob

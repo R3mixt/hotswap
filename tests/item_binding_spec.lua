@@ -1,4 +1,9 @@
-local function readyItems() local k=TestAddon; k:Init(); return k end
+local function readyItems(allowFixtureOverflow)
+  local k=TestAddon; k:Init()
+  -- Item maintenance scenarios install the oversized all-talents Druid fixture.
+  if allowFixtureOverflow then k:GetSettings().allowAccountMacros=true end
+  return k
+end
 local function itemAction(plan,id) for _,action in ipairs(plan.actions) do if action.id==id then return action end end end
 local function has(value,needle) return type(value)=="string" and value:find(needle,1,true)~=nil end
 local function macroBody(action) local _,_,body=GetMacroInfo(GetMacroIndexByName(action.macroName)); return body end
@@ -17,7 +22,7 @@ function Tests.item_binding_missing_selection_does_not_silently_use_a_saved_alte
 end
 
 function Tests.item_binding_arrival_updates_only_installed_macro_and_preserves_staged_selection()
-  local k=readyItems(); Mock.async=true
+  local k=readyItems(true); Mock.async=true
   Mock.itemInfo[9001]={name="Installed Potion",effect="Heal"}; Mock.itemInfo[9002]={name="Staged Potion",effect="Heal"}
   assert(k.Items:SetBindingItem("item.potion",9001))
   assert(k:Apply()=="pending"); local ok,why=Mock:Drain(); assert(ok,why)
@@ -92,7 +97,7 @@ function Tests.item_binding_library_items_and_manual_choices_roundtrip_in_a_pres
 end
 
 function Tests.item_binding_shared_macro_is_updated_once_for_multiple_keys()
-  local k=readyItems(); Mock.async=true
+  local k=readyItems(true); Mock.async=true
   Mock.itemInfo[9001]={name="Shared Potion",effect="Heal"}
   assert(k.Items:SetBindingItem("item.utility",9001)); assert(k.Items:SetBindingItem("item.potion",9001))
   assert(k:Apply()=="pending"); local ok,why=Mock:Drain(); assert(ok,why)
@@ -106,7 +111,7 @@ function Tests.item_binding_shared_macro_is_updated_once_for_multiple_keys()
 end
 
 function Tests.item_binding_different_target_modes_remain_distinct_before_item_arrives()
-  local k=readyItems(); Mock.async=true
+  local k=readyItems(true); Mock.async=true
   Mock.itemInfo[14530]={name="Heavy Runecloth Bandage",effect="First Aid"}
   assert(k.Items:SetBindingItem("item.utility",14530)); assert(k.Items:SetBindingTargetMode("item.utility","focus"))
   assert(k.Items:SetBindingItem("item.potion",14530)); assert(k.Items:SetBindingTargetMode("item.potion","mouseover"))

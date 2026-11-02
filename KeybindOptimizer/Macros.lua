@@ -153,5 +153,34 @@ function K.Macros:Budget(plan)
     local constants=Constants and Constants.MacroConsts
     local maxAccount=(constants and constants.MAX_ACCOUNT_MACROS) or MAX_ACCOUNT_MACROS or 120
     local maxCharacter=(constants and constants.MAX_CHARACTER_MACROS) or MAX_CHARACTER_MACROS or 18
-    return count,math.max(0,maxAccount-account)+math.max(0,maxCharacter-character),maxAccount,maxCharacter
+    local settings=plan.settings or K:GetSettings()
+    local characterFree=math.max(0,maxCharacter-character)
+    local accountFree=math.max(0,maxAccount-account)
+    local available=characterFree+(settings.allowAccountMacros and accountFree or 0)
+    return count,available,maxAccount,maxCharacter
+end
+
+function K.Macros:CapacityMessage(plan,needed,available,context)
+    local account=(plan.settings or K:GetSettings()).allowAccountMacros
+    local scope=account and "macro slots" or "character-specific macro slots"
+    local help=account and " Free some macro slots before trying again." or " Free character macro slots, or enable account-wide macro overflow in Settings > Action bars and choose Apply & save."
+    -- A named backup restores its saved storage policy, never the editing
+    -- draft. Changing today's checkbox cannot add capacity to that snapshot.
+    if context=="restore" then help=" Free "..scope.." to restore this saved layout." end
+    return "Need "..needed.." free "..scope.."; only "..available.." are available."..help.." No macros will be overwritten."
+end
+
+function K.Macros:FitBudget(plan)
+    local needed,available=self:Budget(plan)
+    if needed>available and not plan.deferFutureMacros then
+        -- Future ability metadata belongs in the editor, not necessarily in a
+        -- finite macro bank. Keep native keys/positions, and populate them on
+        -- learning through the owned-slot worker without changing the preset.
+        plan.deferFutureMacros=true
+        local layout,why=K.NativeBars:Prepare(plan)
+        if not layout then return nil,nil,why end
+        needed,available=self:Budget(plan)
+    end
+    plan.macrosNeeded,plan.macrosAvailable=needed,available
+    return needed,available
 end

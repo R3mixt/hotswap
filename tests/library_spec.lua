@@ -1,5 +1,6 @@
+-- These fixtures exercise full catalogs/visible reservations with account overflow explicitly enabled.
 local function libraryInit()
-    TestAddon:Init(); TestAddon.db.settings.flavor='era'; return TestAddon
+    TestAddon:Init(); TestAddon:GetSettings().allowAccountMacros=true; TestAddon.db.settings.flavor='era'; return TestAddon
 end
 local function actionFor(k,id)
     for _,action in ipairs(k:Preview().actions) do if action.id==id then return action end end

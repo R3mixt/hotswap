@@ -1,4 +1,4 @@
-# Requirement map — 0.4.1 beta
+# Requirement map — 0.4.2 beta
 
 The final release targets WoW Forever. Classic Era / Hardcore is the temporary development target. Retail is not a supported release target. Automated tests use Lua 5.1 with mocked game APIs; a passing suite does not certify protected execution inside either client.
 
@@ -15,6 +15,8 @@ The final release targets WoW Forever. Classic Era / Hardcore is the temporary d
 | Preserve unrelated controls | Apply updates only keys explicitly assigned by the selected preset; unrelated bindings and mouse controls remain unchanged | An explicit new assignment takes precedence on that key |
 | Protect game controls | Preset checkboxes for movement, camera, chat, targeting, interface and casting settings; Spells only enables all | Protects current custom keys; pinned conflicts block Apply rather than overriding the control |
 | Macro display | Separate native macro-name and tooltip-code switches | Character-local; cosmetic native fontstrings only, deferred during combat |
+| Macro storage | Generated macros use character-specific slots first; per-preset account-wide overflow is opt-in under Settings → Action bars | Existing owned account macros are reused, not migrated; personal macros are never overwritten |
+| Macro capacity | Deduplicated budget; low space reserves future keys/editor metadata with empty native positions and fills managed positions outside combat when learned | Visibility preferences stay unchanged; learned layouts may still need freed slots or explicit account overflow |
 | Unavailable abilities | L/T badges, native tooltips, editor filter and optional empty native positions | Native empty-grid borders follow Blizzard settings; keys remain reserved |
 | Talent key modes | Own key per ability (default), or explicit ordered shared choices; first learned wins | Outside combat; no rotation decisions or guessed dominant specialization; separate existing keys remain |
 | Release previous Hot Swap keys | A key no longer used by the addon regains its prior binding only while its current command still matches Hot Swap's last assignment | Later manual changes are preserved |
@@ -37,12 +39,12 @@ The final release targets WoW Forever. Classic Era / Hardcore is the temporary d
 | Food/water | May be selected and bound as inventory items | Automatic best-food/water selection is **not implemented** |
 | Diagnostic logging | Opt-in, off by default, bounded saved history with operations, key/command/stage, backups, recovery outcomes and bounded stacks | Hot Swap errors only; copy/clear controls; persisted by WoW on reload/logout |
 | Local window preferences | Settings tab with opacity, scale, viewport fitting and Reset appearance | Character-local; independent of shared binding presets |
-| Readable failure details | Persistent selectable Details dialog with explicit outcome and backup | Current-session last error stays available even if logging is disabled |
+| Readable failure details | Persistent selectable opaque Details dialog with explicit outcome and backup | Independent of window opacity; current-session last error stays available even if logging is disabled |
 | Native command capability | Registry-based preflight before action writes; unavailable defaults omitted | Explicit unsupported focus targets need review rather than silent retargeting |
 | Settings/menu entry points | AddOns settings category, Escape menu and `/hotswap` | Separate client menu adapters |
 | Escape during recording | Cancels capture before closing the main window | Modal tests pass; client retest required |
 | Avoid script timeout | Bounded jobs, cached previews/catalogs and coalesced events | Individual game API calls cannot be interrupted; client retest required |
-| Learned-action maintenance | Owned form/item macros and enabled availability/talent choices refresh outside combat without key churn | New uncatalogued families still need reviewed Apply; manual slot/key edits are preserved |
+| Learned-action maintenance | Owned form/item macros, enabled availability/talent choices and capacity-reserved future spells refresh outside combat without key churn | Capacity checks still apply; new uncatalogued families need reviewed Apply; manual slot/key edits are preserved |
 | Expert research | Dated primary-source report distinguishes evidence from proposals | Complete 20-player keymap census remains incomplete |
 | Maintainability | Separate client API, data, planning, native bars, transactions, presets and UI | Architecture and review records describe invariants and live checks |
 | Distribution | Portable build, validation workflow, release notes and CurseForge materials | Public availability requires author sign-in, upload and moderation |

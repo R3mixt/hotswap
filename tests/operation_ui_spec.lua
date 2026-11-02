@@ -1,9 +1,12 @@
-local function operationUI()
-    local k=TestAddon; k:Init(); k.UI:Open(); Mock.async=true
+local function operationUI(allowFixtureOverflow)
+    local k=TestAddon; k:Init()
+    -- Apply/rollback scenarios use the artificial all-talents Druid fixture.
+    if allowFixtureOverflow then k:GetSettings().allowAccountMacros=true end
+    k.UI:Open(); Mock.async=true
     return k
 end
 function Tests.operation_failure_details_preserve_full_binding_error_after_review_and_reopen()
-    local k=operationUI(); local original=SetBinding; local rejected=false; local placed=false
+    local k=operationUI(true); local original=SetBinding; local rejected=false; local placed=false
     SetBinding=function(key,command)
         if key=="F6" and command and not rejected then
             rejected=true; placed=next(Mock.actions)~=nil; return false
@@ -32,7 +35,7 @@ function Tests.operation_failure_details_preserve_full_binding_error_after_revie
 end
 
 function Tests.operation_preflight_failure_ignores_old_rollback_and_success_clears_details()
-    local k=operationUI()
+    local k=operationUI(true)
     k.Engine.lastJob={finished=true,ok=false,kind="apply",rollingBack=true,message="Old setup was rolled back",entry={id="old",name="Old backup",complete=true}}
     local original=k.Presets.Activate
     k.Presets.Activate=function() return false,"This client does not support F6 (Target focus; TARGETFOCUS)." end
@@ -58,4 +61,43 @@ function Tests.operation_rollback_failure_never_claims_the_previous_setup_was_re
     assert(error.details:find("Recovery setup [b9]",1,true) and error.details:find("Installing bindings",1,true),"Recovery instructions lost backup or original stage")
     assert(error.details:find("Binding: F6 - Target focus (TARGETFOCUS)",1,true),"Copy details lost readable binding context")
     assert(not error.summary:find("restored",1,true),"Footer promises unverified restoration")
+end
+
+function Tests.operation_error_details_are_opaque_without_changing_window_preferences()
+    local k=operationUI(); k.UI:SetAppearance("windowOpacity",0.4)
+    local create=CreateFrame
+    CreateFrame=function(kind,name,...)
+        local frame=create(kind,name,...)
+        if name=="KeybindOptimizerOperationError" then
+            function frame:SetIgnoreParentAlpha(value) self.ignoresParentAlpha=value end
+        end
+        return frame
+    end
+    k.UI:RecordOperationFailure("Not enough character-specific macro slots.","apply")
+    local dialog=k.UI.operationErrorDialog
+    assert(dialog.ignoresParentAlpha and dialog:GetAlpha()==1,"Failure text inherited the translucent main window")
+    assert(dialog.opaqueBackground and dialog.opaqueBackground.colorTexture[4]==1,"Native translucent backdrop has no opaque backing")
+    assert(dialog.opaqueBackground.allPoints==dialog and dialog.backdrop,"Opaque backing lost full coverage or native styling")
+    assert(k.db.preferences.windowOpacity==0.4 and k.UI.frame:GetAlpha()==0.4,"Opening details overwrote the user's window appearance")
+    dialog.close:Click(); Mock:Advance(0.05)
+    assert(k.UI.frame:IsShown() and k.UI.frame:GetAlpha()==0.4,"Closing error details changed or closed the main window")
+end
+
+function Tests.operation_review_capacity_reservations_are_informational_and_keep_draft_status()
+    local k=operationUI(); local plan=k.UI.plan
+    plan.capacityDeferredCount=12; plan.errors={}
+    k.Preview=function() return plan end; k.PreviewCached=function() return plan end
+    k.UI.notice=nil; k.UI:Refresh(); k.UI:OpenReview()
+    assert(k.UI.status:GetText():find("12 future spells reserved; see Review.",1,true),"Footer omitted macro-capacity reservations")
+    assert(k.UI.status:GetText():find("Draft",1,true),"Capacity note replaced the draft/active state")
+    local found
+    for _,row in ipairs(k.UI.review.list.rows) do
+        if row:GetText():find("12 future spells reserved to save macro slots.",1,true) then
+            assert(row.textColor[1]~=1 or row.textColor[2]~=.43,"Capacity reservation was styled as an error")
+            found=true
+        end
+    end
+    assert(found and k.UI.apply:IsEnabled() and not k.UI.operationError,"Future reservations incorrectly blocked applying")
+    plan.capacityDeferredCount=0; k.UI:Refresh()
+    assert(not k.UI.status:GetText():find("future spells reserved",1,true),"Cleared reservations left a stale capacity note")
 end

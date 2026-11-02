@@ -40,6 +40,7 @@ end
 
 function Tests.native_bar_ui_closes_during_async_apply_and_staged_choices_survive_presets()
     local k,f=startBarUI(); Mock.async=true
+    k:GetSettings().allowAccountMacros=true -- Full Druid fixture needs both banks.
     assert(k.UI:SetNativeBarPreference(2,true))
     assert(k.Presets:Create("Extra bars",true))
     assert(k:GetSettings().nativeBars[2]==true,"Duplicating a preset dropped its bar preference")
