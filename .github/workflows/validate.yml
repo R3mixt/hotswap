@@ -20,6 +20,8 @@ jobs:
           cache-dependency-path: requirements-dev.txt
       - name: Install test dependencies
         run: python -m pip install -r requirements-dev.txt
+      - name: Check CurseForge publisher without network
+        run: python -m unittest discover -s tests -p test_curseforge.py -v
       - name: Run Lua 5.1 regressions and build verified packages
         run: python package.py
       - name: Upload verified packages

@@ -1,35 +1,51 @@
-# CurseForge submission
+# CurseForge publishing and GitHub sync
 
-Status: the author reports that the CurseForge project has been created. The project ID and public URL have not been supplied here, and upload/publication of this release is not verified. The files below are prepared locally for that existing project.
+Project: [Hot Swap](https://www.curseforge.com/wow/addons/hot-swap), ID **1779519**. Source: [R3mixt/hotswap](https://github.com/R3mixt/hotswap). The project already has published files; publication of a new version is separate from pushing source.
 
-## Prepared materials
+## How this repository publishes
 
-- `publishing/project.json`: title, summary, proposed category and release metadata.
-- `publishing/curseforge-description.md`: player-facing description.
-- `publishing/logo.png`: original project logo; `logo.svg` is its editable source.
-- `CHANGELOG.md`: release notes.
-- `dist/HotSwap-0.4.4-CurseForge.zip`: **the only ZIP to upload to CurseForge**, produced by `python package.py`.
-- `dist/HotSwap-0.4.4-developer-source-NOT-FOR-UPLOAD.zip`: separate development archive; **do not upload this to CurseForge**.
-- SHA-256 manifests: verify the file you upload matches the reviewed build.
+| GitHub action | Result |
+| --- | --- |
+| Push or pull request | Test and build; no CurseForge upload |
+| Publish a GitHub prerelease | Build, verify, upload as CurseForge Beta |
+| Publish a normal GitHub release | Build, verify, upload as CurseForge Release |
+| Run Publish to CurseForge manually | Build and upload using your selected channel; default Beta |
 
-The upload ZIP must contain `KeybindOptimizer/KeybindOptimizer.toc` immediately inside the addon folder, with the listed Lua files beside it. Upload the ZIP unchanged; do not add an outer HotSwap/version folder or upload the source archive. Packaging verifies this shape and every TOC load path before producing the upload file.
+[Publish to CurseForge](../.github/workflows/curseforge.yml) runs the publisher's network-free tests, then `package.py`, which runs the Lua and packaging regressions. It retains the exact runtime ZIP/checksum as an Actions artifact before uploading. The token is passed only to the upload step. Upload failures do not retry automatically, because a timed-out request may already have created a file.
 
-The author reported a missing-TOC rejection for version 0.4.2. The local runtime archive does contain the correctly placed TOC and all referenced files. The source archive has an extra outer folder; which exact file was submitted and the full rejection text have not been verified. Do not describe the old runtime file as missing its TOC or claim this rebuild has been accepted by CurseForge.
+This integration uploads files. It does not synchronize the CurseForge project description, screenshots, settings or comments. Keep the public description current separately. CurseForge moderation can delay availability after a successful upload.
 
-The default license is All Rights Reserved with permission for personal gameplay. It does not grant others permission to republish modified copies. A broader open-source license can be chosen deliberately later.
+## One-time setup
 
-## Submission steps
+1. Create a publisher token in [CurseForge API tokens](https://authors.curseforge.com/account/api-tokens).
+2. In [GitHub Actions secrets](https://github.com/R3mixt/hotswap/settings/secrets/actions), create **CURSEFORGE_API_TOKEN** and paste the token into its Secret field. Never put it in an issue, commit, workflow text or chat.
+3. Check [publishing/curseforge.json](../publishing/curseforge.json). It targets project 1779519 and Classic Era **1.15.9**. Add other game version names only after checking the client and CurseForge support. Forever is not automatically advertised by this publisher.
+4. Enable GitHub Actions for the repository if GitHub prompts you. The workflow needs only read access to repository contents; CurseForge upload authorization comes from the dedicated secret.
 
-1. Sign in at the [author dashboard](https://authors.curseforge.com/) and open the existing Hot Swap project.
-2. Use Hot Swap as the title. Confirm available slug/category values in the current dashboard; metadata contains no invented numeric IDs. Add the prepared summary, description, license and original logo.
-3. Upload the install ZIP as **Beta** with the changelog. Select only the exact supported game flavor/version offered in the dashboard. Era is the present test target; do not mark Retail or claim a Forever client acceptance run that has not occurred.
-4. Submit for moderation, then record the assigned project ID, project URL and file URL. A created draft or uploaded file is not yet a publicly approved release.
-5. Perform compatibility.md's live-client acceptance checks. Promote a subsequent verified build to Release only when appropriate.
+The repository owner reported completing step 2 on 2026-11-02. A successful first publishing run is still needed to establish token validity and project upload permission.
 
-CurseForge's [submission documentation](https://support.curseforge.com/support/solutions/articles/9000197241-creating-and-submitting-a-project) explains the account, metadata, file upload and review process. Its current guidance says default app synchronization needs at least one Release file; Beta files require opt-in. Keep the beta label truthful rather than changing it solely for app visibility. See also the [project submission guide](https://support.curseforge.com/support/solutions/articles/9000199552-project-submission-guide-and-tips).
+## Publish an update
 
-## Version control and later releases
+1. Update the version in `KeybindOptimizer/Core.lua` and `KeybindOptimizer/KeybindOptimizer.toc` together.
+2. Add `publishing/changelog-<version>.txt`, update `CHANGELOG.md` and `publishing/project.json`, and update the changelog entry in `package.py`'s source allowlist.
+3. Push the commit and wait for **Validate Hot Swap** to pass. Complete the required live-client acceptance checks before claiming compatibility.
+4. Open [GitHub Releases](https://github.com/R3mixt/hotswap/releases/new). Create a matching tag such as `v1.0.1` on the reviewed commit and publish it. For user testing, use `v1.0.1-beta.1` and check **Set as a pre-release**. The TOC may remain `1.0.1` for that prerelease tag.
+5. Open the **Publish to CurseForge** Actions run. Its summary reports the uploaded file ID. Check the CurseForge Files page for moderation status and the correct versions/channel.
 
-The dedicated Git repository contains source, tests, documentation, build tools and publication metadata. Machine installation scripts, recovery backups, dependencies and generated QA captures are ignored. GitHub Actions is prepared to validate and build if this repository is later pushed to GitHub; it does not run merely because the local files exist.
+Do not repeatedly rerun a successful upload: it can create duplicate files. If a connection fails after transmission, inspect CurseForge first. A release tag that differs from the TOC version fails before upload. Publishing a GitHub release here triggers the upload workflow; it does not attach the ZIP to the GitHub release itself. The exact package remains available in the Actions artifacts.
 
-For an update: change the TOC/Core version together, update changelog and target-version claims, run tests, build, inspect checksums, commit, tag the reviewed beta/release, then upload the matching install ZIP to the existing project. Never commit CurseForge API tokens. No remote, API secret or automatic upload is configured by this preparation.
+## Troubleshooting and manual upload
+
+- **Missing secret:** save `CURSEFORGE_API_TOKEN` at repository level, with the exact spelling.
+- **401/403:** check the token and whether its CurseForge account owns or can upload to project 1779519.
+- **Version/channel error:** inspect `publishing/curseforge.json`, the release tag and the workflow inputs.
+- **Failed tests:** fix the failure; the workflow stops before uploading.
+- **Upload returned a file ID but download is unavailable:** inspect moderation/release status on CurseForge.
+
+For a manual fallback, run `python package.py` and upload only `dist/HotSwap-<version>-CurseForge.zip`. Its immediate root must be `KeybindOptimizer/KeybindOptimizer.toc`. Never upload the developer-source ZIP. Keep the All Rights Reserved license and accurate client claims.
+
+## Why not enable a second packager webhook?
+
+This repository already has a tested archive manifest and a nested source layout. The Actions uploader uses that exact archive. Running CurseForge's repository packager as well would establish a second packaging path and could create duplicate files. Choose one publishing route.
+
+The implementation uses the documented multipart upload API with the token in a header and explicit version/channel metadata. See [CurseForge Upload API](https://support.curseforge.com/support/solutions/articles/9000197321). CurseForge also offers [repository webhook packaging](https://support.curseforge.com/support/solutions/articles/9000197281); it is an alternative, not required for this workflow.

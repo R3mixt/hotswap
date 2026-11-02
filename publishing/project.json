@@ -1,7 +1,7 @@
 {
-  "format": "Hot Swap manual publishing worksheet",
+  "format": "Hot Swap publishing metadata",
   "formatVersion": 1,
-  "publishingState": "project-created-by-author-file-not-verified",
+  "publishingState": "public-project-github-actions-upload-configured",
   "name": "Hot Swap",
   "summary": "Build and switch class keybind presets on Blizzard's original action bars, with a visual keyboard editor, generated macros, item choices, and named backups.",
   "release": {
@@ -52,12 +52,11 @@
   },
   "publishingNotes": [
     "This file is a local worksheet, not a CurseForge API payload.",
-    "The author reports the project was created; no project ID, URL or verified file upload has been recorded here.",
     "Open the existing Hot Swap project for this file upload.",
-    "Category labels are verified on CurseForge; numeric category, game-version, and project IDs are deliberately omitted.",
     "Do not label this build as live-client verified until acceptance checks pass.",
     "Keep the name Hot Swap without a version number; use the release display name for file uploads.",
-    "Choose the matching All Rights Reserved license option, or Custom with the included release license text if necessary."
+    "Choose the matching All Rights Reserved license option, or Custom with the included release license text if necessary.",
+    "GitHub Actions uploads on published releases; CURSEFORGE_API_TOKEN is a repository secret. First automated upload remains to be verified."
   ],
   "references": {
     "checkedOn": "2026-11-01",
@@ -65,5 +64,8 @@
     "actionBarsCategory": "https://www.curseforge.com/wow/search?categories=action-bars&class=addons&page=1&pageSize=50&sortBy=latest+update",
     "pvpCategory": "https://www.curseforge.com/wow/search?categories=pvp&class=addons&page=1&pageSize=50&sortBy=popularity",
     "classCategory": "https://www.curseforge.com/wow/search?categories=class&class=addons&page=1&pageSize=50&sortBy=latest+update"
-  }
+  },
+  "projectId": 1779519,
+  "projectUrl": "https://www.curseforge.com/wow/addons/hot-swap",
+  "repositoryUrl": "https://github.com/R3mixt/hotswap"
 }

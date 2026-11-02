@@ -31,6 +31,8 @@ MODULES = (
 RUNTIME_FILES = (TOC, *MODULES, "README.md")
 SOURCE_FILES = (
     "package.py", "requirements-dev.txt", ".github/workflows/validate.yml",
+    ".github/workflows/curseforge.yml", "CONTRIBUTING.md",
+    "publishing/upload_curseforge.py", "publishing/curseforge.json",
     ".gitattributes", "build_library_data.py", "catalog-classification-input.json",
     "classification-source.json", "talent-classification-source.json",
     "forever-talent-classification-source.json", "ui-qa/capture.py", "ui-qa/render.ps1",
