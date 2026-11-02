@@ -53,12 +53,32 @@ function P:Initialize()
         if type(preset.id)~="string" or not preset.id:match("^p%d+$") or used[preset.id] then preset.id=self:NewID() end
         used[preset.id]=true
     end
+    local _,class=UnitClass("player")
+    if db.presets[active].sourceClass and db.presets[active].sourceClass~=class then
+        local compatible
+        for _,name in ipairs(sorted(db.presets)) do
+            local preset=db.presets[name]
+            if not preset.sourceClass or preset.sourceClass==class then compatible=name; break end
+        end
+        if not compatible then
+            local base="Recommended "..class; compatible=base; local n=2
+            while db.presets[compatible] do compatible=base.." ("..n..")"; n=n+1 end
+            db.presets[compatible]={id=self:NewID(),sourceClass=class,settings=K.Copy(K.defaults),items={},equipment={}}
+        end
+        active=compatible
+    end
     db.activePreset=active
     db.settings=db.presets[active].settings
     if db.enabled and not db.appliedPreset then db.appliedPreset=active end
     db.schema=2
+    self:EnsureSaveBaseline()
 end
-function P:List() if not K.db then K:Init() end return sorted(K.db.presets) end
+function P:List()
+    if not K.db then K:Init() end
+    local _,class=UnitClass("player"); local visible={}
+    for name,preset in pairs(K.db.presets) do if not preset.sourceClass or preset.sourceClass==class then visible[name]=preset end end
+    return sorted(visible)
+end
 function P:FindID(id)
     for name,preset in pairs(K.db.presets) do if preset.id==id then return name,preset end end
 end
@@ -78,6 +98,43 @@ function P:Signature(name)
     local hotkeys={}; for _,entry in pairs(K.db.presets) do if entry.hotkey then hotkeys[entry.id]=entry.hotkey end end
     return signature({settings=preset.settings,items=preset.items,hotkeys=hotkeys})
 end
+-- Keep the saved version separately from the editable draft. This also
+-- preserves the original when the player chooses Save as new after editing.
+function P:EnsureSaveBaseline(name)
+    local db=K.db; local preset=db.presets[name or db.activePreset]
+    db.presetSaveBases=type(db.presetSaveBases)=="table" and db.presetSaveBases or {}
+    if preset and not db.presetSaveBases[preset.id] then db.presetSaveBases[preset.id]=K.Copy(preset) end
+end
+function P:HasSaveChanges()
+    self:EnsureSaveBaseline()
+    local preset=K.db.presets[K.db.activePreset]
+    return signature(preset)~=signature(K.db.presetSaveBases[preset.id])
+end
+function P:SaveDraftChoice(name,overwrite,snapshot)
+    if busy() or self.activating then return false,waitMessage end
+    local clean,why=validName(name); if not clean then return false,why end
+    local db=K.db; local current=db.presets[db.activePreset]
+    local _,class=UnitClass("player")
+    if snapshot and (type(snapshot)~="table" or type(snapshot.settings)~="table" or snapshot.sourceClass~=class) then return false,"Preview recommendations for this character first." end
+    if overwrite and clean~=db.activePreset then return false,"Only the selected preset can be overwritten." end
+    if not overwrite and db.presets[clean] then return false,"That name already exists. Choose a new name or overwrite the selected preset." end
+    self:EnsureSaveBaseline()
+    local saved=K.Copy(snapshot or current)
+    if overwrite then
+        saved.id=current.id; saved.hotkey=current.hotkey
+    else
+        saved.id=self:NewID(); saved.hotkey=nil
+        if not snapshot then db.presets[db.activePreset]=K.Copy(db.presetSaveBases[current.id]) end
+    end
+    saved.sourceClass=class
+    db.presets[clean]=saved
+    -- Reattach before Select so its outgoing-draft write cannot restore the
+    -- edited settings onto the original during Save as new.
+    db.settings=db.presets[db.activePreset].settings
+    db.presetSaveBases[saved.id]=K.Copy(saved)
+    self:Select(clean)
+    return true,"Saved "..clean..". Your game controls are unchanged.",clean
+end
 function P:HasUnappliedChanges()
     local db=K.db
     if not db or not db.enabled or not db.appliedPlan then return true end
@@ -90,6 +147,9 @@ function P:Select(name)
     if not K.db then K:Init() end
     local preset=K.db.presets[name]
     if not preset then return false,"Unknown preset." end
+    local _,class=UnitClass("player")
+    if preset.sourceClass and preset.sourceClass~=class then return false,"Choose a preset for "..class.."." end
+    self:EnsureSaveBaseline(name)
     local previous=K.db.presets[K.db.activePreset]
     if previous then previous.settings=K.db.settings end
     K.db.activePreset=name; K.db.settings=preset.settings
@@ -126,6 +186,7 @@ function P:Delete(name)
     if not K.db.presets[name] then return false,"Unknown preset." end
     if #self:List()==1 then return false,"Keep at least one preset." end
     if name==K.db.appliedPreset and K.db.enabled then return false,"Use another preset before deleting the active preset." end
+    if K.db.presetSaveBases then K.db.presetSaveBases[K.db.presets[name].id]=nil end
     K.db.presets[name]=nil
     if K.db.activePreset==name then
         local nextName=self:List()[1]; K.db.activePreset=nextName; K.db.settings=K.db.presets[nextName].settings
@@ -341,6 +402,8 @@ function P:RestoreState(state)
             local tail=" (restored "..suffix..")"; target=name:sub(1,48-#tail)..tail; suffix=suffix+1
         end
         K.db.presets[target]=K.Copy(saved); renamed[name]=target
+        K.db.presetSaveBases=K.db.presetSaveBases or {}
+        K.db.presetSaveBases[saved.id]=K.Copy(saved)
     end
     K.db.nextPresetID=math.max(tonumber(K.db.nextPresetID) or 0,tonumber(state.nextPresetID) or 0)
     K.db.activePreset=renamed[state.activePreset] or (K.db.presets[state.activePreset] and state.activePreset) or self:List()[1]

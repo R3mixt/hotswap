@@ -13,7 +13,7 @@ function Tests.operation_failure_details_preserve_full_binding_error_after_revie
         end
         return original(key,command)
     end
-    k.UI.apply:Click()
+    k.UI.apply:Click(); if k.UI.saveDialog and k.UI.saveDialog:IsShown() then k.UI.saveDialog.overwrite:Click() end
     local ok,why=Mock:Drain(); assert(not ok and rejected,why)
     assert(placed,"Failure fixture did not occur after native bar placement")
     local error=k.UI.operationError; local dialog=k.UI.operationErrorDialog
@@ -39,13 +39,13 @@ function Tests.operation_preflight_failure_ignores_old_rollback_and_success_clea
     k.Engine.lastJob={finished=true,ok=false,kind="apply",rollingBack=true,message="Old setup was rolled back",entry={id="old",name="Old backup",complete=true}}
     local original=k.Presets.Activate
     k.Presets.Activate=function() return false,"This client does not support F6 (Target focus; TARGETFOCUS)." end
-    Mock:ResetWrites(); k.UI.apply:Click()
+    Mock:ResetWrites(); k.UI.apply:Click(); if k.UI.saveDialog and k.UI.saveDialog:IsShown() then k.UI.saveDialog.overwrite:Click() end
     local error=k.UI.operationError
     assert(error.outcome=="not-started" and not error.backupID,"Preflight borrowed an old rollback or backup")
     assert(error.details:find("No game changes were made",1,true) and error.details:find("No new recovery backup",1,true),"Preflight outcome is misleading")
     assert(#Mock.writes==0,"Failure details changed game state")
     k.UI.operationErrorDialog.close:Click(); Mock:Advance(0.05)
-    k.Presets.Activate=original; k.UI.apply:Click()
+    k.Presets.Activate=original; k.UI.apply:Click(); if k.UI.saveDialog and k.UI.saveDialog:IsShown() then k.UI.saveDialog.overwrite:Click() end
     assert(not k.UI.operationErrorDialog:IsShown(),"Retry retained its modal over progress")
     local ok,why=Mock:Drain(); assert(ok,why); Mock:Advance(0.2)
     assert(not k.UI.operationError and k.UI.reviewButton:GetText()=="Review","Successful retry kept stale failure details")

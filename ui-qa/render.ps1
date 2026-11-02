@@ -16,9 +16,9 @@ function Draw-QABevel($graphics, $rect, $top, $bottom, $edge) {
     $graphics.DrawLine($pen,$rect.X+2,$rect.Y+2,$rect.Right-3,$rect.Y+2)
     $pen.Dispose()
 }
-foreach ($pageName in @('setup','presets','bindings','bindings-shift','bindings-cat','bindings-test','items','safety','share','library-spells','library-ranks','library-items','library-macros','action-bars','settings','settings-controls','settings-bars','settings-window','settings-diagnostics','diagnostic-log','operation-error','talent-choices','talent-own','hover-bind','bindings-current','bindings-recommendation')) {
+foreach ($pageName in @('setup','presets','bindings','bindings-shift','bindings-cat','bindings-test','items','safety','share','library-spells','library-ranks','library-items','library-macros','action-bars','settings','settings-controls','settings-bars','settings-window','settings-diagnostics','diagnostic-log','operation-error','talent-choices','talent-own','hover-bind','bindings-current','bindings-recommendation','save-preset')) {
     $nodes = Get-Content -LiteralPath (Join-Path $PSScriptRoot "$pageName.json") -Raw | ConvertFrom-Json
-    $canvasWidth = if ($pageName -like 'library-*') { 1180 } else { 860 }
+    $canvasWidth = if ($pageName -like 'library-*' -or $pageName -eq 'bindings-current') { 1180 } else { 860 }
     $bitmap = [System.Drawing.Bitmap]::new($canvasWidth, 652)
     $graphics = [System.Drawing.Graphics]::FromImage($bitmap)
     $graphics.Clear([System.Drawing.Color]::FromArgb(14,17,20))

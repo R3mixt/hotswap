@@ -100,14 +100,15 @@ cases=[('Setup','setup',None,None),('Presets','presets',None,None),('Bindings','
 cases.extend([('Setup','action-bars',None,None),('Settings','settings',None,None),('Settings','diagnostic-log',None,None),('Setup','operation-error',None,None)])
 cases.extend([('Settings','settings-controls',None,None),('Settings','settings-bars',None,None),('Settings','settings-window',None,None),('Settings','settings-diagnostics',None,None),('Bindings','talent-choices','caster',''),('Bindings','talent-own','caster','')])
 cases.append(('Bindings','hover-bind','caster',''))
+cases.append(('Bindings','save-preset','caster',''))
 cases.extend([('Bindings','bindings-current',None,''),('Bindings','bindings-recommendation','caster','')])
 for page,filename,form,layer in cases:
-    lua.execute('for _,name in ipairs({"nativeBarsDialog","diagnosticLogDialog","operationErrorDialog","talentDialog"}) do local f=K.UI[name]; if f then f:Hide() end end')
+    lua.execute('for _,name in ipairs({"nativeBarsDialog","diagnosticLogDialog","operationErrorDialog","talentDialog","saveDialog"}) do local f=K.UI[name]; if f then f:Hide() end end')
     if filename.startswith('settings-') or filename.startswith('talent-'):
         lua.execute('K.UI:ClearOperationError()')
-    lua.globals().K.UI.libraryOpen=filename.startswith('library-')
+    lua.globals().K.UI.libraryOpen=filename.startswith('library-') or filename=='bindings-current'
     if filename == 'bindings-current':
-        lua.execute('Mock.bindings["1"]="ACTIONBUTTON1"; Mock.actions[1]={"spell",5176}; K.UI:ClearOperationError(); K.UI:SetBindingSource("current")')
+        lua.execute('Mock.bindings["1"]="ACTIONBUTTON1"; Mock.actions[1]={"spell",5176}; K.UI:ClearOperationError(); K.UI:Open()')
     elif filename == 'bindings-recommendation':
         lua.execute('K.UI:ClearOperationError(); K.UI:PreviewRecommendations()')
     else:
@@ -122,6 +123,8 @@ for page,filename,form,layer in cases:
         lua.execute('K.TalentBindings:SetChoices("druid.form_moonkin",{"druid.form_moonkin","druid.natures_swiftness","druid.swiftmend"}); K.UI:Refresh(); for _,a in ipairs(K.UI.plan.actions) do if a.id=="druid.form_moonkin" then K.UI:OpenTalentChoices(a); break end end')
     if filename == 'talent-own':
         lua.execute('K.TalentBindings:SetMode("druid.form_moonkin","separate"); K.UI:Refresh(); for _,a in ipairs(K.UI.plan.actions) do if a.id=="druid.form_moonkin" then K.UI:OpenTalentChoices(a); break end end')
+    if filename == 'save-preset':
+        lua.execute('K.UI:ClearOperationError(); K.UI:PromptSavePreset(nil,true)')
     if filename == 'hover-bind':
         lua.execute('K.UI:ClearOperationError(); K.UI:OpenHoverBindings()')
     if filename == 'action-bars':
@@ -183,7 +186,7 @@ for page,filename,form,layer in cases:
     def visible(i):
         return i is None or i==0 or (nodes[i]['shown'] and visible(nodes[i]['parent']))
     frame_id=int(lua.globals().K.UI.frame.qid);fx,fy,fw,fh=bounds(frame_id)
-    if filename.startswith('library-'):fw+=320
+    if filename.startswith('library-') or filename=='bindings-current':fw+=320
     result=[]
     def depth(i):
         p=nodes[i]['parent']

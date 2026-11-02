@@ -94,7 +94,7 @@ function Tests.preset_tab_creates_names_and_activates_complete_layout_with_named
   assert(not k.db.enabled,"Binding a shortcut applied the preset")
   -- A new preset starts with safe defaults; explicitly permit this oversized fixture.
   k:UpdateSetting("allowAccountMacros",true)
-  page.usePreset:Click(); Mock:Advance(0.2)
+  page.usePreset:Click(); if k.UI.saveDialog and k.UI.saveDialog:IsShown() then k.UI.saveDialog.overwrite:Click() end; Mock:Advance(0.2)
   eq(k.db.appliedPreset,"Healing dungeon","Use preset did not activate the selected mode")
   assert(k.db.enabled,"Preset was not enabled")
   local backups=k.Engine:ListBackups(); assert(#backups>0,"Use preset skipped backup")

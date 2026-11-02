@@ -1020,7 +1020,7 @@ function Tests.apply_button_does_not_repeat_heavy_preview_work_in_same_callback(
   local bindingRows=observeCalls(k.UI,"RenderBindings")
   local inventoryRows=observeCalls(k.UI,"RenderItems")
   local recoveryRows=observeCalls(k.UI,"RenderSafety")
-  k.UI.apply:Click()
+  k.UI.apply:Click(); if k.UI.saveDialog and k.UI.saveDialog:IsShown() then k.UI.saveDialog.overwrite:Click() end
   assert(k.db.enabled,"Apply click did not install its reviewed plan")
   equal(builds.count,1,"Apply callback immediately built a second complete preview")
   equal(bindingRows.count,0,"Apply on Setup rendered hidden binding rows")

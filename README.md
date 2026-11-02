@@ -1,6 +1,6 @@
 # Hot Swap
 
-WoW binding presets and keyboard editing using Blizzard's original action bars. **0.4.5 beta** targets Forever, with Classic Era / Hardcore as the current test client. Bindings opens read-only on the actual game layout. Recommendations are previewed separately, saved as a new preset, then explicitly applied. Applying a saved preset updates its assigned keys while preserving unrelated bindings and mouse controls.
+WoW binding presets and keyboard editing using Blizzard's original action bars. **0.4.6 beta** targets Forever, with Classic Era / Hardcore as the current test client. Bindings opens in edit mode on your actual game layout with the spellbook open. Current edits apply only the controls you changed. Prefilled presets remain separate; saving offers overwrite or save as new. Applying a saved preset updates its assigned keys while preserving unrelated bindings and mouse controls.
 
 [Player instructions](KeybindOptimizer/README.md), [scope and known gaps](docs/requirements.md), [architecture](docs/architecture.md), [code review](docs/code-review.md), [CurseForge setup](docs/curseforge.md).
 

@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.4.6 beta — 2026-11-02
+
+- Open Current bindings in edit mode with the spellbook visible. Stage key changes and learned-spell/item/macro replacements, then apply only those edits with a named backup. Discard pending edits without game writes.
+- Detect stale keys/slots before applying Current edits; retain pending edits after a failed installation and use the existing recovery worker.
+- Select a class-compatible draft on login; retain foreign presets but exclude them from selection. Disable foreign installed layouts without changing game controls.
+- Prompt to overwrite the selected preset or save under a new name when saving recommendations or applying changed drafts. Preserve preset IDs/shortcuts on overwrite and the original saved version on save-as-new.
+
+
 ## 0.4.5 beta — 2026-11-02
 
 - Fix restored direct macro identities and preserve personal changes after failed form maintenance.

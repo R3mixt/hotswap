@@ -249,3 +249,76 @@ function C:Build()
 end
 function C:Get() return self.cache or self:Build() end
 function C:Invalidate() self.cache=nil end
+
+-- Current editing is a sparse, session-local overlay, not a recommended preset.
+-- Only explicitly edited keys/slots participate in installation.
+function C:Edits()
+ self.edits=self.edits or {keys={},slots={},expectedKeys={},expectedSlots={}}
+ return self.edits
+end
+function C:HasEdits() local e=self.edits; return e and (next(e.keys) or next(e.slots))~=nil or false end
+function C:StageKey(key,command)
+ local e=self:Edits()
+ if e.expectedKeys[key]==nil then e.expectedKeys[key]=GetBindingAction(key) or "" end
+ e.keys[key]=command or false
+end
+function C:Rebind(action,key)
+ key=K.API:NormalizeKey(key)
+ if not key or key=="ESCAPE" or key:match("BUTTON[12]$") then return false,"Choose a valid key other than Escape or the primary mouse buttons." end
+ if not action or not action.key then return false,"Choose a current binding." end
+ if action.key=="ESCAPE" or action.key:match("BUTTON[12]$") then return false,"Keep Escape and primary mouse controls on their current keys." end
+ local e=self:Edits(); local command=e.keys[action.key]
+ if command==nil then command=GetBindingAction(action.key) end
+ if not command or command=="" then return false,"This binding changed. Review Current again." end
+ if action.key==key then return true end
+ self:StageKey(key,command); self:StageKey(action.key,false)
+ return true,"Current binding edit staged. Apply changes installs it."
+end
+function C:StageEntry(entry,key)
+ key=K.API:NormalizeKey(key)
+ if not key or key=="ESCAPE" or key:match("BUTTON[12]$") then return false,"Choose a valid destination key." end
+ local d=entry and entry.descriptor
+ local content,command,label
+ local spellID=entry and entry.spellID or d and d.spellID
+ if spellID then
+  local exact=K.API:ResolveExact(spellID,K.API:GetCachedSpellbook())
+  if not exact or not exact.known then return false,"This spell is not learned. Use the prefilled preset to reserve future abilities." end
+  local name=exact.name; if exact.rank and exact.rank~="" then name=name.."("..exact.rank..")" end
+  content={kind="spell",id=spellID}; command="SPELL "..name; label=exact.name
+ elseif d and d.kind=="item" then content={kind="item",id=d.itemID}; command="ITEM item:"..d.itemID
+ elseif d and d.kind=="macroref" then
+  local name,_,body=GetMacroInfo(GetMacroIndexByName(d.macroName))
+  if name~=d.macroName or K.Macros:Name(body or "")~=d.macroFingerprint then return false,"This local macro changed. Select it again." end
+  content={kind="macro",name=name,body=body}; command="MACRO "..name
+ elseif d and d.kind=="system" and K.API:IsBindingCommandSupported(d.command) then command=d.command
+ else return false,"Choose a learned spell, item, local macro or supported game command." end
+ local e=self:Edits(); self:Build(); local live=self:EditingView().byKey[key]
+ if content and live and live.liveSlot then
+  local at=live.liveSlot
+  if e.expectedSlots[at]==nil then e.expectedSlots[at]=K.NativeBars:ReadSlot(at) or false end
+  if e.expectedKeys[key]==nil then e.expectedKeys[key]=GetBindingAction(key) or "" end
+  e.slots[at]={content=content,command=command,label=label or entry.label}
+ else self:StageKey(key,command) end
+ return true,"Current action edit staged. Apply changes installs it."
+end
+function C:EditingView()
+ local plan=K.Copy(self:Get()); local e=self.edits
+ plan.readOnly=false
+ plan.byID={}; plan.byKey={}; plan.actions={}
+ local commands={}
+ for _,a in ipairs(self:Get().actions) do commands[a.key]=a.command end
+ for key,command in pairs(e and e.keys or {}) do commands[key]=command or nil end
+ for key,command in pairs(commands) do
+  local a=self:Describe(command,key,plan.actionPage,plan.actionPageType)
+  local staged=e and a.liveSlot and e.slots[a.liveSlot]
+  if staged then
+   local preview=self:Describe(staged.command,key,plan.actionPage,plan.actionPageType)
+   preview.liveSlot=a.liveSlot; preview.nativeSlot=a.liveSlot; preview.command=command; a=preview
+   a.label=staged.label or a.label
+  end
+  a.readOnly=false; a.current=true
+  plan.actions[#plan.actions+1]=a; plan.byID[a.id]=a; plan.byKey[key]=a
+ end
+ table.sort(plan.actions,function(a,b) return a.key<b.key end)
+ return plan
+end

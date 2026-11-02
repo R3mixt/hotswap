@@ -221,7 +221,7 @@ local function snapshotSteps(job)
     job.before=snapshot
     for _,key in ipairs({"SELFCAST","FOCUSCAST"}) do snapshot.modified[key]=GetModifiedClick and GetModifiedClick(key) or "NONE" end
     snapshot.cvars.autoSelfCast=getCVar("autoSelfCast")
-    local probes={}
+    local probes=K.Copy(job.probeKeys or {})
     for key in pairs(job.plan and job.plan.nativeLayout and job.plan.nativeLayout.keys or {}) do probes[key]=true end
     for key in pairs(job.previous and job.previous.appliedPlan and job.previous.appliedPlan.nativeLayout and job.previous.appliedPlan.nativeLayout.keys or {}) do probes[key]=true end
     for key in pairs(job.previous and job.previous.appliedPlan and job.previous.appliedPlan.bindingOwnership or {}) do probes[key]=true end
@@ -610,6 +610,42 @@ function E:Apply(plan)
         if #K.db.history>10 then table.remove(K.db.history,1) end
         job.entry.status="applied"; K.db.lastBindingBackupID=job.entry.id
         return "Preset applied to the original action bars. Backup saved: "..job.entry.name
+    end
+    return self:StartJob(job)
+end
+function E:ApplyCurrentEdits()
+    if self.busy or inCombat() then return false,"Leave combat and wait for the current operation." end
+    if not K.CurrentBindings:HasEdits() then return true,"No current binding changes to apply." end
+    local edits=K.Copy(K.CurrentBindings:Edits())
+    local function validate()
+        for key,expected in pairs(edits.expectedKeys) do if (GetBindingAction(key) or "")~=expected then error("Current binding changed on "..key..". Discard pending edits and try again.") end end
+        for at,expected in pairs(edits.expectedSlots) do if not K.NativeBars:SameContent(K.NativeBars:ReadSlot(at),expected or nil) then error("Current action slot changed: "..at..". Discard pending edits and try again.") end end
+    end
+    local ok,why=pcall(validate); if not ok then return self:Reject(why,"current-edit") end
+    local job={kind="current-edit",previous=runtimeState(),created={},probeKeys=edits.expectedKeys}
+    job.steps=snapshotSteps(job); job.rollback=rollbackJob
+    addStep(job.steps,validate,"Rechecking current controls",true,false)
+    for at,entry in pairs(edits.slots) do
+        local index,content=at,entry.content
+        addStep(job.steps,function() K.NativeBars:WriteSlot(index,content) end,"Editing current action slots",false,true)
+    end
+    addStep(job.steps,function()
+        local expected=captureBindings(edits.expectedKeys)
+        job.currentBindings=K.Copy(expected)
+        for key,command in pairs(edits.keys) do expected[key]=command or nil end
+        job.expected=expected; insertSteps(job,bindingSteps(job,expected))
+    end,"Editing current keys",true,false)
+    addStep(job.steps,function() saveBindings(2); loadBindings(2) end,"Saving current character bindings",true,true)
+    addStep(job.steps,function()
+        for key,command in pairs(edits.keys) do if GetBindingAction(key)~=(command or "") then error("Current binding verification failed: "..key) end end
+        for at,entry in pairs(edits.slots) do if not K.NativeBars:SameContent(K.NativeBars:ReadSlot(at),entry.content) then error("Current action verification failed: "..at) end end
+    end,"Verifying current changes",true,false)
+    job.commit=function()
+        -- Existing installed-plan ownership checks treat these as personal edits.
+        -- Do not activate, replace or select a recommended preset.
+        K.CurrentBindings.edits=nil; K.CurrentBindings:Invalidate()
+        job.entry.status="applied"; K.db.lastBindingBackupID=job.entry.id
+        return "Current binding changes applied. Backup saved: "..job.entry.name
     end
     return self:StartJob(job)
 end

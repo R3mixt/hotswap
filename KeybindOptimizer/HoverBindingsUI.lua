@@ -144,7 +144,7 @@ function UI:RenderHoverBindings()
     if f.hoveredID and f.rows[f.hoveredID] then self:HoverBindingEnter(f.rows[f.hoveredID]) end
 end
 function UI:OpenHoverBindings()
-    if self.bindingSource~="draft" then self:Notice("Choose Preset draft before using hover binding. Current and recommended layouts are read-only."); return end
+    if self.bindingSource~="draft" then self:Notice("Choose Preset draft for the all-spells hover grid. Use the spellbook to edit Current bindings."); return end
     if inCombat() then self:Notice("Hover binding is unavailable during combat.",true); return end
     if K.Engine and K.Engine.busy then self:UpdateBusyState(); return end
     self:CloseMenu(); self:ClearInputFocus(); self:EndCapture(); self:CancelLibraryDrag()

@@ -241,6 +241,20 @@ function UI:DropLibraryEntry(key)
     if not entry or not key or not K.Library then return false end
     self:CancelLibraryDrag()
     if K.Engine and K.Engine.busy then return false end
+    if self.bindingSource=="current" then
+        local destination=K.CurrentBindings:EditingView().byKey[key]
+        local function stage()
+            local ok,why=self:Call(K.CurrentBindings,"StageEntry",entry,key)
+            self.currentBindingPlan=nil; self:Refresh(); self:Notice(why,not ok)
+            return ok
+        end
+        if destination then
+            local scope=destination.liveSlot and "This replaces the live action-bar slot, including other keys that use that slot." or "This replaces this key's current command."
+            self:Confirm("Replace "..keyName(key).."?",(entry.label or entry.name or "This action").." will replace "..destination.label..". "..scope.." Apply changes installs the edit.",stage)
+            return false
+        end
+        return stage()
+    end
     if self:IsProtectedKey(key) then self:Notice("This control is protected in Settings. Turn off its category before replacing it.",true); return false end
     local destinations=self.keyIndex and self.keyIndex[key] or {}
     -- Replacing a native slot changes its action on the inspected page only.
@@ -288,7 +302,7 @@ function UI:ToggleLibrary()
 end
 function UI:SyncLibrary(refresh)
     if not self.pages or not self.pages.Bindings then return end
-    local show=self.bindingSource=="draft" and self.activePage=="Bindings" and self.bindingView~="list" and self.libraryOpen~=false and not self.escapeModal and not (K.Engine and K.Engine.busy)
+    local show=self.bindingSource~="recommendation" and self.activePage=="Bindings" and self.bindingView~="list" and self.libraryOpen~=false and not self.escapeModal and not (K.Engine and K.Engine.busy)
     if show and not self.library then self:BuildLibrary() end
     if self.library then
         local changed=self.library:IsShown()~=show

@@ -24,12 +24,12 @@ function Tests.native_ui_recommendations_require_save_and_apply_before_starting_
     eq(#k.Presets:List(),count,"Preview created a preset before review")
     assert(not k.Engine.busy and #Mock.writes==0,"Preview applied game changes")
     assert(k.UI.saveRecommendation:IsShown() and not k.UI.apply:IsShown(),"Preview skipped explicit draft creation")
-    k.UI.saveRecommendation:Click()
+    k.UI.saveRecommendation:Click(); k.UI.saveDialog.new:Click(); k.UI.nameDialog.input:SetText("Recommended Druid"); k.UI.nameDialog.save:Click()
     eq(k.UI.bindingSource,"draft","Saving did not open an editable draft")
     eq(#k.Presets:List(),count+1,"Saving failed to create a new preset")
     assert(not k.db.enabled and #Mock.writes==0,"Saving a draft activated its bindings")
     eq(k.db.presets.Leveling.settings.bindingOverrides["druid.rejuvenation"],"SHIFT-F24","Recommendation discarded the earlier draft")
-    k.UI.apply:Click()
+    k.UI.apply:Click(); if k.UI.saveDialog and k.UI.saveDialog:IsShown() then k.UI.saveDialog.overwrite:Click() end
     assert(k.Engine.busy and k.UI.busyOverlay:IsVisible(),"Explicit Apply skipped the bounded worker")
     local planCalls=watch(k.Planner,"Build")
     for _=1,5 do k.UI:Refresh() end
@@ -292,7 +292,7 @@ function Tests.native_ui_apply_and_save_buttons_install_drafts_and_save_game_bin
     eq(k.UI.apply:GetText(),"Apply & save","Footer final action has the old label")
     eq(page.usePreset:GetText(),"Apply & save","Preset final action differs from the footer")
     eq(k.UI.apply:GetWidth(),128,"Apply label has insufficient button space")
-    assert(page.detail.description:GetText():find("Draft edits are saved automatically",1,true),"Automatic draft saving is unexplained")
+    assert(page.detail.description:GetText():find("Draft edits are kept automatically",1,true),"Automatic draft saving is unexplained")
     assert(k.UI.apply.tipDetail:find("macros",1,true) and k.UI.apply.tipDetail:find("save the game's bindings",1,true),"Final action does not explain installation and saving")
     local function selectDraft(name)
         Mock:ResetWrites()
@@ -305,7 +305,7 @@ function Tests.native_ui_apply_and_save_buttons_install_drafts_and_save_game_bin
     end
     selectDraft("Dungeon")
     k:GetSettings().allowAccountMacros=true -- Explicit opt-in for this full Druid installation fixture.
-    k.UI.apply:Click()
+    k.UI.apply:Click(); if k.UI.saveDialog and k.UI.saveDialog:IsShown() then k.UI.saveDialog.overwrite:Click() end
     assert(k.Engine.busy,"Footer Apply & save did not start installation")
     local ok,why=Mock:Drain(); assert(ok,why); Mock:Advance(0.2)
     eq(k.db.appliedPreset,"Dungeon","Footer Apply & save installed a different preset")
@@ -315,7 +315,7 @@ function Tests.native_ui_apply_and_save_buttons_install_drafts_and_save_game_bin
     assert(saved,"Apply & save did not save the game's bindings")
     selectDraft("PvP")
     k:GetSettings().allowAccountMacros=true
-    page.usePreset:Click()
+    page.usePreset:Click(); if k.UI.saveDialog and k.UI.saveDialog:IsShown() then k.UI.saveDialog.overwrite:Click() end
     assert(k.Engine.busy,"Preset Apply & save did not start installation")
     ok,why=Mock:Drain(); assert(ok,why); Mock:Advance(0.2)
     eq(k.db.appliedPreset,"PvP","Preset Apply & save installed a different draft")

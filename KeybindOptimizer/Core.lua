@@ -1,6 +1,6 @@
 local addonName, K = ...
 _G.KeybindOptimizer = K
-K.name, K.version = addonName or "KeybindOptimizer", "0.4.5"
+K.name, K.version = addonName or "KeybindOptimizer", "0.4.6"
 K.defaults = {
     wheel = true, middle = true, ctrl = true,
     mouseButtons = { BUTTON4 = true, BUTTON5 = true },
@@ -51,6 +51,14 @@ function K:Init()
     self.db.settings = type(self.db.settings)=="table" and self.db.settings or {}
     defaults(self.db.settings, self.defaults)
     self.Presets:Initialize()
+    local _,class=UnitClass("player")
+    if self.db.appliedPlan and self.db.appliedPlan.class and self.db.appliedPlan.class~=class then
+        -- Preserve the old record for recovery, but never activate or maintain
+        -- another class's installed layout on this character.
+        self.db.enabled=false
+        self.db.recoveryRequired=nil
+        self.db.characterSetupNotice="A saved layout for another class was disabled. Your current controls are unchanged."
+    end
     self.db.ownedMacros = self.db.ownedMacros or {}
     self.db.history = self.db.history or {}
     self.dirty=self.Presets:HasUnappliedChanges()
@@ -139,6 +147,9 @@ function K:OnApplyComplete(ok,message,plan,kind)
     if kind=="apply" and ok then
         local name=plan and plan.presetID and self.Presets:FindID(plan.presetID) or (plan and plan.presetName) or self.db.activePreset
         self.db.appliedPreset=name
+        self.db.presetSaveBases=self.db.presetSaveBases or {}
+        local saved=self.db.presets[name]
+        if saved then self.db.presetSaveBases[saved.id]=K.Copy(saved) end
         self.db.appliedPresetSignature=self.Presets:Signature(name)
         self.dirty=self.Presets:HasUnappliedChanges()
     end

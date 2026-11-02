@@ -94,7 +94,7 @@ function Tests.hover_ui_apply_uses_the_existing_preset_worker_and_releases_captu
     local k,f=hoverUI(true); Mock.async=true
     hover(k,"druid.rejuvenation"); press("NUMPAD9")
     assert(not k.db.enabled and #k.Engine:ListBackups()==0,"Staging created a live backup")
-    f.apply:Click()
+    f.apply:Click(); if k.UI.saveDialog and k.UI.saveDialog:IsShown() then k.UI.saveDialog.overwrite:Click() end
     assert(k.Engine.busy and not f.active and not k.UI.hoverInput:IsShown() and not k.UI.hoverMouseShield:IsShown(),"Applying kept hover capture or bypassed the worker")
     local ok,why=Mock:Drain(); assert(ok,why); Mock:Advance(0.1)
     assert(k.db.appliedPreset==k.db.activePreset and GetBindingAction("NUMPAD9")~="","Apply did not install the selected preset binding")
