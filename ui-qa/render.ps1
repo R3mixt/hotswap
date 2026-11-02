@@ -1,12 +1,41 @@
 param([string[]]$Pages, [ValidateRange(1,3)][int]$Scale = 2)
 $ErrorActionPreference = 'Stop'
 Add-Type -AssemblyName System.Drawing
+$iconManifest = Get-Content -LiteralPath (Join-Path $PSScriptRoot 'icons/manifest.json') -Raw | ConvertFrom-Json
+$iconImages = @{}
+function Draw-GameIcon($graphics,$rect,$node) {
+    $name = [string]$node.icon
+    if ($name -notmatch '^[a-z0-9_]+$') { throw "Unsafe icon name: $name" }
+    if (-not $iconImages.ContainsKey($name)) {
+        $asset = $iconManifest.assets.PSObject.Properties[$name].Value
+        $path = Join-Path $PSScriptRoot ".cache/icons/$name.jpg"
+        if (-not $asset -or -not (Test-Path -LiteralPath $path) -or (Get-FileHash -LiteralPath $path -Algorithm SHA256).Hash.ToLowerInvariant() -ne $asset.sha256) {
+            throw "Missing or changed icon $name. Run python ui-qa/icon_assets.py --fetch before rendering."
+        }
+        $iconImages[$name] = [System.Drawing.Image]::FromFile($path)
+    }
+    $art = $iconImages[$name]
+    $uv = if ($node.texCoord -and $node.texCoord.Count -eq 4) { $node.texCoord } else { @(0,1,0,1) }
+    $tint = if ($node.vertexColor) { $node.vertexColor } else { @(1,1,1,1) }
+    $matrix = [System.Drawing.Imaging.ColorMatrix]::new()
+    $matrix.Matrix00 = [single]$tint[0]; $matrix.Matrix11 = [single]$tint[1]; $matrix.Matrix22 = [single]$tint[2]
+    if ($node.desaturated) {
+        $matrix.Matrix00 = 0.2126*$tint[0]; $matrix.Matrix01 = 0.2126*$tint[1]; $matrix.Matrix02 = 0.2126*$tint[2]
+        $matrix.Matrix10 = 0.7152*$tint[0]; $matrix.Matrix11 = 0.7152*$tint[1]; $matrix.Matrix12 = 0.7152*$tint[2]
+        $matrix.Matrix20 = 0.0722*$tint[0]; $matrix.Matrix21 = 0.0722*$tint[1]; $matrix.Matrix22 = 0.0722*$tint[2]
+    }
+    $matrix.Matrix33 = [single]$node.alpha * $(if ($tint.Count -gt 3) { [single]$tint[3] } else { 1 })
+    $attributes = [System.Drawing.Imaging.ImageAttributes]::new()
+    $attributes.SetColorMatrix($matrix)
+    $graphics.DrawImage($art,[System.Drawing.Rectangle]::Round($rect),[single]($uv[0]*$art.Width),[single]($uv[2]*$art.Height),[single](($uv[1]-$uv[0])*$art.Width),[single](($uv[3]-$uv[2])*$art.Height),[System.Drawing.GraphicsUnit]::Pixel,$attributes)
+    $attributes.Dispose()
+}
 function New-QAColor($values) {
     if ($null -eq $values) { return [System.Drawing.Color]::White }
     $alpha = if ($values.Count -gt 3) { [int]($values[3] * 255) } else { 255 }
     return [System.Drawing.Color]::FromArgb($alpha, [int]($values[0]*255), [int]($values[1]*255), [int]($values[2]*255))
 }
-# These are geometry-review stand-ins, not copies of Blizzard texture files.
+# Window chrome is approximated; spell/item artwork is loaded from verified game icons.
 function Draw-QABevel($graphics, $rect, $top, $bottom, $edge) {
     $brush = [System.Drawing.Drawing2D.LinearGradientBrush]::new($rect, $top, $bottom, [System.Drawing.Drawing2D.LinearGradientMode]::Vertical)
     $graphics.FillRectangle($brush, $rect)
@@ -50,19 +79,8 @@ foreach ($pageName in $Pages) {
         if ($node.keycap -and -not $node.backdrop -and $nativeArtwork) {
             Draw-QABevel $graphics $rect ([System.Drawing.Color]::FromArgb(37,34,27)) ([System.Drawing.Color]::FromArgb(15,14,10)) ([System.Drawing.Color]::FromArgb(96,84,58))
         }
-        if ($node.texture -like 'QA:*') {
-            $hue = (@([char[]]$node.texture | ForEach-Object { [int]$_ }) | Measure-Object -Sum).Sum % 4
-            $top = @([System.Drawing.Color]::FromArgb(49,110,69),[System.Drawing.Color]::FromArgb(79,82,137),[System.Drawing.Color]::FromArgb(35,104,129),[System.Drawing.Color]::FromArgb(137,88,43))[$hue]
-            Draw-QABevel $graphics $rect $top ([System.Drawing.Color]::FromArgb(17,32,39)) ([System.Drawing.Color]::FromArgb(130,142,151))
-            $iconLabel=$node.texture.Substring(3)
-            $iconFont=[System.Drawing.Font]::new('Segoe UI',8,[System.Drawing.FontStyle]::Bold,[System.Drawing.GraphicsUnit]::Pixel)
-            $iconBrush=[System.Drawing.SolidBrush]::new([System.Drawing.Color]::FromArgb(244,226,174))
-            $iconFormat=[System.Drawing.StringFormat]::new()
-            $iconFormat.Alignment=[System.Drawing.StringAlignment]::Center
-            $iconFormat.LineAlignment=[System.Drawing.StringAlignment]::Center
-            $graphics.DrawString($iconLabel.Substring(0,[Math]::Min(2,$iconLabel.Length)),$iconFont,$iconBrush,$rect,$iconFormat)
-            $iconFormat.Dispose();$iconBrush.Dispose();$iconFont.Dispose()
-        }
+        if ($node.icon) { Draw-GameIcon $graphics $rect $node }
+        if ($node.unresolvedTexture -or $node.texture -like 'QA:*') { throw 'Unresolved placeholder texture in capture. Regenerate with verified icon metadata.' }
         if ($node.theme -eq 'modern' -and $node.backdrop -and $node.fill) {
             $brush = [System.Drawing.SolidBrush]::new((New-QAColor $node.fill))
             $graphics.FillRectangle($brush, $rect)
@@ -138,7 +156,7 @@ foreach ($pageName in $Pages) {
     $graphics.ResetClip()
     $font = [System.Drawing.Font]::new('Segoe UI', 11, [System.Drawing.FontStyle]::Regular, [System.Drawing.GraphicsUnit]::Pixel)
     $brush = [System.Drawing.SolidBrush]::new([System.Drawing.Color]::FromArgb(170,180,187))
-    $graphics.DrawString('OFFLINE PREVIEW  /  Actual addon UI + sample data  /  Approximate game artwork and fonts', $font, $brush, 12, $contentHeight+11)
+    $graphics.DrawString('OFFLINE PREVIEW  /  Actual addon UI + real spell icons  /  Sample data; approximate window artwork and fonts', $font, $brush, 12, $contentHeight+11)
     $bitmap.Save((Join-Path $PSScriptRoot "$pageName.png"), [System.Drawing.Imaging.ImageFormat]::Png)
     if ($pageName -match '^(classic|modern)-') {
         $deliverables = Join-Path (Split-Path $PSScriptRoot -Parent) 'review/themes'
@@ -148,6 +166,7 @@ foreach ($pageName in $Pages) {
     $brush.Dispose(); $font.Dispose(); $graphics.Dispose(); $bitmap.Dispose()
     Write-Output "Rendered $pageName.png"
 }
+foreach ($art in $iconImages.Values) { $art.Dispose() }
 
 # A review sheet uses the rendered widgets above, with a title outside the UI.
 # It is deliberately labeled so this cannot be mistaken for a game capture.

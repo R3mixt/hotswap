@@ -1,0 +1,853 @@
+{
+  "schema": 1,
+  "attribution": "World of Warcraft icon artwork belongs to Blizzard Entertainment. Preview-only cache served by Wowhead/ZAM; not part of the MIT-licensed addon runtime.",
+  "entities": {
+    "item:10577": {
+      "id": 10577,
+      "kind": "item",
+      "name": "Goblin Mortar",
+      "icon": "inv_musket_01",
+      "edition": "classic",
+      "metadataSource": "https://nether.wowhead.com/classic/tooltip/item/10577"
+    },
+    "item:14530": {
+      "id": 14530,
+      "kind": "item",
+      "name": "Heavy Runecloth Bandage",
+      "icon": "inv_misc_bandage_12",
+      "edition": "classic",
+      "metadataSource": "https://nether.wowhead.com/classic/tooltip/item/14530"
+    },
+    "item:1710": {
+      "id": 1710,
+      "kind": "item",
+      "name": "Greater Healing Potion",
+      "icon": "inv_potion_52",
+      "edition": "classic",
+      "metadataSource": "https://nether.wowhead.com/classic/tooltip/item/1710"
+    },
+    "item:4388": {
+      "id": 4388,
+      "kind": "item",
+      "name": "Discombobulator Ray",
+      "icon": "inv_misc_spyglass_02",
+      "edition": "classic",
+      "metadataSource": "https://nether.wowhead.com/classic/tooltip/item/4388"
+    },
+    "item:5512": {
+      "id": 5512,
+      "kind": "item",
+      "name": "Minor Healthstone",
+      "icon": "inv_stone_04",
+      "edition": "classic",
+      "metadataSource": "https://nether.wowhead.com/classic/tooltip/item/5512"
+    },
+    "spell:1058": {
+      "id": 1058,
+      "kind": "spell",
+      "name": "Rejuvenation",
+      "icon": "spell_nature_rejuvenation",
+      "edition": "classic",
+      "metadataSource": "https://nether.wowhead.com/classic/tooltip/spell/1058"
+    },
+    "spell:1066": {
+      "id": 1066,
+      "kind": "spell",
+      "name": "Aquatic Form",
+      "icon": "ability_druid_aquaticform",
+      "edition": "classic",
+      "metadataSource": "https://nether.wowhead.com/classic/tooltip/spell/1066"
+    },
+    "spell:1079": {
+      "id": 1079,
+      "kind": "spell",
+      "name": "Rip",
+      "icon": "ability_ghoulfrenzy",
+      "edition": "classic",
+      "metadataSource": "https://nether.wowhead.com/classic/tooltip/spell/1079"
+    },
+    "spell:1082": {
+      "id": 1082,
+      "kind": "spell",
+      "name": "Claw",
+      "icon": "ability_druid_rake",
+      "edition": "classic",
+      "metadataSource": "https://nether.wowhead.com/classic/tooltip/spell/1082"
+    },
+    "spell:1126": {
+      "id": 1126,
+      "kind": "spell",
+      "name": "Mark of the Wild",
+      "icon": "spell_nature_regeneration",
+      "edition": "classic",
+      "metadataSource": "https://nether.wowhead.com/classic/tooltip/spell/1126"
+    },
+    "spell:16689": {
+      "id": 16689,
+      "kind": "spell",
+      "name": "Nature's Grasp",
+      "icon": "spell_nature_natureswrath",
+      "edition": "classic",
+      "metadataSource": "https://nether.wowhead.com/classic/tooltip/spell/16689"
+    },
+    "spell:16857": {
+      "id": 16857,
+      "kind": "spell",
+      "name": "Faerie Fire (Feral)",
+      "icon": "spell_nature_faeriefire",
+      "edition": "classic",
+      "metadataSource": "https://nether.wowhead.com/classic/tooltip/spell/16857"
+    },
+    "spell:16864": {
+      "id": 16864,
+      "kind": "spell",
+      "name": "Omen of Clarity",
+      "icon": "spell_nature_crystalball",
+      "edition": "classic",
+      "metadataSource": "https://nether.wowhead.com/classic/tooltip/spell/16864"
+    },
+    "spell:16914": {
+      "id": 16914,
+      "kind": "spell",
+      "name": "Hurricane",
+      "icon": "spell_nature_cyclone",
+      "edition": "classic",
+      "metadataSource": "https://nether.wowhead.com/classic/tooltip/spell/16914"
+    },
+    "spell:16979": {
+      "id": 16979,
+      "kind": "spell",
+      "name": "Feral Charge",
+      "icon": "ability_hunter_pet_bear",
+      "edition": "classic",
+      "metadataSource": "https://nether.wowhead.com/classic/tooltip/spell/16979"
+    },
+    "spell:17116": {
+      "id": 17116,
+      "kind": "spell",
+      "name": "Nature's Swiftness",
+      "icon": "spell_nature_ravenform",
+      "edition": "classic",
+      "metadataSource": "https://nether.wowhead.com/classic/tooltip/spell/17116"
+    },
+    "spell:1822": {
+      "id": 1822,
+      "kind": "spell",
+      "name": "Rake",
+      "icon": "ability_druid_disembowel",
+      "edition": "classic",
+      "metadataSource": "https://nether.wowhead.com/classic/tooltip/spell/1822"
+    },
+    "spell:1850": {
+      "id": 1850,
+      "kind": "spell",
+      "name": "Dash",
+      "icon": "ability_druid_dash",
+      "edition": "classic",
+      "metadataSource": "https://nether.wowhead.com/classic/tooltip/spell/1850"
+    },
+    "spell:18562": {
+      "id": 18562,
+      "kind": "spell",
+      "name": "Swiftmend",
+      "icon": "inv_relics_idolofrejuvenation",
+      "edition": "classic",
+      "metadataSource": "https://nether.wowhead.com/classic/tooltip/spell/18562"
+    },
+    "spell:18960": {
+      "id": 18960,
+      "kind": "spell",
+      "name": "Teleport: Moonglade",
+      "icon": "spell_arcane_teleportmoonglade",
+      "edition": "classic",
+      "metadataSource": "https://nether.wowhead.com/classic/tooltip/spell/18960"
+    },
+    "spell:19970": {
+      "id": 19970,
+      "kind": "spell",
+      "name": "Entangling Roots",
+      "icon": "spell_nature_stranglevines",
+      "edition": "classic",
+      "metadataSource": "https://nether.wowhead.com/classic/tooltip/spell/19970"
+    },
+    "spell:20484": {
+      "id": 20484,
+      "kind": "spell",
+      "name": "Rebirth",
+      "icon": "spell_nature_reincarnation",
+      "edition": "classic",
+      "metadataSource": "https://nether.wowhead.com/classic/tooltip/spell/20484"
+    },
+    "spell:21849": {
+      "id": 21849,
+      "kind": "spell",
+      "name": "Gift of the Wild",
+      "icon": "spell_nature_regeneration",
+      "edition": "classic",
+      "metadataSource": "https://nether.wowhead.com/classic/tooltip/spell/21849"
+    },
+    "spell:22568": {
+      "id": 22568,
+      "kind": "spell",
+      "name": "Ferocious Bite",
+      "icon": "ability_druid_ferociousbite",
+      "edition": "classic",
+      "metadataSource": "https://nether.wowhead.com/classic/tooltip/spell/22568"
+    },
+    "spell:22812": {
+      "id": 22812,
+      "kind": "spell",
+      "name": "Barkskin",
+      "icon": "spell_nature_stoneclawtotem",
+      "edition": "classic",
+      "metadataSource": "https://nether.wowhead.com/classic/tooltip/spell/22812"
+    },
+    "spell:22842": {
+      "id": 22842,
+      "kind": "spell",
+      "name": "Frenzied Regeneration",
+      "icon": "ability_bullrush",
+      "edition": "classic",
+      "metadataSource": "https://nether.wowhead.com/classic/tooltip/spell/22842"
+    },
+    "spell:24858": {
+      "id": 24858,
+      "kind": "spell",
+      "name": "Moonkin Form",
+      "icon": "spell_nature_forceofnature",
+      "edition": "classic",
+      "metadataSource": "https://nether.wowhead.com/classic/tooltip/spell/24858"
+    },
+    "spell:2637": {
+      "id": 2637,
+      "kind": "spell",
+      "name": "Hibernate",
+      "icon": "spell_nature_sleep",
+      "edition": "classic",
+      "metadataSource": "https://nether.wowhead.com/classic/tooltip/spell/2637"
+    },
+    "spell:2782": {
+      "id": 2782,
+      "kind": "spell",
+      "name": "Remove Curse",
+      "icon": "spell_holy_removecurse",
+      "edition": "classic",
+      "metadataSource": "https://nether.wowhead.com/classic/tooltip/spell/2782"
+    },
+    "spell:2893": {
+      "id": 2893,
+      "kind": "spell",
+      "name": "Abolish Poison",
+      "icon": "spell_nature_nullifypoison_02",
+      "edition": "classic",
+      "metadataSource": "https://nether.wowhead.com/classic/tooltip/spell/2893"
+    },
+    "spell:2908": {
+      "id": 2908,
+      "kind": "spell",
+      "name": "Soothe Animal",
+      "icon": "ability_hunter_beastsoothe",
+      "edition": "classic",
+      "metadataSource": "https://nether.wowhead.com/classic/tooltip/spell/2908"
+    },
+    "spell:2912": {
+      "id": 2912,
+      "kind": "spell",
+      "name": "Starfire",
+      "icon": "spell_arcane_starfire",
+      "edition": "classic",
+      "metadataSource": "https://nether.wowhead.com/classic/tooltip/spell/2912"
+    },
+    "spell:29166": {
+      "id": 29166,
+      "kind": "spell",
+      "name": "Innervate",
+      "icon": "spell_nature_lightning",
+      "edition": "classic",
+      "metadataSource": "https://nether.wowhead.com/classic/tooltip/spell/29166"
+    },
+    "spell:339": {
+      "id": 339,
+      "kind": "spell",
+      "name": "Entangling Roots",
+      "icon": "spell_nature_stranglevines",
+      "edition": "classic",
+      "metadataSource": "https://nether.wowhead.com/classic/tooltip/spell/339"
+    },
+    "spell:467": {
+      "id": 467,
+      "kind": "spell",
+      "name": "Thorns",
+      "icon": "spell_nature_thorns",
+      "edition": "classic",
+      "metadataSource": "https://nether.wowhead.com/classic/tooltip/spell/467"
+    },
+    "spell:48438": {
+      "id": 48438,
+      "kind": "spell",
+      "name": "Wild Growth",
+      "icon": "ability_druid_flourish",
+      "edition": "retail",
+      "metadataSource": "https://nether.wowhead.com/tooltip/spell/48438"
+    },
+    "spell:50769": {
+      "id": 50769,
+      "kind": "spell",
+      "name": "Revive",
+      "icon": "ability_druid_lunarguidance",
+      "edition": "retail",
+      "metadataSource": "https://nether.wowhead.com/tooltip/spell/50769"
+    },
+    "spell:5176": {
+      "id": 5176,
+      "kind": "spell",
+      "name": "Wrath",
+      "icon": "spell_nature_abolishmagic",
+      "edition": "classic",
+      "metadataSource": "https://nether.wowhead.com/classic/tooltip/spell/5176"
+    },
+    "spell:5177": {
+      "id": 5177,
+      "kind": "spell",
+      "name": "Wrath",
+      "icon": "spell_nature_abolishmagic",
+      "edition": "classic",
+      "metadataSource": "https://nether.wowhead.com/classic/tooltip/spell/5177"
+    },
+    "spell:5185": {
+      "id": 5185,
+      "kind": "spell",
+      "name": "Healing Touch",
+      "icon": "spell_nature_healingtouch",
+      "edition": "classic",
+      "metadataSource": "https://nether.wowhead.com/classic/tooltip/spell/5185"
+    },
+    "spell:5209": {
+      "id": 5209,
+      "kind": "spell",
+      "name": "Challenging Roar",
+      "icon": "ability_druid_challangingroar",
+      "edition": "classic",
+      "metadataSource": "https://nether.wowhead.com/classic/tooltip/spell/5209"
+    },
+    "spell:5211": {
+      "id": 5211,
+      "kind": "spell",
+      "name": "Bash",
+      "icon": "ability_druid_bash",
+      "edition": "classic",
+      "metadataSource": "https://nether.wowhead.com/classic/tooltip/spell/5211"
+    },
+    "spell:5215": {
+      "id": 5215,
+      "kind": "spell",
+      "name": "Prowl",
+      "icon": "ability_ambush",
+      "edition": "classic",
+      "metadataSource": "https://nether.wowhead.com/classic/tooltip/spell/5215"
+    },
+    "spell:5217": {
+      "id": 5217,
+      "kind": "spell",
+      "name": "Tiger's Fury",
+      "icon": "ability_mount_jungletiger",
+      "edition": "classic",
+      "metadataSource": "https://nether.wowhead.com/classic/tooltip/spell/5217"
+    },
+    "spell:5221": {
+      "id": 5221,
+      "kind": "spell",
+      "name": "Shred",
+      "icon": "spell_shadow_vampiricaura",
+      "edition": "classic",
+      "metadataSource": "https://nether.wowhead.com/classic/tooltip/spell/5221"
+    },
+    "spell:5225": {
+      "id": 5225,
+      "kind": "spell",
+      "name": "Track Humanoids",
+      "icon": "ability_tracking",
+      "edition": "classic",
+      "metadataSource": "https://nether.wowhead.com/classic/tooltip/spell/5225"
+    },
+    "spell:5229": {
+      "id": 5229,
+      "kind": "spell",
+      "name": "Enrage",
+      "icon": "ability_druid_enrage",
+      "edition": "classic",
+      "metadataSource": "https://nether.wowhead.com/classic/tooltip/spell/5229"
+    },
+    "spell:5487": {
+      "id": 5487,
+      "kind": "spell",
+      "name": "Bear Form",
+      "icon": "ability_racial_bearform",
+      "edition": "classic",
+      "metadataSource": "https://nether.wowhead.com/classic/tooltip/spell/5487"
+    },
+    "spell:5570": {
+      "id": 5570,
+      "kind": "spell",
+      "name": "Insect Swarm",
+      "icon": "spell_nature_insectswarm",
+      "edition": "classic",
+      "metadataSource": "https://nether.wowhead.com/classic/tooltip/spell/5570"
+    },
+    "spell:6785": {
+      "id": 6785,
+      "kind": "spell",
+      "name": "Ravage",
+      "icon": "ability_druid_ravage",
+      "edition": "classic",
+      "metadataSource": "https://nether.wowhead.com/classic/tooltip/spell/6785"
+    },
+    "spell:6795": {
+      "id": 6795,
+      "kind": "spell",
+      "name": "Growl",
+      "icon": "ability_physical_taunt",
+      "edition": "classic",
+      "metadataSource": "https://nether.wowhead.com/classic/tooltip/spell/6795"
+    },
+    "spell:6807": {
+      "id": 6807,
+      "kind": "spell",
+      "name": "Maul",
+      "icon": "ability_druid_maul",
+      "edition": "classic",
+      "metadataSource": "https://nether.wowhead.com/classic/tooltip/spell/6807"
+    },
+    "spell:740": {
+      "id": 740,
+      "kind": "spell",
+      "name": "Tranquility",
+      "icon": "spell_nature_tranquility",
+      "edition": "classic",
+      "metadataSource": "https://nether.wowhead.com/classic/tooltip/spell/740"
+    },
+    "spell:768": {
+      "id": 768,
+      "kind": "spell",
+      "name": "Cat Form",
+      "icon": "ability_druid_catform",
+      "edition": "classic",
+      "metadataSource": "https://nether.wowhead.com/classic/tooltip/spell/768"
+    },
+    "spell:770": {
+      "id": 770,
+      "kind": "spell",
+      "name": "Faerie Fire",
+      "icon": "spell_nature_faeriefire",
+      "edition": "classic",
+      "metadataSource": "https://nether.wowhead.com/classic/tooltip/spell/770"
+    },
+    "spell:774": {
+      "id": 774,
+      "kind": "spell",
+      "name": "Rejuvenation",
+      "icon": "spell_nature_rejuvenation",
+      "edition": "classic",
+      "metadataSource": "https://nether.wowhead.com/classic/tooltip/spell/774"
+    },
+    "spell:779": {
+      "id": 779,
+      "kind": "spell",
+      "name": "Swipe",
+      "icon": "inv_misc_monsterclaw_03",
+      "edition": "classic",
+      "metadataSource": "https://nether.wowhead.com/classic/tooltip/spell/779"
+    },
+    "spell:783": {
+      "id": 783,
+      "kind": "spell",
+      "name": "Travel Form",
+      "icon": "ability_druid_travelform",
+      "edition": "classic",
+      "metadataSource": "https://nether.wowhead.com/classic/tooltip/spell/783"
+    },
+    "spell:8921": {
+      "id": 8921,
+      "kind": "spell",
+      "name": "Moonfire",
+      "icon": "spell_nature_starfall",
+      "edition": "classic",
+      "metadataSource": "https://nether.wowhead.com/classic/tooltip/spell/8921"
+    },
+    "spell:8936": {
+      "id": 8936,
+      "kind": "spell",
+      "name": "Regrowth",
+      "icon": "spell_nature_resistnature",
+      "edition": "classic",
+      "metadataSource": "https://nether.wowhead.com/classic/tooltip/spell/8936"
+    },
+    "spell:8946": {
+      "id": 8946,
+      "kind": "spell",
+      "name": "Cure Poison",
+      "icon": "spell_nature_nullifypoison",
+      "edition": "classic",
+      "metadataSource": "https://nether.wowhead.com/classic/tooltip/spell/8946"
+    },
+    "spell:8998": {
+      "id": 8998,
+      "kind": "spell",
+      "name": "Cower",
+      "icon": "ability_druid_cower",
+      "edition": "classic",
+      "metadataSource": "https://nether.wowhead.com/classic/tooltip/spell/8998"
+    },
+    "spell:9005": {
+      "id": 9005,
+      "kind": "spell",
+      "name": "Pounce",
+      "icon": "ability_druid_supriseattack",
+      "edition": "classic",
+      "metadataSource": "https://nether.wowhead.com/classic/tooltip/spell/9005"
+    },
+    "spell:9634": {
+      "id": 9634,
+      "kind": "spell",
+      "name": "Dire Bear Form",
+      "icon": "ability_racial_bearform",
+      "edition": "classic",
+      "metadataSource": "https://nether.wowhead.com/classic/tooltip/spell/9634"
+    },
+    "spell:99": {
+      "id": 99,
+      "kind": "spell",
+      "name": "Demoralizing Roar",
+      "icon": "classic_ability_druid_demoralizingroar",
+      "edition": "classic",
+      "metadataSource": "https://nether.wowhead.com/classic/tooltip/spell/99"
+    }
+  },
+  "assets": {
+    "ability_ambush": {
+      "url": "https://wow.zamimg.com/images/wow/icons/large/ability_ambush.jpg",
+      "sha256": "acc00e6886d46737cfd65fac9d9915eabc604859e52e999dba3a155a95737ea7",
+      "bytes": 1812
+    },
+    "ability_bullrush": {
+      "url": "https://wow.zamimg.com/images/wow/icons/large/ability_bullrush.jpg",
+      "sha256": "16e3b17de00c51fb8cb7372b667b12783d0407ea90953c4b43181831285282be",
+      "bytes": 1724
+    },
+    "ability_druid_aquaticform": {
+      "url": "https://wow.zamimg.com/images/wow/icons/large/ability_druid_aquaticform.jpg",
+      "sha256": "92191834241df153e917fe316f406379db768416b75f575ab078488765859d11",
+      "bytes": 1729
+    },
+    "ability_druid_bash": {
+      "url": "https://wow.zamimg.com/images/wow/icons/large/ability_druid_bash.jpg",
+      "sha256": "6fe161320bf64a68cf5a9bbd029ec272aa22954b99c0050f6a0c4ae3092f608b",
+      "bytes": 2091
+    },
+    "ability_druid_catform": {
+      "url": "https://wow.zamimg.com/images/wow/icons/large/ability_druid_catform.jpg",
+      "sha256": "6b291740003679b302325d281ee70807b9430890fb6a5201a39fb081b5dadbcc",
+      "bytes": 1861
+    },
+    "ability_druid_challangingroar": {
+      "url": "https://wow.zamimg.com/images/wow/icons/large/ability_druid_challangingroar.jpg",
+      "sha256": "59c7ab3709668d9b16915390bd97750b01ad4a599977e548d299bff8d5a5e48d",
+      "bytes": 1912
+    },
+    "ability_druid_cower": {
+      "url": "https://wow.zamimg.com/images/wow/icons/large/ability_druid_cower.jpg",
+      "sha256": "a818112181c97e1ecf3ce55757dbc41b04a22b135bc81f950404301035de59ba",
+      "bytes": 1931
+    },
+    "ability_druid_dash": {
+      "url": "https://wow.zamimg.com/images/wow/icons/large/ability_druid_dash.jpg",
+      "sha256": "3022bbd0029c1ada10703d7e35b9da5620bdb80b42da8ad742343502d6a9bec8",
+      "bytes": 2236
+    },
+    "ability_druid_disembowel": {
+      "url": "https://wow.zamimg.com/images/wow/icons/large/ability_druid_disembowel.jpg",
+      "sha256": "eeda967dc12a77345c1ac9ccca7b57ba4670ee08fcf682b31f200b45c74d00bb",
+      "bytes": 1465
+    },
+    "ability_druid_enrage": {
+      "url": "https://wow.zamimg.com/images/wow/icons/large/ability_druid_enrage.jpg",
+      "sha256": "434ac68e0577033868589eedb748c6e674eb0f48ec5c1558bc62e764c8a3a522",
+      "bytes": 2132
+    },
+    "ability_druid_ferociousbite": {
+      "url": "https://wow.zamimg.com/images/wow/icons/large/ability_druid_ferociousbite.jpg",
+      "sha256": "71c959b74526048094d94253365ad25b459022b76acc10cc2b7527e0f19e07ff",
+      "bytes": 1964
+    },
+    "ability_druid_flourish": {
+      "url": "https://wow.zamimg.com/images/wow/icons/large/ability_druid_flourish.jpg",
+      "sha256": "1db5eef9a8832f2f0695f0965b03cb58b3e375e1291f5e1535496864a35452c2",
+      "bytes": 2160
+    },
+    "ability_druid_lunarguidance": {
+      "url": "https://wow.zamimg.com/images/wow/icons/large/ability_druid_lunarguidance.jpg",
+      "sha256": "b8f8deec83a4f7f805388423fd3c22cc3006b2c3960a33e6e58d2f78ab8fe23f",
+      "bytes": 1480
+    },
+    "ability_druid_maul": {
+      "url": "https://wow.zamimg.com/images/wow/icons/large/ability_druid_maul.jpg",
+      "sha256": "7dd82c04b2783879833c06bd07255eca6cce077613afce5d5bb7e603005b2a26",
+      "bytes": 1840
+    },
+    "ability_druid_rake": {
+      "url": "https://wow.zamimg.com/images/wow/icons/large/ability_druid_rake.jpg",
+      "sha256": "933cf40954197554d65b74f1410b5016936f531639323cd912e5f6eb5a88b42a",
+      "bytes": 1901
+    },
+    "ability_druid_ravage": {
+      "url": "https://wow.zamimg.com/images/wow/icons/large/ability_druid_ravage.jpg",
+      "sha256": "01188573e79c555e87b75f2a853e423abe3b3e4a16a01e900d1aff3ca473fbbc",
+      "bytes": 1637
+    },
+    "ability_druid_supriseattack": {
+      "url": "https://wow.zamimg.com/images/wow/icons/large/ability_druid_supriseattack.jpg",
+      "sha256": "c84e8f96caa54738d8e114900a37470c3bdca73008354f6a742668548a0d2d0d",
+      "bytes": 1960
+    },
+    "ability_druid_travelform": {
+      "url": "https://wow.zamimg.com/images/wow/icons/large/ability_druid_travelform.jpg",
+      "sha256": "eba62c416be72cc8ecd09becb662830070c008b97e8a813eebc36fbbef297cff",
+      "bytes": 1527
+    },
+    "ability_ghoulfrenzy": {
+      "url": "https://wow.zamimg.com/images/wow/icons/large/ability_ghoulfrenzy.jpg",
+      "sha256": "c2bebe7dd18205bf978c102e5cc22b2163d398f9c52e7795b04523975f072b14",
+      "bytes": 1664
+    },
+    "ability_hunter_beastsoothe": {
+      "url": "https://wow.zamimg.com/images/wow/icons/large/ability_hunter_beastsoothe.jpg",
+      "sha256": "fa2e77be2b76f43c6f96865575b04489d0b9e37d767e560311eae202f3e20931",
+      "bytes": 1771
+    },
+    "ability_hunter_pet_bear": {
+      "url": "https://wow.zamimg.com/images/wow/icons/large/ability_hunter_pet_bear.jpg",
+      "sha256": "6ebc67b2b5616f4e13fb01c2b9bdc505c9b7b45c5e54b834424362110be1a814",
+      "bytes": 1900
+    },
+    "ability_mount_jungletiger": {
+      "url": "https://wow.zamimg.com/images/wow/icons/large/ability_mount_jungletiger.jpg",
+      "sha256": "e1f2643fe991d7c405ece42030667ffb02f1f304d06a6d6e961fa6f47a786669",
+      "bytes": 2138
+    },
+    "ability_mount_ridinghorse": {
+      "url": "https://wow.zamimg.com/images/wow/icons/large/ability_mount_ridinghorse.jpg",
+      "sha256": "5d98c87823ce2b2769e1e4395e04e8de241acaa6f7dcc479350395b8cd47c752",
+      "bytes": 1752
+    },
+    "ability_physical_taunt": {
+      "url": "https://wow.zamimg.com/images/wow/icons/large/ability_physical_taunt.jpg",
+      "sha256": "2fd3c881d95cfe4eb6d9953b6ba35b62267cb5fcd0d59bd744ce074954ed2db6",
+      "bytes": 1863
+    },
+    "ability_racial_bearform": {
+      "url": "https://wow.zamimg.com/images/wow/icons/large/ability_racial_bearform.jpg",
+      "sha256": "1021a85689bddb50cd690567030c2b9cc3644ee32f9d64c2f636036c33417261",
+      "bytes": 1695
+    },
+    "ability_tracking": {
+      "url": "https://wow.zamimg.com/images/wow/icons/large/ability_tracking.jpg",
+      "sha256": "520287130b97a33d39eeb7d13e1e47076c923ca25df3864dcebc117db55645a3",
+      "bytes": 1670
+    },
+    "classic_ability_druid_demoralizingroar": {
+      "url": "https://wow.zamimg.com/images/wow/icons/large/classic_ability_druid_demoralizingroar.jpg",
+      "sha256": "8f1084ce7797a709ebc93efab136e4be1e805bdf794625a40c921b32ce500e55",
+      "bytes": 1925
+    },
+    "inv_jewelry_trinketpvp_01": {
+      "url": "https://wow.zamimg.com/images/wow/icons/large/inv_jewelry_trinketpvp_01.jpg",
+      "sha256": "2f9ff0e3dcc197b34a2f070d718c8f16f11673168f0d5fb795b041c686e75ee2",
+      "bytes": 2157
+    },
+    "inv_misc_bag_08": {
+      "url": "https://wow.zamimg.com/images/wow/icons/large/inv_misc_bag_08.jpg",
+      "sha256": "8abd2c59b153f4a14e540ee1dfcd5e9f5d89e068fe53e766c054b9289c0c1f05",
+      "bytes": 1774
+    },
+    "inv_misc_bandage_12": {
+      "url": "https://wow.zamimg.com/images/wow/icons/large/inv_misc_bandage_12.jpg",
+      "sha256": "d858e8e3715c3e16ab973155a881cf569efa7f0518d5fea1df345df5f4bcec23",
+      "bytes": 1459
+    },
+    "inv_misc_book_09": {
+      "url": "https://wow.zamimg.com/images/wow/icons/large/inv_misc_book_09.jpg",
+      "sha256": "96e78430bca4f44617baecbb548c3d99e2a1e84318e33850212a48e300c5b0ad",
+      "bytes": 1807
+    },
+    "inv_misc_monsterclaw_03": {
+      "url": "https://wow.zamimg.com/images/wow/icons/large/inv_misc_monsterclaw_03.jpg",
+      "sha256": "687ce3f955fb4faf01eb731abde7cc062e9fb47060194c23f9eb50126649e6b5",
+      "bytes": 2089
+    },
+    "inv_misc_questionmark": {
+      "url": "https://wow.zamimg.com/images/wow/icons/large/inv_misc_questionmark.jpg",
+      "sha256": "c2946592d85b6172ea3cf6714832fa867c3b253a06eb2e4ba6f57908863e44a0",
+      "bytes": 1369
+    },
+    "inv_misc_spyglass_02": {
+      "url": "https://wow.zamimg.com/images/wow/icons/large/inv_misc_spyglass_02.jpg",
+      "sha256": "c28896108f29d98f6ebc45c1f667f5e39c47a269a45909c2a064b7dc410e13a4",
+      "bytes": 1607
+    },
+    "inv_musket_01": {
+      "url": "https://wow.zamimg.com/images/wow/icons/large/inv_musket_01.jpg",
+      "sha256": "9ff821fd9fe31b8381383a4923d8ffbad78aa875b46efcd4d978d93d04ce326b",
+      "bytes": 1390
+    },
+    "inv_potion_52": {
+      "url": "https://wow.zamimg.com/images/wow/icons/large/inv_potion_52.jpg",
+      "sha256": "7c1b9b0d44d77e0bd4da7942b98d649d93da0c0f6295ab04f7f2fd7962e6bfa7",
+      "bytes": 1593
+    },
+    "inv_relics_idolofrejuvenation": {
+      "url": "https://wow.zamimg.com/images/wow/icons/large/inv_relics_idolofrejuvenation.jpg",
+      "sha256": "d724a7fa13a60084bd50eca143f44cc9a837406af278253754b32ab36aeb350d",
+      "bytes": 1826
+    },
+    "inv_stone_04": {
+      "url": "https://wow.zamimg.com/images/wow/icons/large/inv_stone_04.jpg",
+      "sha256": "e2509db7f190d7cf2bc5ebdc8c06eaae05481ad709d4a79ddae59da6c8aaf3de",
+      "bytes": 1986
+    },
+    "spell_arcane_starfire": {
+      "url": "https://wow.zamimg.com/images/wow/icons/large/spell_arcane_starfire.jpg",
+      "sha256": "60e0ad33a1772e6de86dbf97f5c994d452cd713d6c10096255ae6e92b2e6d230",
+      "bytes": 2045
+    },
+    "spell_arcane_teleportmoonglade": {
+      "url": "https://wow.zamimg.com/images/wow/icons/large/spell_arcane_teleportmoonglade.jpg",
+      "sha256": "d217d7b9e0931eb661393e97e3690f64fe3ae75e29885aa7e010e3c68c870624",
+      "bytes": 1482
+    },
+    "spell_holy_removecurse": {
+      "url": "https://wow.zamimg.com/images/wow/icons/large/spell_holy_removecurse.jpg",
+      "sha256": "e195276f790e14ae51ee8264b9cc00450a55979fade18a6a3cf2d64648b3f5a7",
+      "bytes": 1934
+    },
+    "spell_nature_abolishmagic": {
+      "url": "https://wow.zamimg.com/images/wow/icons/large/spell_nature_abolishmagic.jpg",
+      "sha256": "98b819bc9987638b4116cab53ee1339fac1c3df12d04f780e5e1125d0fee2cd2",
+      "bytes": 1556
+    },
+    "spell_nature_crystalball": {
+      "url": "https://wow.zamimg.com/images/wow/icons/large/spell_nature_crystalball.jpg",
+      "sha256": "a671a928132b55932e458ca83ee07e543566cad9f6883b0cd7458de8483f2866",
+      "bytes": 1770
+    },
+    "spell_nature_cyclone": {
+      "url": "https://wow.zamimg.com/images/wow/icons/large/spell_nature_cyclone.jpg",
+      "sha256": "d83c25e2c8f0cdeec4e64461b25a954528bef8fc2b5447deb32e39ba31ff833b",
+      "bytes": 1506
+    },
+    "spell_nature_faeriefire": {
+      "url": "https://wow.zamimg.com/images/wow/icons/large/spell_nature_faeriefire.jpg",
+      "sha256": "08f6e660cc62f5a31667c3d0dbfb71549f38981ba0a108a463e19429e7645824",
+      "bytes": 1878
+    },
+    "spell_nature_forceofnature": {
+      "url": "https://wow.zamimg.com/images/wow/icons/large/spell_nature_forceofnature.jpg",
+      "sha256": "aed07da825021cd5f47413f911bc0fabf8d585720b076ffab13f48a29d54b83b",
+      "bytes": 1759
+    },
+    "spell_nature_healingtouch": {
+      "url": "https://wow.zamimg.com/images/wow/icons/large/spell_nature_healingtouch.jpg",
+      "sha256": "18769de0e3eb3ff5fc6ef61815ec015f85cb7a2782079a04cbe8ecea3c11792a",
+      "bytes": 1733
+    },
+    "spell_nature_insectswarm": {
+      "url": "https://wow.zamimg.com/images/wow/icons/large/spell_nature_insectswarm.jpg",
+      "sha256": "deb03fabc2721c46e399eca29cb5e6fcc3de4a8b220e0645fa4a50d0e17af4fe",
+      "bytes": 2123
+    },
+    "spell_nature_lightning": {
+      "url": "https://wow.zamimg.com/images/wow/icons/large/spell_nature_lightning.jpg",
+      "sha256": "32b03501d89d266eaf29914a6b9e42cf8aed8735de632156e91b6dd7b7d66af2",
+      "bytes": 1473
+    },
+    "spell_nature_natureswrath": {
+      "url": "https://wow.zamimg.com/images/wow/icons/large/spell_nature_natureswrath.jpg",
+      "sha256": "2e9ba50feb1f50885ac5a8ddc494e257157b6e0d055d98c213992014c9be4590",
+      "bytes": 2166
+    },
+    "spell_nature_nullifypoison": {
+      "url": "https://wow.zamimg.com/images/wow/icons/large/spell_nature_nullifypoison.jpg",
+      "sha256": "c78a866e069e0f6490920ac164a7ce419b0d9df222bf2579baae99ddd28fa968",
+      "bytes": 1760
+    },
+    "spell_nature_nullifypoison_02": {
+      "url": "https://wow.zamimg.com/images/wow/icons/large/spell_nature_nullifypoison_02.jpg",
+      "sha256": "b1241830e1b337355db1bc315ad09bfc28721b21bcf53aeff98d3bbb5a6538c9",
+      "bytes": 2075
+    },
+    "spell_nature_ravenform": {
+      "url": "https://wow.zamimg.com/images/wow/icons/large/spell_nature_ravenform.jpg",
+      "sha256": "0ce0820738312f9ebe01ddb702ab62d7c9a924e048b937170bab2880dfdeb2ad",
+      "bytes": 1637
+    },
+    "spell_nature_regeneration": {
+      "url": "https://wow.zamimg.com/images/wow/icons/large/spell_nature_regeneration.jpg",
+      "sha256": "aa51e831637d693eb86f049ed43df03865224ac41c72729820530648fbb7bdfc",
+      "bytes": 1809
+    },
+    "spell_nature_reincarnation": {
+      "url": "https://wow.zamimg.com/images/wow/icons/large/spell_nature_reincarnation.jpg",
+      "sha256": "7bbf9d657a28e08d08f5d86c21d7c8cbe68f45fbb65151c8f594fcabbd830f48",
+      "bytes": 1772
+    },
+    "spell_nature_rejuvenation": {
+      "url": "https://wow.zamimg.com/images/wow/icons/large/spell_nature_rejuvenation.jpg",
+      "sha256": "859b7e4465fb11d66286459beb6acac30cb9060d94468a1879045c58dd41d1a5",
+      "bytes": 2295
+    },
+    "spell_nature_resistnature": {
+      "url": "https://wow.zamimg.com/images/wow/icons/large/spell_nature_resistnature.jpg",
+      "sha256": "a1e8430414ed0a752a574ca947981683e6f249263c0773d814793585fee856f7",
+      "bytes": 1976
+    },
+    "spell_nature_sleep": {
+      "url": "https://wow.zamimg.com/images/wow/icons/large/spell_nature_sleep.jpg",
+      "sha256": "9c787b793fe76b44b5a043cff3a09001f5bbc9ffaaf23c5852b09ab3b008304d",
+      "bytes": 1580
+    },
+    "spell_nature_starfall": {
+      "url": "https://wow.zamimg.com/images/wow/icons/large/spell_nature_starfall.jpg",
+      "sha256": "82d18428ab4ce8f23af1f7180e028b69913a405dcd2e924ea78f24e8408fc9f8",
+      "bytes": 1617
+    },
+    "spell_nature_stoneclawtotem": {
+      "url": "https://wow.zamimg.com/images/wow/icons/large/spell_nature_stoneclawtotem.jpg",
+      "sha256": "aa710067b510239097b5ad3f887f5d105c724660b1d646462b4a8c154f66fd7b",
+      "bytes": 2429
+    },
+    "spell_nature_stranglevines": {
+      "url": "https://wow.zamimg.com/images/wow/icons/large/spell_nature_stranglevines.jpg",
+      "sha256": "1f95d943f651625427a94dacf362cc4c88161d71f48a0577ff1100239fa5d91a",
+      "bytes": 1947
+    },
+    "spell_nature_thorns": {
+      "url": "https://wow.zamimg.com/images/wow/icons/large/spell_nature_thorns.jpg",
+      "sha256": "3061cd655ea57f6ffd05beda1cef05b0ba10c5a4e7ec789170a7bd60f76777b1",
+      "bytes": 1759
+    },
+    "spell_nature_tranquility": {
+      "url": "https://wow.zamimg.com/images/wow/icons/large/spell_nature_tranquility.jpg",
+      "sha256": "d57de757544a64e8f34e58cfdf95e88bab2e76cf1cb1b238a44d0c62091adca5",
+      "bytes": 1307
+    },
+    "spell_nature_wispsplode": {
+      "url": "https://wow.zamimg.com/images/wow/icons/large/spell_nature_wispsplode.jpg",
+      "sha256": "baccc73b1067d3a9d6761f3588d41c6aa46092f5adc10f5e26065a8e15d58d18",
+      "bytes": 1479
+    },
+    "spell_shadow_vampiricaura": {
+      "url": "https://wow.zamimg.com/images/wow/icons/large/spell_shadow_vampiricaura.jpg",
+      "sha256": "029294831748994ba5d2a5ec7ca29ea08917393251c579d4a9cc798bf16a15e4",
+      "bytes": 1892
+    }
+  }
+}

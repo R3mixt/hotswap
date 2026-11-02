@@ -6,7 +6,9 @@ artwork and client rendering remain approximations in the PNG renderer.
 """
 from pathlib import Path
 import json, math, sys
+from icon_assets import verify as verify_icons
 ROOT = Path(__file__).resolve().parent.parent
+icon_manifest = verify_icons()
 sys.path.insert(0, str(ROOT/'python-deps'))
 from lupa.lua51 import LuaRuntime
 lua = LuaRuntime(unpack_returned_tuples=True)
@@ -58,6 +60,7 @@ function CreateFrame(kind,name,parent,template)
  function f:GetBackdropBorderColor() return unpack(self.border or {1,1,1,1}) end
  function f:SetColorTexture(...) self.fill={...};self.texture=nil end
  function f:SetTexture(value) self.texture=value;self.fill=nil end
+ function f:SetTexCoord(...) self.texCoord={...} end
  function f:SetTextColor(...) self.color={...} end
  function f:GetTextColor() return unpack(self.color or {1,1,1,1}) end
  function f:GetVertexColor() return unpack(self.vertexColor or {1,1,1,1}) end
@@ -107,10 +110,45 @@ for module in modules:
     lua.compile((ROOT/'KeybindOptimizer'/f'{module}.lua').read_text(encoding='utf-8-sig'))('KeybindOptimizer',namespace)
 lua.globals().K=namespace
 lua.globals().TestAddon=namespace
+icons=lua.table()
+for key,entry in icon_manifest['entities'].items():
+    record=lua.table()
+    for field,value in entry.items():record[field]=value
+    icons[key]=record
+lua.globals().PreviewIcons=icons
 lua.execute(r'''
 Mock.build='1.15.9'; Mock.buildNumber='70576'
+-- Resolve art for both learned and unlearned spells, without changing learning.
+for key,entry in pairs(PreviewIcons) do
+    if entry.kind=='spell' then
+        local known=Mock:Spell(entry.id)
+        if known then known.icon='ICON:'..key
+        else Mock.catalog[entry.id]={id=entry.id,name=entry.name,icon='ICON:'..key} end
+    end
+end
+for _,macro in pairs(Mock.macros) do macro.icon='Interface\\Icons\\INV_Misc_QuestionMark' end
+local originalItemInfo=GetItemInfo
+function GetItemInfo(id)
+    local values={originalItemInfo(id)}
+    if values[1] and PreviewIcons['item:'..id] then values[10]='ICON:item:'..id end
+    return unpack(values)
+end
+C_Item.GetItemInfo=GetItemInfo
+function GetInventoryItemTexture(unit,slot)
+    local id=Mock.equipment[slot]
+    return id and PreviewIcons['item:'..id] and 'ICON:item:'..id or nil
+end
+local originalBagItemInfo=C_Container.GetContainerItemInfo
+function C_Container.GetContainerItemInfo(bag,slot)
+    local item=originalBagItemInfo(bag,slot)
+    if item and PreviewIcons['item:'..item.itemID] then item.iconFileID='ICON:item:'..item.itemID end
+    return item
+end
+function GetShapeshiftFormInfo(index)
+    local form=Mock.forms[index]
+    if form then return 'ICON:spell:'..form.id,false,true,form.id end
+end
 K:Init(); K:GetSettings().flavor='era'
-for _,s in ipairs(Mock.spells) do s.icon='QA:'..s.name end
 Mock.itemInfo[5512]={name='Minor Healthstone',effect='Restores health'}
 Mock.itemInfo[1710]={name='Greater Healing Potion',effect='Restores health'}
 Mock.itemInfo[4388]={name='Discombobulator Ray',effect='Discombobulator Ray'}
@@ -144,6 +182,7 @@ for theme in ('classic','modern'):
     ])
 if namespace.Themes:
     cases.extend(showcase_cases)
+uncached_icons=set()
 for page,output_name,form,layer in cases:
     showcase=output_name.startswith(('classic-','modern-'))
     theme=output_name.split('-',1)[0] if showcase else 'classic'
@@ -213,6 +252,15 @@ K.UI.libraryCategory=nil; K.UI.libraryQuery=''; K.UI.libraryRanks=false
             if value is None:return None
             return int(value['qid']) if value['qid'] else 0
         n={'id':int(f.qid),'kind':f.kind,'strata':f.strata,'parent':ident(f.parent),'all':ident(f.all),'scrollHost':ident(f.scrollHost),'shown':bool(f.shown),'alpha':f.alpha if isinstance(f.alpha,(int,float)) else 1,'w':f.width,'h':f.height,'text':str(f.GetText(f) or ''),'font':f.fontsize or 12,'fontpath':f.fontpath,'wrap':f.wrap is not False,'justify':f.justify or 'LEFT','justifyV':f.justifyV or 'TOP','points':[], 'template':f.template, 'texture':f.texture if isinstance(f.texture,str) else None,'selected':bool(f.selected),'checked':bool(f.checked),'enabled':f.enabled is not False,'keycap':bool(f.base),'theme':theme,'themeRole':f.hotSwapThemeRole}
+        n['texCoord']=list(f.texCoord.values()) if f.texCoord else [0,1,0,1]
+        n['desaturated']=bool(f.desaturated)
+        if isinstance(f.texture,(int,float)):n['unresolvedTexture']=f.texture
+        if n['texture'] and n['texture'].startswith('ICON:'):
+            n['icon']=icon_manifest['entities'][n['texture'][5:]]['icon']
+        elif n['texture'] and n['texture'].lower().startswith('interface\\icons\\'):
+            n['icon']=n['texture'].split('\\')[-1].lower()
+        if n.get('icon') and n['icon'] not in icon_manifest['assets']:
+            uncached_icons.add(n['icon'])
         if f.backdrop:n['backdrop']={k:v for k,v in f.backdrop.items() if k in ('bgFile','edgeFile','edgeSize')}
         n['layer']=f.layer or ('OVERLAY' if f.kind=='FontString' else 'ARTWORK')
         n['sublevel']=f.sublevel if isinstance(f.sublevel,(int,float)) else 0
@@ -299,4 +347,6 @@ K.UI.libraryCategory=nil; K.UI.libraryQuery=''; K.UI.libraryRanks=false
         result.append(n)
     (ROOT/'ui-qa'/f'{output_name}.json').write_text(json.dumps(result),encoding='utf-8')
     print(output_name, 'captured',len(result),'visible native UI objects')
+if uncached_icons:
+    raise RuntimeError('Uncached icon assets: '+', '.join(sorted(uncached_icons)))
 print('Actual UI.lua instantiated successfully under Lua 5.1. Mock geometry only; no game-client claim.')

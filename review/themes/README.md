@@ -1,6 +1,6 @@
 # Classic and Modern previews
 
-Generated on 2026-11-02 from the actual development addon UI, without running World of Warcraft. The Lua harness supplies the same sample Druid bindings to both themes. Artwork, spell icons and fonts are approximations; these are not live-game captures.
+Generated on 2026-11-02 from the actual development addon UI, without running World of Warcraft. The Lua harness supplies the same sample Druid bindings to both themes. Spell icons use recognizable game artwork from the preview-only cache; frame artwork and fonts remain approximations. These are not live-game captures.
 
 ![Classic and Modern](theme-comparison.png)
 
@@ -16,6 +16,7 @@ Images are exported at twice the logical UI resolution. [Reproduction instructio
 ## Verification
 
 - 505 Lua 5.1 scenarios passed, including 11 new theme regressions.
+- A follow-up icon audit passed all 13 focused theme tests, including two new tests preserving spell artwork, visibility, alpha, crop, tint and size across repeated theme switches in the keyboard, spellbook and lazy hover editor.
 - 7 archive packaging checks and 8 publisher checks passed.
 - Theme tests cover local persistence, invalid values, preset/export isolation, Current and preset drafts, reset, lazy dialogs, reversible native artwork/fonts, button and checkbox states, repeated switching, combat and busy-operation boundaries.
 - Visual review covered both themes, the populated keyboard, settings, preset lists and spellbook. Slider positions follow their actual values; text respects the widgets' wrapping settings.

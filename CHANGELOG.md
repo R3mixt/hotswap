@@ -5,6 +5,7 @@
 - Add a Modern theme with flat slate panels, cool accents and sans-serif typography alongside the default Classic theme.
 - Switch themes immediately in Settings → Window without changing binding drafts or shared presets. Reset appearance restores Classic.
 - Generate reproducible Classic and Modern preview images from the real addon UI without launching WoW, with explicit offline-preview labels.
+- Show recognizable spell artwork in offline theme previews instead of letter placeholders or blank numeric texture references; verify that live theme switching preserves spell icons.
 
 ## 1.0.0 - 2026-11-02
 

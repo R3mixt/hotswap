@@ -30,7 +30,7 @@ Choose **Classic** or **Modern** under **Settings → Window → Theme**. Classi
 
 ![Modern theme offline preview](review/themes/modern-current.png)
 
-*Rendered from the actual addon UI without running WoW. Sample bindings, approximate icons and fonts. See the [theme guide](docs/themes.md), [Classic comparison](review/themes/classic-current.png), and [preview generation instructions](ui-qa/README.md). This feature is in development after the 1.0 release.*
+*Rendered from the actual addon UI without running WoW. Sample bindings and real spell artwork; fonts and frame artwork are approximate. See the [theme guide](docs/themes.md), [Classic comparison](review/themes/classic-current.png), and [preview generation instructions](ui-qa/README.md). This feature is in development after the 1.0 release.*
 
 ## Install
 

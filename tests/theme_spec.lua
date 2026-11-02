@@ -193,3 +193,79 @@ function Tests.theme_checked_state_tracks_native_updates_and_disables_without_lo
     assert(k.Themes:Set("classic"))
     assert(check:GetCheckedTexture():GetAlpha()==1 and check:GetDisabledCheckedTexture():GetAlpha()==1,"Classic checkbox did not regain both native check textures")
 end
+
+-- Track texture cropping locally: the general mock otherwise treats
+-- SetTexCoord as a no-op, which would conceal an icon-masking regression.
+local function trackThemeIconCrops()
+    local create=CreateFrame
+    CreateFrame=function(...)
+        local frame=create(...)
+        if frame.kind=="Texture" then
+            local set=frame.SetTexCoord
+            frame.SetTexCoord=function(self,...)
+                self.themeTestCrop={...}; return set(self,...)
+            end
+        end
+        return frame
+    end
+end
+local function themeIconSnapshot(icon)
+    assert(icon and icon:IsVisible() and icon:GetAlpha()>0,"Fixture spell icon must be visible")
+    assert(icon:GetTexture(),"Fixture spell icon must have its native artwork")
+    return {
+        icon=icon,texture=icon:GetTexture(),alpha=icon:GetAlpha(),
+        crop=TestAddon.Copy(icon.themeTestCrop),vertex=TestAddon.Copy(icon.vertexColor),
+        solid=TestAddon.Copy(icon.colorTexture),desaturated=icon.desaturated,
+        width=icon:GetWidth(),height=icon:GetHeight(),
+    }
+end
+local function assertThemeIconsUnchanged(snapshots)
+    for _,entry in ipairs(snapshots) do
+        local icon=entry.icon
+        assert(icon:IsVisible() and icon:GetAlpha()==entry.alpha,"Theme hid or faded a spell icon")
+        assert(icon:GetTexture()==entry.texture and same(icon.colorTexture,entry.solid),"Theme replaced spell artwork with a flat surface")
+        assert(same(icon.themeTestCrop,entry.crop),"Theme changed spell icon cropping")
+        assert(same(icon.vertexColor,entry.vertex) and icon.desaturated==entry.desaturated,"Theme recolored a spell icon or changed its learned-state treatment")
+        assert(icon:GetWidth()==entry.width and icon:GetHeight()==entry.height,"Theme changed spell icon dimensions")
+    end
+end
+
+function Tests.theme_current_keyboard_and_spellbook_keep_original_spell_artwork()
+    trackThemeIconCrops()
+    local spells={{5177,"Interface\\Icons\\Spell_Nature_AbolishMagic"},{8921,"Interface\\Icons\\Spell_Nature_StarFall"},{2912,"Interface\\Icons\\Spell_Arcane_StarFire"}}
+    for slot,spell in ipairs(spells) do
+        Mock:Spell(spell[1]).icon=spell[2]
+        Mock.actions[slot]={"spell",spell[1]}; Mock.bindings[tostring(slot)]="ACTIONBUTTON"..slot
+    end
+    local k=themeAddon(); local ui=k.UI; local snapshots={}
+    for slot,spell in ipairs(spells) do
+        local icon=ui.pages.Bindings.keyboard.keys[tostring(slot)].icon
+        assert(icon:GetTexture()==spell[2],"Current keyboard omitted the native spell texture")
+        snapshots[#snapshots+1]=themeIconSnapshot(icon)
+    end
+    local libraryIcons=0
+    for _,row in ipairs(ui.library.list.rows) do
+        if row:IsVisible() and row.icon:GetTexture() then
+            libraryIcons=libraryIcons+1; snapshots[#snapshots+1]=themeIconSnapshot(row.icon)
+        end
+    end
+    assert(libraryIcons>=3,"Fixture did not expose enough spellbook icons")
+    for _,theme in ipairs({"modern","classic","modern"}) do
+        assert(ui:SetTheme(theme)); assertThemeIconsUnchanged(snapshots)
+    end
+end
+
+function Tests.theme_lazy_hover_editor_keeps_spell_icons_through_switches()
+    trackThemeIconCrops()
+    local k=themeAddon(); local ui=k.UI
+    assert(ui:SetTheme("modern")); ui:OpenHoverBindings()
+    assert(ui.hoverBindings and ui.hoverBindings:IsShown(),"Hover editor did not open in Modern")
+    local snapshots={}
+    for _,row in pairs(ui.hoverBindings.rows) do
+        if row:IsVisible() then snapshots[#snapshots+1]=themeIconSnapshot(row.icon) end
+    end
+    assert(#snapshots>=10,"Fixture did not populate the hover editor's spell icons")
+    for _,theme in ipairs({"classic","modern","classic"}) do
+        assert(ui:SetTheme(theme)); assertThemeIconsUnchanged(snapshots)
+    end
+end
