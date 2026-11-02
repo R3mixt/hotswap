@@ -1,0 +1,150 @@
+Hot Swap 0.4.4 transaction and system review
+Baseline: 7d5d5f28a527bfa298ddc33f7a4670b0d24da5bf
+Review date: 2026-11-02
+Scope: Engine, AvailabilityEngine, NativeBars, Core and related API/tests.
+No runtime source was changed.
+
+Evidence
+--------
+transaction_repros.py executes three independent scenarios with the actual
+Lua modules and existing Lua 5.1/WoW mock harness. All three reproduced.
+It asserts the defects as observed, not the expected corrected behavior.
+Run:
+  python review/2026-11-02/transaction_repros.py --deps PATH_TO_LUPA_DIRECTORY
+The default dependency directory is project/python-deps; an installed Lupa
+or PYTHONPATH also works. These are code-level reproductions, not proof of
+live-client protected execution, event timing, casting or taint behavior.
+
+P1 / confirmed: named restore can bind an edited macro after safely recreating
+the intended macro under a new name
+-------------------------------------------------------------------------
+Primary anchor: KeybindOptimizer/Engine.lua:700.
+Supporting anchors: Engine.lua:344-350; Engine.lua:699;
+NativeBars.lua:317-320; Engine.lua:155-160.
+
+Scenario: on a four-extra-bar client, save an applied Warlock layout that
+uses an overflow direct MACRO binding. Edit its generated macro personally.
+Restore original, then restore the named applied backup. Macro creation
+correctly preserves the personal edit and recreates the original body under
+a suffixed name. Native slot restoration also resolves the replacement.
+However, restoreSteps copies the snapshot's literal "MACRO oldName" binding
+unchanged. It verifies that old string and reports successful restoration.
+
+Observed: SHIFT-G binds MACRO KBO_59b3776b; installed plan's intended identity
+is MACRO KBO_59b3776b_1. The first macro contains the personal /say edit,
+whereas the second contains the intended Siphon Life placeholder. This
+affects generated overflow bindings; the reproduction does not claim all
+native slot placements are wrong.
+
+Expected: restore every owned direct macro key to the exact recovered body,
+preserving the personally edited macro separately.
+
+Fix: build an old-identity -> resolved-identity mapping when recreating owned
+macros. Reconcile only snapshot references whose saved name/body prove
+ownership, including active and saved binding maps and bindingOwnership;
+never rewrite arbitrary personal MACRO references by name alone. Verify
+resolved macro contents in addition to the final command string.
+
+Acceptance: edit/remove/recreate name collision; restore backup with native
+and overflow references; original personal macro unchanged; every restored
+key executes the saved exact body; later maintenance and key release still
+use coherent ownership metadata.
+
+P1 / confirmed safety-design issue: automatic form recovery performs a full
+original restore and removes unrelated personal changes
+------------------------------------------------------------------------
+Primary anchor: KeybindOptimizer/Core.lua:195.
+Related automatic asynchronous path: Core.lua:154-156.
+Related login fallback to review: Core.lua:315.
+
+Scenario: apply Druid; later add an unrelated CTRL-F24 chat key and a native
+item slot; personally edit the generated Cat macro; change the form-index
+signature. Maintenance refuses to overwrite the edited macro, but Core
+then calls the full original Restore automatically. Repro uses the same
+deterministic form-index reorder fixture as existing macro_identity tests,
+while retaining Core's high-level recovery callback.
+
+Observed: addon becomes disabled; CTRL-F24 is unbound; the item in slot 2
+is removed. The worker-level preservation guarantee is defeated by its
+caller's broad fallback. Existing macro_identity_spec.lua:138-140 explicitly
+bypasses Core's fallback to isolate worker rollback, so that test does not
+verify end-to-end preservation.
+
+Expected: a maintenance failure may stop unsafe owned actions and request
+review, but it should not silently reset unrelated changes made since the
+original install. Explicit full Restore may retain its documented scope.
+
+Fix: introduce a recovery-required state. Quarantine or neutralize only
+still-owned stale form actions outside combat, preserve detached/personal
+slots and bindings, retain the backup, and present an explicit recovery
+choice. Review the login fallback using the same policy. Do not simply
+ignore stale form indices, which can select an unintended form.
+
+Acceptance: form-index change plus edited/removed owned macro or failed
+maintenance keeps unrelated keys, slots, saved drafts and personal macros;
+affected unsafe owned controls become inert or safely repaired; full
+original restore happens only through an explicit user action.
+
+P2 / confirmed: interleaved unrelated binding changes make Apply and its
+rollback both fail verification
+----------------------------------------------------------------------
+Primary anchor: KeybindOptimizer/Engine.lua:583.
+Supporting anchors: Engine.lua:281-301; Engine.lua:598-599;
+Engine.lua:361-362; Engine.lua:469-476.
+
+Scenario: begin Apply asynchronously and complete backup/macro preparation.
+Pause the worker for combat. After combat ends, set unrelated CTRL-F24 to
+OPENCHAT before the next worker frame. Resume. This models another binding
+writer or user edit in a yielding operation; no writes occur in combat.
+
+Observed: Apply fails on "Unexpected binding remains on CTRL-F24". Rollback
+also fails on "Unexpected restored key CTRL-F24" and reports that recovery
+could not finish. The new personal key survives this reproduction; do not
+describe this case as deleting that key. Cleanup after restoreSteps is not
+reached. Cached job.currentBindings never saw the unrelated addition, and
+strict full-map verification treats it as failed installation/recovery.
+
+Expected: unrelated changes should either merge safely or cause a clearly
+reported conflict before further writes, with recoverable transaction state.
+
+Fix: track an operation mutation journal and live revisions. Reconcile
+fresh observed bindings at resume, before merge and before commit; apply
+compare-and-set ownership rules to touched keys. Rollback should inspect
+current values and reverse only its own writes while preserving concurrent
+unrelated changes. Keep explicit full backup restoration semantics distinct.
+
+Acceptance: additions/removals/changes to unrelated keys after snapshot,
+at combat resume and during rollback do not produce a false recovery failure;
+edits to touched keys follow a documented conflict policy; saved sets remain
+correct; owned macro cleanup completes safely.
+
+System-design recommendations
+-----------------------------
+1. Centralize stable macro identity resolution for generation, native
+   placement, direct bindings, restoration and maintenance. A restored plan
+   and its executable bindings must be verified as one consistent object.
+2. Separate explicit full-restore commands from automatic maintenance
+   recovery. A typed operation intent should constrain permitted write scope.
+3. Extend the existing transaction runner with observed revision/checkpoint
+   and mutation-journal information, preserving its six-step/four-ms budget.
+4. Add end-to-end recovery tests with Core callbacks intact. Existing narrow
+   worker tests are useful but can hide destructive caller fallbacks.
+5. Add a backup retention/size policy with pinned original/last-recoverable
+   records. Engine.lua:107-121 appends indefinitely, and runtimeState at :72
+   captures all presets. This is a confirmed unbounded data model, not a
+   measured client performance failure. Profile capture/serialization before
+   picking limits; protect recovery-critical records from automatic pruning.
+6. Measure synchronous event work in Core.lua:328-345. PET_BAR_UPDATE is
+   treated as a full spellbook change; cache invalidation, availability status
+   scanning and maintenance preparation happen before the bounded mutation
+   worker. Coalesce meaningful knowledge changes and benchmark real pet
+   event bursts rather than claiming a currently measured frame hitch.
+
+Strengths worth preserving
+-------------------------
+The native action-bar boundary is clear; the planner and installed plan are
+separate; generated macros use name/body ownership; snapshots precede
+installation; the mutation worker is bounded and combat-aware; availability
+updates compare owned contents and retain detachments; macro cleanup checks
+live references. The fixes above refine these foundations rather than
+requiring a broad rewrite.
