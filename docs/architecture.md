@@ -1,6 +1,6 @@
-# Hot Swap architecture — 0.4.2
+# Hot Swap architecture — 0.4.4
 
-Hot Swap prepares a binding layout, then installs it onto Blizzard's original bars outside combat. Planning and editing never mutate live game bindings. There are no custom combat bars or rotation decisions.
+Hot Swap first displays the bindings currently installed in the game. Recommendations are a separate temporary preview; a user saves one as a named preset before explicitly installing it onto Blizzard's original bars outside combat. Reading current controls, previewing recommendations and editing drafts never mutate live game bindings. There are no custom combat bars or rotation decisions.
 
 ## Modules
 
@@ -12,6 +12,7 @@ Hot Swap prepares a binding layout, then installs it onto Blizzard's original ba
 | Availability / TalentBindings | Learned/talent presentation and validated ordered shared-key choices |
 | AvailabilityEngine | Bounded owned-slot refresh using the installed layout, separate from draft edits |
 | API | Client feature detection, localized spell/item metadata and game API wrappers |
+| CurrentBindings | Read-only current bindings, native action slots, macro identities and pet-bar presentation; independent of the planner |
 | Profiles / LibraryData | Stable class IDs, recommended keys and display-only specialization/talent metadata |
 | Macros | Supported target, form, rank and item macro bodies |
 | Items | Inventory capabilities, explicit choices/alternatives and equipment operations |
@@ -20,29 +21,39 @@ Hot Swap prepares a binding layout, then installs it onto Blizzard's original ba
 | Planner | Resolve knowledge, reserve future positions, cover learned actions and validate the plan |
 | Engine | Bounded apply, recovery, rollback and maintenance jobs; macro ownership |
 | Presets | Complete drafts, activation shortcuts, backups and data-only transfer |
-| UI / LibraryUI / ItemsUI / SettingsUI | Main configuration, spellbook/target and item editors, local appearance/log controls |
+| UI / LibraryUI / HoverBindingsUI / ItemsUI / SettingsUI | Main configuration, spellbook/target and hover-binding editors, item choices, local appearance/log controls |
 | Launcher | Native settings and Escape-menu integration |
 
 Each Lua module receives the shared `K` namespace through addon varargs. The TOC defines load order. Python is for development only.
 
 ## Data and flow
 
-1. The selected preset holds editable settings. Stable action IDs connect bindings, overrides and item alternatives; preset IDs survive renames.
-2. Planner resolves current-client metadata. Display metadata is separate from learned eligibility. Future actions reserve positions without becoming usable.
-3. NativeBars assigns main positions and available extra slots. A main position has one key across form pages. A spell edit changes the selected page; a key edit changes every linked page. Overflow uses ordinary macro bindings after capacity validation.
-4. Engine preflight checks combat, supported native commands/focus capability, capacity and shortcut overlap; snapshot preparation validates cursor state and restorable action types. Snapshot reads finish before the named backup is stored and live writes begin.
-5. A frame worker advances small steps with time and operation budgets: macros, native actions, planned bindings, release of previously owned keys, settings save and completion verification. Recovery uses the same mechanism.
-6. The applied plan is separate from the draft. Inventory and form maintenance use applied settings; an event cannot silently install an edited draft item choice.
+1. Opening Hot Swap selects the read-only current-game view on Bindings; tab navigation retains an explicitly selected draft or recommendation. Its data comes from actual binding commands and native action contents, not recommendations or an unapplied preset.
+2. Presets → Preview recommendations builds a temporary read-only plan without inserting a saved preset or advancing its ID counter. Save as new preset copies the preview into a uniquely named draft, preserving existing presets. Preview does not create macros, backups or live bindings.
+3. The selected saved preset holds editable settings. Stable action IDs connect bindings, overrides and item alternatives; preset IDs survive renames.
+4. Planner resolves current-client metadata. Display metadata is separate from learned eligibility. Future actions reserve positions without becoming usable.
+5. NativeBars assigns main positions and available extra slots. A main position has one key across form pages. A spell edit changes the selected page; a key edit changes every linked page. Overflow uses ordinary macro bindings after capacity validation.
+6. Engine preflight checks combat, supported native commands/focus capability, capacity and shortcut overlap; snapshot preparation validates cursor state and restorable action types. Snapshot reads finish before the named backup is stored and live writes begin.
+7. A frame worker advances small steps with time and operation budgets: macros, native actions, planned bindings, release of previously owned keys, settings save and completion verification. Recovery uses the same mechanism.
+8. The applied plan is separate from the draft. Inventory and form maintenance use applied settings; an event cannot silently install an edited draft item choice.
 
 `bindingOverrides` maps action IDs to keys. `actionOverrides` holds rank, targeting and replacement edits. `customActions` contains typed spell/item/system/emote/macro-reference descriptors. `itemBindings` holds a selected item ID, ordered alternatives, target mode and explicit empty state. UI calls these domain methods rather than constructing executable text.
 
+The Hover bind editor is available only while editing a saved preset draft. It renders planned spell actions in a scrollable grid, grouped by native form and specialization / skill line. Future talents and custom ranks remain accessible regardless of the normal unavailable-entry filter. Hovered keyboard, Shift/Ctrl, side-button and wheel input goes through the existing binding-assignment path, including protection, collision and linked-form checks. Alt and primary mouse clicks are not assigned by this mode. Wheel input over a spell assigns it; blank grid space scrolls. Done retains the preset draft, while Apply uses the normal preflight, named backup and bounded worker. The editor consumes gameplay input only while active; modal Escape handling, close, page change, operations and combat release capture without casting.
+
 Apply merges planned keys into the captured live binding map. `appliedPlan.bindingOwnership[key]` records the installed command and the command it displaced, with false representing an unbound key. If a later preset releases that key, the displaced command is restored only while the live command still matches Hot Swap's owned command. Personal edits and unrelated shortcuts remain. Explicit Restore and rollback continue to recover full saved binding maps; they are not scoped Apply operations.
+
+With no enabled applied plan, Init, PLAYER_LOGIN and UPDATE_BINDINGS do not write game bindings or construct the editor's input-capture frames. UPDATE_BINDINGS invalidates capability/preview caches. A fresh character can inherit missing or custom controls from the saved account map; this is distinct from addon input capture. Explicit Apply & save installs character bindings and preserves the account map. There is no automatic account-file repair path.
 
 The visible binding registry omits some valid hidden commands. `API.HiddenMouseCommands` contains only the two source-verified native camera/turn commands. Captures supplement enumeration with all aliases from `GetBindingKey` and direct BUTTON1/BUTTON2 reads, preserving custom and unbound states. Expected/owned key probes also cover commands absent from enumeration. A read failure stops snapshot preparation rather than inventing bindings.
 
 Snapshots and applied plans use `mouseBindingsVersion=1` after hidden mouse state is handled. Older snapshots cannot distinguish uncaptured mouse defaults from intentional unbinding: restore retains the current mouse controls and hidden aliases separately for each account/character binding set, supplying native defaults only when needed. Legacy installed layouts can receive a bounded, backed-up recovery of missing BUTTON1/BUTTON2 controls after combat; existing custom mouse actions remain untouched. New snapshots preserve intentional unbinding exactly.
 
 `nativeBars` contains optional boolean visibility choices keyed by native toggle index 1–7 (displayed bars 2–8). Missing entries preserve unused bar visibility; planned occupancy always forces a required bar on. Visibility snapshots preserve every tuple position, including nil/legacy flags. Current Era/Forever proxy setters maintain a short-lived full-mask cache: capability-checked derived setters synchronize all bits before the final full-mask write. A bounded observer refreshes Blizzard frames from current mirrored values after server updates, pauses in combat, and never replays stale visibility writes.
+
+## Pet controls
+
+The current-game reader resolves bound BONUSACTIONBUTTON1–10 commands using live pet-slot names, icons, spell IDs and autocast metadata. It does not add an independent pet-bar editor or list unbound pet slots. Blizzard owns pet-bar visibility and execution. Hunter and warlock recommendations include pet spell families and attack/follow/passive macros; registered pet-slot commands can also be saved as ordinary bindings. Presets do not capture or restore pet-slot order, autocast state, pet identity or per-pet layouts. Normal native action-bar snapshots do not imply a pet-bar snapshot. See Blizzard's [pet-bar update and input code](https://github.com/Gethe/wow-ui-source/blob/classic_era/Interface/AddOns/Blizzard_ActionBar/Shared/PetActionBar.lua) and [ten-slot native template](https://github.com/Gethe/wow-ui-source/blob/classic_era/Interface/AddOns/Blizzard_ActionBar/Classic/PetActionBar.xml).
 
 ## Macro capacity
 

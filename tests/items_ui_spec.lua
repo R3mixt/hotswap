@@ -2,7 +2,7 @@ local function fixture()
  Mock.itemInfo[1251]={name="Linen Bandage",effect="Linen Bandage"}
  Mock.itemInfo[1710]={name="Greater Healing Potion",effect="Healing Potion"}
  Mock.bagItems[0]={{id=1251,count=3}}
- local k=TestAddon; k:Init(); k.UI:Open(); k.UI:ShowPage("Items")
+ local k=TestAddon; k:Init(); k.UI:Open(); k.UI:SetBindingSource("draft"); k.UI:ShowPage("Items")
  return k,k.UI.pages.Items
 end
 function Tests.items_page_explains_key_current_item_and_missing_saved_choices()

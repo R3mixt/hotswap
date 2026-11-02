@@ -1,8 +1,8 @@
-# Hot Swap 0.4.3
+# Hot Swap 0.4.4
 
 A configurable World of Warcraft addon for stable class bindings, druid form pages, mouseover/focus macros, Alt self-cast, and selectable on-use items.
 
-**Status: installable beta.** Version 0.4.3 gives generated native buttons readable action labels, explains empty trinket bindings, and clearly identifies the CurseForge upload ZIP. Generated macros remain character-specific by default, with future spell positions reserved when space is limited. Account-wide overflow is an explicit preset option. Bindings and mouse controls outside the selected preset remain unchanged. The actual Lua modules are checked using Lua 5.1 and mocked WoW APIs; real-client behavior still needs a retest. Geometry previews approximate artwork and fonts and are not game screenshots.
+**Status: installable beta.** Version 0.4.4 opens Bindings on your actual game layout, read-only. Preview recommendations separately on Presets, save a new named draft, then explicitly Apply & save. The scrollable Hover bind editor edits saved drafts without casting. Generated native buttons retain readable action labels and explanatory trinket tooltips. Generated macros remain character-specific by default, with future spell positions reserved when space is limited. Account-wide overflow is an explicit preset option. Bindings and mouse controls outside the selected preset remain unchanged. The actual Lua modules are checked using Lua 5.1 and mocked WoW APIs; real-client behavior still needs a retest. Geometry previews approximate artwork and fonts and are not game screenshots.
 
 ## Install and open
 
@@ -10,13 +10,13 @@ A configurable World of Warcraft addon for stable class bindings, druid form pag
 2. Use the client folder you intend to test: `_classic_era_` for Era / Hardcore or the Forever client folder when available. Do not install into a different client's AddOns folder.
 3. Restart WoW if it was running while a new addon folder was installed. Enable Hot Swap at character selection.
 4. Open **Hot Swap** from the Escape menu or **Options → AddOns → Hot Swap → Open Hot Swap**. `/hotswap` also works. Select the client automatically or explicitly, record your side buttons, and choose whether to use the wheel and middle click.
-5. Click **Optimize** to create and use a new recommended preset with your selected mouse controls and items. The original preset remains saved. On **Presets**, you can also create or duplicate any custom mode, edit **Bindings**, **Setup**, and **Items**, then choose **Apply & save** outside combat.
+5. Open **Bindings** to inspect your actual controls. On **Presets**, choose **Preview recommendations** to inspect a proposed layout without saving or applying it. Choose **Save as new preset** to keep a uniquely named draft, or explicitly edit an existing preset. Edit that saved draft in **Bindings**, **Setup**, and **Items**, then choose **Apply & save** outside combat.
 
 Opening the window or selecting a preset does not change live bindings. **Apply & save** records a named backup first, creates the needed macros, populates the original action bars, enables required extra bars, updates the keys explicitly assigned by the preset, sets self-cast options unless protected, and saves character bindings. Unrelated bindings and mouse controls remain unchanged. No outside application, subscription, or library is required to run the addon.
 
 When a new layout stops using a key previously assigned by Hot Swap, the addon restores that key's earlier binding only if its current binding still matches Hot Swap's last assignment. If you changed the key yourself afterward, that change is preserved. An explicitly assigned key in the new preset still takes precedence; Review lists those expected replacements.
 
-In **Setup → Action bars**, see which original bars the preset requires and choose whether to show other available bars. Required bars always turn on; an unchecked unused bar can be hidden. **Use defaults** clears optional choices so unused bars retain their current visibility. Changes are saved in the preset and take effect with **Apply & save** or **Optimize**. Hidden bars remain selectable; bars absent from the client are marked unavailable. Visibility may take a moment to update while WoW receives its settings from the server.
+In **Setup → Action bars**, see which original bars the preset requires and choose whether to show other available bars. Required bars always turn on; an unchecked unused bar can be hidden. **Use defaults** clears optional choices so unused bars retain their current visibility. Changes are saved in the preset and take effect with **Apply & save**. Hidden bars remain selectable; bars absent from the client are marked unavailable. Visibility may take a moment to update while WoW receives its settings from the server.
 
 Wait for the progress indicator to finish. You may close the window while the operation continues. An operation cannot start in combat; if combat begins during setup, the partly completed operation pauses and resumes afterward. Automatic rollback and named recovery use the same bounded worker. The original backup is retained if recovery cannot finish.
 
@@ -24,7 +24,7 @@ The addon is displayed as **Hot Swap**. Its existing `KeybindOptimizer` install 
 
 ## Presets and mode shortcuts
 
-The **Presets** tab manages complete setups: spell and system bindings, mouse options, self-cast settings, selected items and saved equipment. Create, duplicate, rename and delete custom modes without a fixed number of slots. Each preset saves edits as you make them. **Editing** identifies the selected draft; **Active** identifies the layout currently installed in the game.
+The **Presets** tab manages complete setups: spell and system bindings, mouse options, self-cast settings, selected items and saved equipment. Create, duplicate, rename and delete custom modes without a fixed number of slots. Each saved preset retains edits as you make them. **Editing** identifies the selected draft; **Active** identifies the layout currently installed in the game. Recommendation previews are temporary: merely opening one creates no preset, consumes no preset ID and changes no game controls. **Save as new preset** preserves the recommendation as a separate unique copy; it still does not install it.
 
 Set a **Hot Swap key** for each preset, then use a preset to install updated shortcuts. Shortcuts stay available across modes and follow renames. A shortcut cannot overlap another preset shortcut or a planned action in any saved mode. Switching uses the same fresh validation, named backup and rollback process as the button. Switching is unavailable in combat and is not queued to fire later. Repeating an unchanged active mode does not create another backup.
 
@@ -42,11 +42,15 @@ The seven tabs are **Setup**, **Presets**, **Bindings**, **Items**, **Backups**,
 
 All artwork is referenced from the installed game; there is no browser, web UI, bundled replacement font, or external skin dependency. Geometry previews use approximate artwork and fonts, so the exact client rendering still needs an in-game check.
 
-The Bindings page opens as a QWERTY keyboard with ability icons and mouse controls. **Follow form** previews the current native page; choosing an Action page pins the editor without shifting your character. Hold Shift, Ctrl, or both to see that layer; Alt shows self-cast aliases and the reserved camera/auto-run controls. Layer buttons also let you inspect a layer without holding a key. Press a combination to highlight its keys and display the planned action. Testing previews the staged layout; it does not cast or apply it, and ends when combat starts.
+The Bindings page opens on **Current**, a read-only QWERTY view of your actual game bindings, native action icons and pet controls. It returns to Current each time you open Hot Swap; navigating between tabs keeps an explicitly selected editing view. Select a saved preset draft explicitly to edit it. Recommendation previews are also read-only until saved as a new preset. Current follows the active native action page. In a draft or recommendation, **Follow form** follows your form; choosing an Action page pins the preview without shifting your character. Hold Shift, Ctrl, Alt, or a combination to inspect that modifier layer. Current shows the actual bindings on that layer; recommended layouts reserve Alt for self-cast and the camera/auto-run controls. Layer buttons also let you inspect a layer without holding a key. Press a combination to highlight its keys and display the action from the selected view. Current displays what is installed; a draft or recommendation displays only its proposed actions. Testing does not cast or apply anything and ends when combat starts.
 
-Click an occupied key or icon to begin rebinding immediately. Each main-bar position uses one key across every native form page, so rebinding updates the linked position on all pages. Empty keys open a searchable action picker. The detail panel retains **Change action** and **Reset key**. Compatible swaps require confirmation; incompatible collisions are blocked. All changes stay staged until **Apply & save**. The **List** view and search retain access to every action, including bindings outside the displayed keyboard/mouse controls.
+While editing a saved preset draft, click an occupied key or icon to begin rebinding immediately. Current-game and recommendation views do not open rebinding controls. Each main-bar position uses one key across every native form page, so rebinding updates the linked position on all pages. Empty keys open a searchable action picker. The detail panel retains **Change action** and **Reset key**. Compatible swaps require confirmation; incompatible collisions are blocked. All changes stay staged until **Apply & save**. The **List** view and search retain access to every action, including bindings outside the displayed keyboard/mouse controls.
 
-Open **Spellbook** beside the keyboard to browse spells by specialization / skill line, including reserved talent abilities. Separate sections list game commands, chat controls, emotes, and existing user or generated macros. Drag an entry onto a key, or select it and click the destination. Dragging only edits the preset and never casts the action. **Show ranks** exposes ranks identified in the current client; choosing one permits a separate downrank binding alongside the highest-rank family entry. Rankless spells do not acquire invented ranks, and future ranks absent from current-client data cannot be safely enumerated.
+For faster editing of a saved preset draft, choose **Bindings → Hover bind**. It is unavailable in Current and unsaved recommendation views. Its scrollable grid shows all planned spell bindings, grouped by form and specialization / skill line, including future talents, form-specific abilities and custom ranks. Entries remain available here even when the normal editor hides unavailable spells. Hover an ability and press a key, a Shift/Ctrl combination, a side mouse button or the wheel to stage its binding. Alt and the primary left/right mouse clicks remain reserved; movement and protected-control restrictions still apply. The wheel binds when over a spell and scrolls when over blank grid space.
+
+Hover bind uses the same linked form positions and collision checks as the keyboard editor. **Done - keep draft** exits without installing changes; **Apply & save** installs the edited preset with a named backup. No spells cast while the mode is active. Escape dismisses a confirmation first, then leaves Hover bind. Closing the window, changing pages, starting an operation or entering combat releases its input capture.
+
+While editing a saved preset draft, open **Spellbook** beside the keyboard to browse spells by specialization / skill line, including reserved talent abilities. Separate sections list game commands, chat controls, emotes, and existing user or generated macros. Drag an entry onto a key, or select it and click the destination. Dragging only edits the preset and never casts the action. **Show ranks** exposes ranks identified in the current client; choosing one permits a separate downrank binding alongside the highest-rank family entry. Rankless spells do not acquire invented ranks, and future ranks absent from current-client data cannot be safely enumerated.
 
 The binding editor offers supported targeting modes, such as target, mouseover, focus and self, with a small badge and tooltip. Helpful spells preserve Alt-self precedence where allowed. Existing macro references preserve their text; missing or changed macros are reported for review instead of silently recreated. Targeting controls do not rewrite arbitrary user macro text.
 
@@ -84,19 +88,27 @@ Apply failures also have a full selectable **Details** view even when logging is
 
 Classic Era omits unavailable default focus controls. Command support comes from the running client's binding registry, not the selected profile label. Explicit saved focus targeting is rejected for review instead of silently changing its target. Unsupported commands fail before backup or action-bar writes.
 
+New characters can inherit custom or unbound controls from WoW's saved account bindings. Hot Swap does not write bindings or open an input-capture overlay on a fresh character's login; an inherited missing control can therefore remain missing until you explicitly change the bindings or apply a saved preset. Apply & save saves the chosen layout for that character and leaves the account binding map unchanged. Hot Swap does not automatically repair account binding files.
+
 ## Core behavior
 
 - All nine Forever/Classic classes have curated profiles. The Druid layout is identical across specs; talent positions remain reserved when not learned.
 - Druid uses the original Base, Moonkin, Cat and Bear pages. Prowl stays on Cat; Travel and Aquatic use Base. The combat bank uses `1–5`, `Shift-1–5`, `R`, and `Shift-R`. Support and emergency controls remain accessible from every form.
 - Every distinct active spell found in the player's and current pet's spellbooks receives a binding. Passives are excluded. Uncatalogued spells receive stable fallback keys, clearly labeled **Additional spells**. These fallback placements are complete coverage, not a claim of expert optimization.
-- Optimize reserves future catalog families at every level, including talented abilities. Normal families use the highest learned rank; explicit downranks can be added from the spellbook. Existing keys stay stable when learning spells.
+- Recommendations reserve future catalog families at every level, including talented abilities. Normal families use the highest learned rank; explicit downranks can be added from the spellbook. Existing keys stay stable when learning spells.
 - Runtime form indices are discovered. Form and combination macros receive bounded maintenance outside combat when learned abilities change. If stale form guards cannot be repaired, original recovery is attempted. Native bar paging remains owned by Blizzard.
 - Form selection uses a `noform` guard. Intentional Classic Era powershifting has a separate control; it is never triggered by repeatedly scrolling into the same form.
 - Helpful spells use Alt-self, friendly mouseover, then friendly target. The optional final self fallback is off by default. Spells that cannot target self are excluded. Focus and resurrection macros have explicit target conditions.
 - Simple learned spells use native spell actions. Targeting, exact ranks, forms and shared actions use stored macros when needed; future reservations can retain empty native slots to save macro space. Macros are deduplicated and checked against capacity and body-length limits. Personal macros are never overwritten to make room.
 - Macro contents and the resulting bindings are verified. Applying a changed layout keeps the original rollback baseline.
 
-## Your default controls
+## Pets
+
+Current resolves bound native pet-slot commands to the pet bar's actual actions and icons when a pet is available. Hunter and warlock recommendations include pet abilities and attack, follow and passive commands; their spell and key edits belong to the preset. You can also bind supported native pet-slot commands through the spellbook's game-controls section.
+
+Blizzard continues to control the pet bar. Hot Swap does **not** save or restore its slot order, autocast choices, pet identity or separate layouts for different pets. Switching a preset changes the saved keybindings and generated pet commands; it does not rearrange the pet bar or change autocast.
+
+## Your recommended controls
 
 | Input | Function |
 | --- | --- |

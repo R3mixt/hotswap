@@ -91,3 +91,19 @@ The reported T-button text `KBO_5e1cc3d3` is the content-derived name for `#show
 Empty trinket tooltips are derived from the live inventory slot. Equipped-item details remain native; optional item-spell data is described as reported availability, not proof of a passive effect. Tests cover modern and legacy hooks, optional arguments/returns, personal edits, page changes, visibility, combat deferral, tooltip ownership and current item metadata.
 
 The 0.4.2 runtime ZIP has the expected immediate `KeybindOptimizer/KeybindOptimizer.toc`; local integrity/manifest checks did not reproduce a missing TOC. The reported upload was identified only by version. New artifacts explicitly distinguish the CurseForge upload from developer source and validate the upload's root/TOC/load-file shape before publication. External CurseForge acceptance is not claimed.
+
+
+## 0.4.4 follow-up — 2 November 2026
+
+HoverBindingsUI is a separate UI extension loaded after the spellbook editor. It consumes the existing complete plan and stages edits through UI:AssignBinding, preserving reserved controls, Alt self-cast, linked form positions and collision confirmation. The scrollable grid retains all planned spell actions including future talents and configured ranks, independently of the keyboard's unavailable-spell filter. Hovering uses cached data; input does not rescan the spellbook. Done keeps the current draft; Apply & save uses the existing backed-up installation worker.
+
+Input ownership was reviewed alongside the existing keyboard tester. Hover mode has its own keyboard sink and mouse-only world shield; neither exists on fresh login. Closing, page changes, combat and operation start release hover capture. Swap confirmation temporarily suspends the grid while retaining input interception and returns to the editor afterward. Geometry checks resolve viewport width before first layout and use responsive columns; rendering remains an approximation of the real game.
+
+The reported fresh-character mouse failure was reproduced from saved account overrides that explicitly disabled BUTTON1 and BUTTON2. Current fresh initialization and binding-change events perform no binding writes; explicit Apply & save installs controls in the character set while preserving the account set. The local account file was backed up and only those two entries repaired while WoW was closed. This is an individual data repair, not an automatic account-reset feature in the distributed addon. The historical writer of the disabled entries was not proven.
+
+
+### 0.4.4 current/recommendation separation
+
+Opening Hot Swap now selects a read-only view of the actual game layout; tab navigation retains an explicitly selected view. Recommendation preview is a distinct temporary plan; saving it creates a uniquely named preset without installing it. Only an explicit Apply & save or configured preset activation performs the backed-up transaction. Saved-draft editing, spellbook changes and Hover bind are unavailable for current-game and unsaved recommendation views. Preview construction must restore temporary planning context even on failure and must not advance the saved preset counter.
+
+The current reader includes native pet slots, commands, icons and reported autocast state. Existing hunter/warlock spell and command bindings remain part of presets; pet-bar slot ordering, autocast persistence and per-pet layout storage are not implemented. The private account-file repair described above is excluded from runtime and release artifacts. Final review and regression results for this flow are recorded by the release validation step; live-client acceptance remains required.

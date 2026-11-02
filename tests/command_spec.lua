@@ -71,7 +71,8 @@ end
 
 function Tests.command_fresh_era_druid_optimize_succeeds_without_installing_unsupported_f6()
   local k=freshEra()
-  local result,why=k.Presets:Optimize(); equal(result,"pending",why)
+  local created,message,name=k.Presets:CreateRecommended(); assert(created,message)
+  local result,why=k.Presets:Activate(name); equal(result,"pending",why)
   local ok,message=Mock:Drain(); assert(ok,message)
   assert(k.db.enabled and k.db.appliedPlan,"Fresh Era preset was not installed")
   equal(Mock.bindings.F6,nil,"Era Optimize installed unavailable Target focus")

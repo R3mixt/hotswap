@@ -273,7 +273,7 @@ function UI:Call(owner, method, ...)
         self:Notice("This feature is not available in this client.", true)
         return nil
     end
-    local operation=(owner==K.Presets and (method=="Activate" or method=="Optimize")) or (owner==K and (method=="Apply" or method=="Restore")) or (owner==K.Engine and method=="RestoreBackup")
+    local operation=(owner==K.Presets and method=="Activate") or (owner==K and (method=="Apply" or method=="Restore")) or (owner==K.Engine and method=="RestoreBackup")
     local priorError=self.operationError
     local kind=method:find("Restore",1,true) and "restore" or "apply"
     local ok,a,b
@@ -300,6 +300,7 @@ function UI:Call(owner, method, ...)
     elseif b and type(b) == "string" then self:Notice(b, false) end
     if operation and a==false and self.operationError==priorError then self:RecordOperationFailure(b,kind)
     elseif operation and a==true then self:ClearOperationError() end
+    if a==true and owner==K.Presets and (method=="Create" or method=="Select" or method=="SetHotkey" or method=="ClearHotkey") then self.bindingSource="draft" end
     return a, b
 end
 function UI:UpdateBusyState()
@@ -325,18 +326,19 @@ function UI:UpdateBusyState()
                 control:SetEnabled(false)
             end
         end
-        for _,name in ipairs({"apply","optimize","restore","reviewButton"}) do disable(self[name]) end
+        for _,name in ipairs({"apply","saveRecommendation","restore","reviewButton"}) do disable(self[name]) end
         for _,tab in pairs(self.nav or {}) do disable(tab) end
         local pages=self.pages or {}
         for _,name in ipairs({"Setup","Presets","Bindings","Items","Safety","Share","Settings"}) do
             local page=pages[name]
             if page then
-                for _,control in ipairs({"optimize","nativeBars","new","duplicate","rename","delete","usePreset","hotkey","gearCapture","gearEquip","restoreSelected","original","import","opacity","scale","resetAppearance","diagnostics","viewLog","clearLog"}) do disable(page[control]) end
+                for _,control in ipairs({"recommendations","source","nativeBars","new","duplicate","rename","delete","usePreset","hotkey","gearCapture","gearEquip","restoreSelected","original","import","opacity","scale","resetAppearance","diagnostics","viewLog","clearLog","hoverBind"}) do disable(page[control]) end
                 if page.detail then for _,control in ipairs({"rebind","change","reset","clearKey","talents"}) do disable(page.detail[control]) end end
                 for _,row in ipairs(page.checks or {}) do disable(row); disable(row.checkbox) end
                 for _,row in ipairs(page.list and page.list.rows or {}) do disable(row); disable(row.key) end
             end
         end
+        if self.CloseHoverBindings then self:CloseHoverBindings() end
         self:ClearInputFocus(); self:EndCapture(); self:CloseMenu()
         if self.CancelLibraryDrag then self:CancelLibraryDrag() end
         if self.library then self.library:Hide() end
@@ -384,16 +386,14 @@ function UI:UpdateBusyState()
     f.step:SetText(index and total and total>0 and ("Step "..math.min(index,total).." of "..total) or (progress>0 and (math.floor(progress*100).."%") or "In progress"))
     f.note:SetText(paused and "This resumes when combat ends. You can close this window." or "You can close this window. The update continues in the background.")
     f:Show()
-    for _,control in ipairs({self.apply,self.optimize,self.restore,self.reviewButton,self.pages and self.pages.Setup and self.pages.Setup.optimize}) do if control then control:SetEnabled(false) end end
+    for _,control in ipairs({self.apply,self.restore,self.reviewButton,self.saveRecommendation}) do if control then control:SetEnabled(false) end end
     for _,tab in pairs(self.nav or {}) do tab:SetEnabled(false) end
     if self.status then self.status:SetText((paused and "Paused for combat: " or "Updating: ")..message); color(self.status,paused and C.warning or C.muted) end
     return true
 end
 function UI:OnOperationComplete(ok,message,kind)
-    if self.awaitingOptimize then
-        if ok then self.followForm=true; self.pendingOptimizeBindings=true end
-        self.awaitingOptimize=nil
-    end
+    self.currentBindingPlan=nil
+    if K.CurrentBindings then K.CurrentBindings:Invalidate() end
     self:UpdateBusyState()
     if ok then self:ClearOperationError(); self:Notice(message or "Setup updated.")
     else
@@ -404,6 +404,7 @@ function UI:OnOperationComplete(ok,message,kind)
     if K.QueueRefresh then K:QueueRefresh() end
 end
 function UI:Stage(key, value)
+    self.bindingSource="draft"
     self.notice = nil
     self:Call(K, "UpdateSetting", key, value)
     self:Refresh()
@@ -464,7 +465,7 @@ local function check(parent, text, hint, key, y)
     return row
 end
 local function keyName(key)
-    local names = {MOUSEWHEELUP = "Wheel up", MOUSEWHEELDOWN = "Wheel down", BUTTON3 = "Middle", BUTTON4 = "Mouse 4", BUTTON5 = "Mouse 5", SPACE = "Space"}
+    local names = {MOUSEWHEELUP = "Wheel up", MOUSEWHEELDOWN = "Wheel down", BUTTON1="Left click", BUTTON2="Right click", BUTTON3 = "Middle", BUTTON4 = "Mouse 4", BUTTON5 = "Mouse 5", SPACE = "Space"}
     local prefix, base = "", key or ""
     if base:find("CTRL%-") then prefix = prefix .. "Ctrl+"; base = base:gsub("CTRL%-", "") end
     if base:find("SHIFT%-") then prefix = prefix .. "Shift+"; base = base:gsub("SHIFT%-", "") end
@@ -494,6 +495,7 @@ specialFrame = function(name, enabled)
     if enabled then table.insert(UISpecialFrames, name) end
 end
 function UI:BeginModal(frame, name)
+    if self.BeforeHoverModal then self:BeforeHoverModal(frame) end
     self:ResetKeyTest()
     if self.tester then self.tester:Hide() end
     if self.escapeModal and self.escapeModal ~= frame then self.escapeModal:Hide() end
@@ -590,6 +592,7 @@ end
 function UI:AssignBinding(action, key)
     if K.Engine and K.Engine.busy then self:UpdateBusyState(); return false end
     if not action then return false end
+    if action.current or self.bindingSource~="draft" then self:Notice("Choose Preset draft to edit bindings. Current and recommended views are read-only."); return false end
     if action.preserved or self:IsProtectedKey(key) then self:Notice("This control is protected in Settings. Turn off its category to edit it.",true); return false end
     if action.presetName then
         local ok,why=self:Call(K.Presets,"SetHotkey",action.presetName,key)
@@ -701,6 +704,7 @@ function UI:CaptureInput(key)
 end
 function UI:BeginActionCapture(action)
     if not action then return end
+    if action.current or self.bindingSource~="draft" then self:Notice("This view is read-only. Choose Preset draft to edit bindings."); return end
     if action.preserved then self:Notice("This control is protected in Settings. Its current game binding is kept."); return end
     if action.presetID and K.Presets and K.Presets.FindID then
         local name=K.Presets:FindID(action.presetID)
@@ -709,6 +713,9 @@ function UI:BeginActionCapture(action)
     self:BeginCapture(action.presetName and "preset" or "key",action)
 end
 function UI:BeginCapture(mode, action)
+    if mode~="mouse" and mode~="preset" and (self.bindingSource~="draft" or (action and action.current)) then
+        self:Notice("Choose an editable preset draft before rebinding."); return
+    end
     if K.Engine and K.Engine.busy then self:UpdateBusyState(); return end
     if InCombatLockdown and InCombatLockdown() then self:Notice("Rebinding is paused during combat.", true); return end
     self:CloseMenu()
@@ -852,7 +859,7 @@ end
 function UI:BuildSetup(page)
     local head = label(page, "Controls", 18)
     head:SetPoint("TOPLEFT")
-    local sub = label(page, "Choose your controls, then Optimize to fill Blizzard's action bars.", 11, C.muted)
+    local sub = label(page, "Choose controls for your preset. Preview recommendations on the Presets tab.", 11, C.muted)
     sub:SetPoint("TOPLEFT", 0, -28)
     local flavor = button(page, "Game version", 190, function(self)
         UI:Menu(self, {{value="auto",label="Auto-detect client"},{value="forever",label="WoW Forever"},{value="era",label="Classic Era"},{value="retail",label="Retail"}}, settings().flavor or "auto", function(v) UI:Stage("flavor", v) end)
@@ -881,15 +888,6 @@ function UI:BuildSetup(page)
     tooltip(page.nativeBars,"Blizzard action bars","Show additional native bars, inspect bars required by your preset, and distinguish hidden bars from bars unavailable on this client.")
     page.nativeNote=label(page,"Uses Blizzard's main and form bars, plus the extra bars it needs.\nFuture spells keep their places as you level.",11,C.muted)
     page.nativeNote:SetPoint("TOPLEFT",0,-249); page.nativeNote:SetWidth(615)
-    local optimize=box("Frame",page)
-    optimize:SetPoint("TOPRIGHT",0,0); optimize:SetSize(168,198)
-    label(optimize,"Ready to play",15):SetPoint("TOPLEFT",13,-14)
-    local detail=label(optimize,"Create a full-level layout using these controls.",11,C.muted)
-    detail:SetPoint("TOPLEFT",13,-43); detail:SetWidth(142)
-    page.optimize=button(optimize,"Optimize",140,function() UI:Optimize() end,true)
-    page.optimize:SetPoint("TOPLEFT",14,-96); page.optimize:SetHeight(32)
-    local note=label(optimize,"Backs up bindings and bars, then applies the new layout. Keeps your saved presets.",10,C.muted)
-    note:SetPoint("TOPLEFT",13,-141); note:SetWidth(142)
     page.advanced = box("Frame", page)
     page.advanced:SetPoint("TOPLEFT", 0, -117)
     page.advanced:SetSize(625, 320)
@@ -938,6 +936,7 @@ local function actionIcon(action)
 end
 function UI:SpellAvailability(action)
     if not action then return nil end
+    if action.current then return nil end
     local descriptor=action.descriptor
     local spell=descriptor and descriptor.kind=="spell" or (not descriptor and isSpellAction(action))
     if not spell then return nil end
@@ -947,14 +946,16 @@ function UI:SpellAvailability(action)
     return state,text,tone
 end
 function UI:IsEditorHidden(action)
+    if action and action.current then return false end
     if not K.db or not K.db.preferences or K.db.preferences.showUnavailableBindings~=false then return false end
     local state=self:SpellAvailability(action)
     return state~=nil and state~="ready"
 end
 function UI:DisplayActions()
+    local plan=self.bindingPlan or self.plan or {}
     local actions={}
-    for _,action in ipairs((self.plan or {}).actions or {}) do actions[#actions+1]=action end
-    for _,action in ipairs((self.plan or {}).preservedActions or {}) do actions[#actions+1]=action end
+    for _,action in ipairs(plan.actions or {}) do actions[#actions+1]=action end
+    for _,action in ipairs(plan.preservedActions or {}) do actions[#actions+1]=action end
     return actions
 end
 function UI:IsProtectedKey(key)
@@ -994,7 +995,7 @@ function UI:TestKeyDown(base)
     for _, action in ipairs(actions) do names[#names+1] = (self:IsEditorHidden(action) and "Reserved unavailable spell" or actionName(action)) .. (#actions > 1 and (" (" .. (action.form or "all") .. ")") or "") end
     self.lastTest = keyName(full) .. " -> " .. (#names > 0 and table.concat(names, " / ") or "Unassigned")
     if actions[1] and not self:IsEditorHidden(actions[1]) then self.selectedAction=actions[1]; self:BindingDetail(actions[1]) end
-    self.pages.Bindings.keyboard.note:SetText("Testing planned binds — no casting  |  " .. self.lastTest)
+    self.pages.Bindings.keyboard.note:SetText((self.bindingSource=="current" and "Current bindings" or self.bindingSource=="recommendation" and "Recommendation preview" or "Preset draft").." — no casting  |  " .. self.lastTest)
     self:RenderKeyboard()
 end
 function UI:TestKeyUp(base)
@@ -1023,6 +1024,12 @@ function UI:AttachTestMouse(frame, preserveWheel)
     end
 end
 function UI:UpdateBindingTester()
+    if self.hoverBindings and self.hoverBindings.active then
+        if self.tester then self.tester:Hide() end
+        if self.testMouseShield then self.testMouseShield:Hide() end
+        self:UpdateHoverInput()
+        return
+    end
     local available=self:IsKeyTestAvailable()
     local mouseContext=self.frame and self.frame:IsShown() and self.activePage=="Bindings" and self.bindingView~="list" and not (K.Engine and K.Engine.busy) and not (InCombatLockdown and InCombatLockdown())
     local sink=mouseContext and not (GetCurrentKeyBoardFocus and GetCurrentKeyBoardFocus()) and not (self.escapeModal and self.escapeModal==self.capture)
@@ -1076,7 +1083,8 @@ function UI:UpdateBindingTester()
     self.testMouseShield:Show()
     self.tester:Show()
     if available then
-        self.pages.Bindings.keyboard.note:SetText(self.lastTest and ("Testing planned binds — no casting  |  " .. self.lastTest) or "Test keys here — no casting. Click to rebind. L = unlearned; T = talent.")
+        local view=self.bindingSource=="current" and "Current bindings" or self.bindingSource=="recommendation" and "Recommendation preview" or "Preset draft"
+        self.pages.Bindings.keyboard.note:SetText(self.lastTest and (view.." — no casting  |  "..self.lastTest) or (self.bindingSource=="draft" and "Test keys here — no casting. Click to rebind. L = unlearned; T = talent." or view.." - read-only. Press keys to inspect; no casting. Use List for other keys."))
     else
         self:ResetKeyTest()
         self.pages.Bindings.keyboard.note:SetText("Choose an action or press Escape to return to key testing. No casting.")
@@ -1160,7 +1168,7 @@ end
 local actionPageNames={caster="Base",cat="Cat",bear="Bear",moonkin="Moonkin",all="All pages"}
 function UI:CacheActionPages()
     self.availableActionPages={caster=true}
-    for _,action in ipairs((self.plan or {}).actions or {}) do
+    for _,action in ipairs((self.bindingPlan or self.plan or {}).actions or {}) do
         if action.form=="cat" or action.form=="bear" or action.form=="moonkin" then self.availableActionPages[action.form]=true end
     end
     self.previewForms=K.API and K.API.GetForms and K.API:GetForms() or {}
@@ -1187,6 +1195,7 @@ function UI:SetFollowForm(value)
     self:ResetKeyTest(); self:RenderBindings(true)
 end
 function UI:ActionPageChanged()
+    if self.bindingSource=="current" then self.currentBindingPlan=nil; self:Refresh(); return end
     if self.activePage~="Bindings" or self.followForm==false or self.escapeModal then return end
     local current=self:CurrentActionPage()
     if self.formFilter~=current then self.formFilter=current; self:ResetKeyTest(); self:RenderBindings(true) end
@@ -1207,9 +1216,17 @@ function UI:IndexKeyboard(reuseIcons)
             end
         end
     end
-    local mouse = {"MOUSEWHEELUP", "MOUSEWHEELDOWN", "BUTTON3"}
+    local mouse = self.bindingSource=="current" and {"BUTTON1","BUTTON2","MOUSEWHEELUP","MOUSEWHEELDOWN","BUTTON3"} or {"MOUSEWHEELUP", "MOUSEWHEELDOWN", "BUTTON3"}
     local side = {}
-    for key, enabled in pairs(settings().mouseButtons or {}) do if enabled then side[#side+1]=key end end
+    local seen={}
+    for key, enabled in pairs(settings().mouseButtons or {}) do if enabled then seen[key]=true end end
+    if self.bindingSource=="current" then
+        for _,action in ipairs(self:DisplayActions()) do
+            local key=tostring(action.key):match("(BUTTON%d+)$")
+            if key and tonumber(key:match("%d+"))>3 then seen[key]=true end
+        end
+    end
+    for key in pairs(seen) do side[#side+1]=key end
     table.sort(side, function(a,b) return (tonumber(a:match("%d+")) or 0) < (tonumber(b:match("%d+")) or 0) end)
     for _, key in ipairs(side) do mouse[#mouse+1]=key end
     for _, cap in ipairs(page.keyboard.mouseCaps) do cap:Hide(); page.keyboard.keys[cap.base]=nil end
@@ -1221,6 +1238,12 @@ function UI:IndexKeyboard(reuseIcons)
             cap.base = base
             cap:SetScript("OnClick", function() UI:KeyboardKeyClick(base) end)
             cap:ClearAllPoints(); cap:SetPoint("TOPLEFT", 644, -31-(i-1)*(height+3)); cap:SetHeight(height)
+            local compact=height<30
+            cap.icon:SetSize(compact and 18 or 22,compact and 18 or 22)
+            cap.caption:ClearAllPoints(); cap.caption:SetPoint("TOPLEFT",36,compact and -3 or -7)
+            cap.caption:SetFont(STANDARD_TEXT_FONT or "Fonts\\FRIZQT__.TTF",compact and 9 or 10,""); cap.caption:SetHeight(compact and 10 or 12)
+            cap.tag:ClearAllPoints(); cap.tag:SetPoint("BOTTOMLEFT",36,compact and 3 or 6)
+            cap.tag:SetFont(STANDARD_TEXT_FONT or "Fonts\\FRIZQT__.TTF",compact and 8 or 9,""); cap.tag:SetHeight(compact and 10 or 12)
             cap.caption:SetText(keyName(base))
             cap:Show()
             page.keyboard.keys[base]=cap
@@ -1234,7 +1257,7 @@ function UI:RenderKeyboard()
     local prefix = self.testPrefix ~= nil and self.testPrefix or (held ~= "" and held or self.pinnedLayer or "")
     self.modifierPrefix = prefix
     for layer, b in pairs(page.layers) do color(b.text, prefix == layer and C.accent or C.muted) end
-    page.layerHint:SetText(prefix:find("ALT%-") and "Alt: self-cast + camera / auto-run" or "Hold modifiers; Alt = self-cast.")
+    page.layerHint:SetText(self.bindingSource=="current" and "Hold Shift / Ctrl / Alt to inspect." or prefix:find("ALT%-") and "Alt: self-cast + camera / auto-run" or "Hold modifiers; Alt = self-cast.")
     local mods = modifierKeys
     for base, cap in pairs(page.keyboard.keys) do
         local full = prefix .. base
@@ -1245,7 +1268,7 @@ function UI:RenderKeyboard()
         local state,status,tone=self:SpellAvailability(a)
         tone=tone or C.warning
         cap.alias = a and a.selfKey == full and a.key ~= full or false
-        cap.icon:SetShown(a ~= nil and not hidden and (a.kind ~= "system" or a.presetName~=nil))
+        cap.icon:SetShown(a ~= nil and not a.liveEmpty and not hidden and (a.kind ~= "system" or a.presetName~=nil))
         cap.icon:SetTexture(a and ((self.keyIcons or {})[a.id] or actionIcon(a)) or nil)
         cap.locked = state~=nil and state~="ready" and not hidden or false
         cap.icon:SetAlpha(cap.locked and 0.85 or 1)
@@ -1262,7 +1285,7 @@ function UI:RenderKeyboard()
             cap.pressed = self:IsKeyTestAvailable() and down and down() or false
         end
         cap.pressGlow:SetShown(cap.pressed)
-        cap.tag:SetText(hidden and "Reserved" or (a and a.kind == "system" and not a.presetName and actionName(a) or ""))
+        cap.tag:SetText(a and a.liveEmpty and "Empty" or hidden and "Reserved" or (a and a.kind == "system" and not a.presetName and actionName(a) or ""))
         cap.count:SetText(#cap.actions > 1 and tostring(#cap.actions) or (cap.alias and "S" or ""))
         color(cap.caption, mods[base] and prefix:find(mods[base],1,true) and C.accent or (a and C.text or C.muted))
         local detail = {}
@@ -1272,7 +1295,8 @@ function UI:RenderKeyboard()
         end
         if mods[base] then detail={"Click to preview this modifier layer. Hold the physical key to preview combinations."}
         elseif cap.alias then detail[#detail+1]="Self-cast alias. Edit the normal binding to move both keys."
-        elseif #detail == 0 then detail[1]="Unassigned. Click to choose an action." end
+        elseif #detail == 0 then detail[1]=self.bindingSource=="draft" and "Unassigned. Click to choose an action." or "Unassigned in this view." end
+        if self.bindingSource~="draft" then detail[#detail+1]="Read-only. Choose Preset draft to edit, or save a recommendation as a new preset." end
         if target and not hidden then detail[#detail+1]="Targeting: "..target end
         if a and a.preserved then detail[#detail+1]="Protected in Settings. Current game binding is kept." end
         tooltip(cap, keyName(full), table.concat(detail,"\n"), not hidden and a and (a.displaySpellID or a.spellID), cap.locked and status or nil,a and a.itemID)
@@ -1288,6 +1312,11 @@ function UI:KeyboardKeyClick(base)
     end
     local cap = self.pages.Bindings.keyboard.keys[base]
     if not cap then return end
+    if self.bindingSource~="draft" then
+        if cap.action then self.selectedAction=cap.action; self:BindingDetail(cap.action) end
+        self:Notice(self.bindingSource=="current" and "Current character bindings are read-only. Choose Preset draft to edit a saved setup." or "Recommendation preview only. Save as new preset to edit it; nothing has been created or applied.")
+        return
+    end
     local function selectAction(action)
         if UI:IsEditorHidden(action) then UI:Notice("This key is reserved. Enable Show unavailable spells in Settings to edit it."); return end
         UI.selectedAction = action
@@ -1304,6 +1333,7 @@ function UI:KeyboardKeyClick(base)
     else self:OpenActionPicker(cap.fullKey) end
 end
 function UI:OpenActionPicker(key)
+    if self.bindingSource~="draft" then return end
     if K.Engine and K.Engine.busy then self:UpdateBusyState(); return end
     self:CloseMenu(); self:ClearInputFocus()
     if not self.picker then
@@ -1364,20 +1394,51 @@ function UI:RenderActionPicker()
     list:UpdateHeight(math.max(50,#matches*38))
 end
 
+function UI:SetBindingSource(source)
+    if source~="current" and source~="draft" and source~="recommendation" then return end
+    if source=="recommendation" and not self.recommendationPlan then return self:PreviewRecommendations() end
+    if self.CloseHoverBindings then self:CloseHoverBindings() end
+    self:EndCapture(); self:CloseMenu(); self:ClearInputFocus(); self:CancelLibraryDrag()
+    self.bindingSource=source; self.selectedAction=nil; self.notice=nil; self.search=nil
+    if self.pages and self.pages.Bindings then self.pages.Bindings.search:SetText("") end
+    self.currentBindingPlan=nil; self.keyIcons=nil; self.availableActionPages=nil; self.lastTest=nil
+    if source=="current" and K.CurrentBindings then K.CurrentBindings:Invalidate() end
+    self:Refresh()
+end
+function UI:PreviewRecommendations()
+    local plan,snapshot=self:Call(K.Presets,"PreviewRecommendations")
+    if type(plan)~="table" then return false end
+    self.recommendationPlan,self.recommendationSnapshot=plan,snapshot
+    self.bindingSource="recommendation"; self.selectedAction=nil; self.keyIcons=nil; self.availableActionPages=nil
+    self.followForm=true; self:ShowPage("Bindings")
+    self:Notice("Recommendation preview only. No preset has been created and no game changes made.")
+    return true
+end
+function UI:SaveRecommendation()
+    if self.bindingSource~="recommendation" or not self.recommendationSnapshot then return end
+    local ok,why=self:Call(K.Presets,"CreateRecommended",nil,self.recommendationSnapshot)
+    if ok then self:SetBindingSource("draft"); self:Notice(why or "New preset saved as a draft. Review it before Apply & save.") end
+end
 function UI:BuildBindings(page)
-    label(page, "Bindings", 18):SetPoint("TOPLEFT")
+    page.source=button(page,"Current bindings",176,function(self)
+        UI:Menu(self,{{value="current",label="Current bindings (read-only)"},{value="draft",label="Preset draft (editable)"},{value="recommendation",label="Preview recommendations"}},UI.bindingSource or "current",function(value) UI:SetBindingSource(value) end)
+    end,true)
+    page.source:SetPoint("TOPLEFT",0,3)
     page.modeButtons = {}
     for i, mode in ipairs({"Keyboard", "List"}) do
-        local b = button(page, mode, 85, function()
+        local b = button(page, mode, i==1 and 73 or 56, function()
             UI.bindingView = mode == "List" and "list" or "keyboard"
             UI:RenderBindings()
         end)
-        b:SetPoint("TOPLEFT", 123 + (i-1)*91, 3)
+        b:SetPoint("TOPLEFT", i==1 and 184 or 263, 3)
         page.modeButtons[mode] = b
     end
-    page.libraryToggle=button(page,"Spellbook",105,function() UI:ToggleLibrary() end)
-    page.libraryToggle:SetPoint("TOPLEFT",310,3)
-    local searchShell, search = edit(page, 230, 30)
+    page.libraryToggle=button(page,"Spellbook",85,function() UI:ToggleLibrary() end)
+    page.libraryToggle:SetPoint("TOPLEFT",327,3)
+    page.hoverBind=button(page,"Hover bind",90,function() UI:OpenHoverBindings() end)
+    page.hoverBind:SetPoint("TOPLEFT",420,3)
+    tooltip(page.hoverBind,"Hover bind","Browse all planned spells, hover an ability and press a key to edit its binding. Changes stay in the current preset draft.")
+    local searchShell, search = edit(page, 210, 30)
     page.search = search
     searchShell:SetPoint("TOPRIGHT", -2, 4)
     search:SetScript("OnTextChanged", function(self, user)
@@ -1388,7 +1449,7 @@ function UI:BuildBindings(page)
         end
     end)
     tooltip(searchShell, "Search bindings", "Find an action by spell, key, category, or action ID.")
-    local hint = label(page, "Search spell / key", 11, C.muted)
+    local hint = label(page, "Search", 10, C.muted)
     hint:SetPoint("RIGHT", searchShell, "LEFT", -9, 0)
     page.tabs = {}
     page.form = button(page, "Action page: Base", 175, function(self)
@@ -1449,6 +1510,7 @@ function UI:BuildBindings(page)
     detail.change:SetPoint("TOPRIGHT", -112, -12)
     detail.change:SetEnabled(false)
     detail.reset = button(detail, "Reset key", 94, function()
+        if UI.bindingSource~="draft" then return end
         if not UI.selectedAction then return end
         if UI.selectedAction.presetName then UI:Call(K.Presets,"ClearHotkey",UI.selectedAction.presetName); UI:Refresh(); return end
         local overrides = copy(settings().bindingOverrides)
@@ -1468,7 +1530,13 @@ function UI:RenderBindings(reusePageCache)
     local page = self.pages and self.pages.Bindings
     if not page then return end
     if not reusePageCache or not self.availableActionPages then self:CacheActionPages() end
-    local filter=self.followForm~=false and self:CurrentActionPage() or self.formFilter or "caster"
+    local current=self.bindingSource=="current"
+    local editable=self.bindingSource=="draft"
+    page.source.text:SetText(current and "Current bindings" or editable and "Preset draft" or "Recommendations")
+    local readErrors={}; for _,entry in ipairs((self.bindingPlan or {}).errors or {}) do readErrors[#readErrors+1]=message(entry) end
+    tooltip(page.source,current and "Current character bindings" or "Binding view",current and #readErrors>0 and table.concat(readErrors,"\n") or "Current bindings reads the live character. Preset draft is editable. Recommendations are an unsaved preview until you choose Save as new preset.")
+    page.libraryToggle:SetEnabled(editable); page.hoverBind:SetEnabled(editable and not (InCombatLockdown and InCombatLockdown()))
+    local filter=current and "all" or (self.followForm~=false and self:CurrentActionPage() or self.formFilter or "caster")
     if filter~="all" and not self.availableActionPages[filter] then filter="caster" end
     self.formFilter = filter
     if self.lastRenderedActionPage~=filter then
@@ -1483,10 +1551,10 @@ function UI:RenderBindings(reusePageCache)
             page.detail:EnableMouse(false)
         end
     end
-    page.form.text:SetText("Action page: "..(actionPageNames[filter] or filter))
-    page.form:SetEnabled((self.plan or {}).class == "DRUID")
+    page.form.text:SetText(current and "Live action page" or "Action page: "..(actionPageNames[filter] or filter))
+    page.form:SetEnabled(not current and (self.bindingPlan or {}).class == "DRUID")
     page.follow:SetChecked(self.followForm~=false)
-    page.follow:SetEnabled((self.plan or {}).class=="DRUID")
+    page.follow:SetEnabled(not current and (self.bindingPlan or {}).class=="DRUID")
     local listView = self.bindingView == "list"
     page.list:SetShown(listView)
     page.listHeader:SetShown(listView)
@@ -1496,11 +1564,17 @@ function UI:RenderBindings(reusePageCache)
     self:RenderKeyboard()
     self:UpdateBindingTester()
     self:SyncLibrary(not reusePageCache)
+    if self.selectedAction then
+        local selectedID=self.selectedAction.id
+        self.selectedAction=nil
+        for _,action in ipairs(self:DisplayActions()) do if action.id==selectedID then self.selectedAction=action; break end end
+    end
     if self.selectedAction and self:IsEditorHidden(self.selectedAction) then self.selectedAction=nil end
     if not self.selectedAction then
         page.detail.title:SetText("Select a binding"); page.detail.desc:SetText("Press a key to test its planned action. Click an icon to rebind.")
         page.detail.rebind:SetEnabled(false); page.detail.change:SetEnabled(false); page.detail.reset:SetEnabled(false); page.detail.talents:SetEnabled(false)
-        page.detail.note:SetText("Apply & save installs your changes."); page.detail:EnableMouse(false)
+        page.detail.note:SetText(editable and "Apply & save installs your changes." or current and "Current character bindings. Choose Preset draft to edit a saved setup." or "Preview only. Save as new preset before editing or applying."); page.detail:EnableMouse(false)
+        if not editable then page.detail.desc:SetText("Select an icon to inspect it. This view is read-only.") end
     end
     if self.selectedAction then
         for _, a in ipairs(self:DisplayActions()) do if a.id == self.selectedAction.id then self.selectedAction=a; break end end
@@ -1542,7 +1616,7 @@ function UI:RenderBindings(reusePageCache)
         row:SetPoint("TOPLEFT", 0, -(i-1)*39)
         row:SetWidth(math.max(560, list.child:GetWidth()))
         row.key.text:SetText(keyName(a.key or "Unbound"))
-        row.key:SetEnabled(not a.preserved)
+        row.key:SetEnabled(editable and not a.preserved)
         row.name:SetText(a.label or a.spellName or a.id)
         row.form:SetText(a.form == "all" and "Every page" or (actionPageNames[a.form] or a.form or "Every page"))
         local pinned = (settings().bindingOverrides or {})[a.id]
@@ -1550,7 +1624,7 @@ function UI:RenderBindings(reusePageCache)
         row.state:SetText(a.preserved and "Protected" or state and state~="ready" and status or a.known==false and "Unavailable" or (pinned and "Pinned" or "Ready"))
         color(row.name, a.known == false and tone or C.text)
         color(row.state, a.known==false and tone or (pinned and C.accent or C.muted))
-        tooltip(row.key, a.label or a.id, a.preserved and "Protected in Settings. Current game binding is kept." or "Click to capture a replacement key. A pinned key is retained when the profile updates.",a.displaySpellID or a.spellID,state and state~="ready" and status)
+        tooltip(row.key, a.label or a.id, not editable and "Read-only binding. Choose an editable preset draft to make changes." or a.preserved and "Protected in Settings. Current game binding is kept." or "Click to capture a replacement key. A pinned key is retained when the profile updates.",a.displaySpellID or a.spellID,state and state~="ready" and status)
         row:Show()
     end
     if not list.empty then list.empty = label(list.child, "", 13, C.muted); list.empty:SetPoint("TOPLEFT", 10, -18); list.empty:SetWidth(550) end
@@ -1575,12 +1649,13 @@ function UI:BindingDetail(a)
     local linked=self:LinkedBindings(a)
     local pinned=false
     for _,action in ipairs(linked) do if (settings().bindingOverrides or {})[action.id]~=nil then pinned=true; break end end
-    d.reset:SetEnabled(not a.preserved and (a.presetName~=nil or pinned))
-    d.note:SetText(#linked>1 and "This action-bar position changes in every form." or "Apply & save installs your changes.")
+    local editable=self.bindingSource=="draft" and not a.current
+    d.reset:SetEnabled(editable and not a.preserved and (a.presetName~=nil or pinned))
+    d.note:SetText(not editable and (self.bindingSource=="current" and "Current character bindings are read-only. Choose Preset draft to edit." or "Recommendation preview only. Save as new preset to edit this layout.") or #linked>1 and "This action-bar position changes in every form." or "Apply & save installs your changes.")
     d.reset.text:SetText(a.presetName and "Clear key" or "Reset key")
-    d.rebind:SetEnabled(not a.preserved)
-    d.change:SetEnabled(not a.preserved and a.key ~= nil and a.kind ~= "system" and not a.presetName)
-    d.talents:SetEnabled(self.CanEditTalentChoices and self:CanEditTalentChoices(a) or false)
+    d.rebind:SetEnabled(editable and not a.preserved)
+    d.change:SetEnabled(editable and not a.preserved and a.key ~= nil and a.kind ~= "system" and not a.presetName)
+    d.talents:SetEnabled(editable and self.CanEditTalentChoices and self:CanEditTalentChoices(a) or false)
     tooltip(d, a.label or a.id, self:MacroDetail(a),a.displaySpellID or a.spellID,state and state~="ready" and status,a.itemID)
     d:EnableMouse(true)
 end
@@ -1660,18 +1735,10 @@ function UI:RenderShare()
     page.copy:SetEnabled(hasText); page.import:SetEnabled(hasText)
 end
 function UI:Optimize()
-    self.notice=nil
-    local ok,why=self:Call(K.Presets,"Optimize")
-    if ok=="pending" then
-        self.awaitingOptimize=true
-    elseif ok==true then
-        self.followForm=true
-        self.pendingOptimizeBindings=true
-        self:Notice(why or "Optimized layout active. Previous bindings and bars are backed up.")
-    end
-    if K.QueueRefresh then K:QueueRefresh() end
+    return self:PreviewRecommendations()
 end
 function UI:UseSelectedPreset()
+    if self.bindingSource~="draft" then self:Notice("Choose an editable preset draft before applying. Current bindings and recommendations are read-only."); return false end
     self.notice=nil
     local ok,why=self:Call(K.Presets,"Activate",K.db and K.db.activePreset)
     if K.QueueRefresh then K:QueueRefresh() end
@@ -1712,9 +1779,12 @@ function UI:BuildPresets(page)
     d.use=button(d,APPLY_LABEL,128,function() UI:UseSelectedPreset() end,true); d.use:SetPoint("BOTTOMRIGHT",-14,17)
     tooltip(d.use,APPLY_LABEL,APPLY_DETAIL)
     page.rename,page.delete,page.usePreset,page.hotkey=d.rename,d.delete,d.use,d.hotkey
-    local bindings=button(page,"Edit bindings",132,function() UI:ShowPage("Bindings") end); bindings:SetPoint("TOPLEFT",248,-305)
+    local bindings=button(page,"Edit bindings",132,function() UI:SetBindingSource("draft"); UI:ShowPage("Bindings") end); bindings:SetPoint("TOPLEFT",248,-305)
     local items=button(page,"Edit items",110,function() UI:ShowPage("Items") end); items:SetPoint("TOPLEFT",388,-305)
     local controls=button(page,"Controls",100,function() UI:ShowPage("Setup") end); controls:SetPoint("TOPLEFT",506,-305)
+    page.recommendations=button(page,"Preview recommendations",212,function() UI:PreviewRecommendations() end,true)
+    page.recommendations:SetPoint("TOPLEFT",248,-349)
+    tooltip(page.recommendations,"Preview recommendations","Inspect a recommended layout before creating a preset. Previewing does not change saved presets or game bindings.")
     local note=label(page,"New starts with the recommended layout. Duplicate copies the selected setup.",10,C.muted)
     note:SetPoint("BOTTOMLEFT",0,24); note:SetWidth(575)
     local export=button(page,"Export all",102,function() UI:OpenPresetTransfer(true) end); export:SetPoint("BOTTOMRIGHT",-116,11)
@@ -1735,7 +1805,7 @@ function UI:RenderPresets()
             row=listRow(list.child); row:SetHeight(48)
             row.name=label(row,"",12); row.name:SetPoint("TOPLEFT",8,-7); truncate(row.name,192)
             row.state=label(row,"",10,C.muted); row.state:SetPoint("TOPLEFT",8,-27); truncate(row.state,192)
-            row:SetScript("OnClick",function(self) UI:Call(K.Presets,"Select",self.presetName); UI:Refresh() end)
+            row:SetScript("OnClick",function(self) UI:Call(K.Presets,"Select",self.presetName); UI:SetBindingSource("draft") end)
             list.rows[i]=row
         end
         local preset=K.db.presets[name]
@@ -1751,7 +1821,7 @@ function UI:RenderPresets()
     d.clearKey:SetEnabled(preset.hotkey~=nil)
     d.delete:SetEnabled(#names>1 and selected~=active)
     local combat=InCombatLockdown and InCombatLockdown()
-    d.use:SetEnabled(not combat and not self.previewFailed and #((self.plan or {}).errors or {})==0)
+    d.use:SetEnabled(self.bindingSource=="draft" and not combat and not self.previewFailed and #((self.plan or {}).errors or {})==0)
     d.hotkey:SetEnabled(not combat)
     d.use.text:SetText(APPLY_LABEL)
 end
@@ -1819,9 +1889,12 @@ end
 function UI:OpenReview()
     if K.Engine and K.Engine.busy then self:UpdateBusyState(); return end
     if self.operationError then return self:OpenOperationError() end
+    if self.bindingSource=="current" then self:Notice("Current bindings are a read-only view. Choose a preset draft or preview recommendations to review changes."); return end
     self:CloseMenu(); self:ClearInputFocus()
-    local plan=self:Call(K,"Preview")
-    if type(plan)=="table" then self.plan=plan end
+    if self.bindingSource~="recommendation" then
+        local plan=self:Call(K,"Preview")
+        if type(plan)=="table" then self.plan=plan; self.draftPlan=plan end
+    end
     if not self.review then
         local f=box("Frame",self.frame,C.bg,"KeybindOptimizerReview")
         f:SetAllPoints(self.frame); f:SetFrameStrata("DIALOG"); f:SetFrameLevel(self.frame:GetFrameLevel()+50); f:EnableMouse(true)
@@ -1840,7 +1913,7 @@ end
 function UI:RenderReview()
     local f=self.review
     if not f then return end
-    local p=self.plan or {}; local coverage=p.coverage or {}; local replacements=p.conflicts or {}; local lines={}
+    local p=self.bindingSource=="recommendation" and self.recommendationPlan or self.plan or {}; local coverage=p.coverage or {}; local replacements=p.conflicts or {}; local lines={}
     local errors=#(p.errors or {})
     f.summary:SetText(tostring(coverage.bound or 0).." / "..tostring(coverage.total or 0).." learned spells bound  |  "..tostring(#replacements).." expected replacements"..(errors>0 and ("  |  "..errors.." issues to fix") or "  |  Ready to use"))
     color(f.summary,errors>0 and C.error or C.text)
@@ -1911,6 +1984,7 @@ function UI:Confirm(title, detail, callback)
 end
 function UI:ShowPage(name)
     if K.Engine and K.Engine.busy then self:UpdateBusyState(); return end
+    if self.CloseHoverBindings then self:CloseHoverBindings() end
     self:CloseMenu()
     self:ClearInputFocus()
     self.activePage = name
@@ -1933,6 +2007,7 @@ function UI:Create()
     f:SetScript("OnDragStart", function(self) self:StartMoving() end)
     f:SetScript("OnDragStop", function(self) self:StopMovingOrSizing() end)
     f:SetScript("OnHide", function()
+        if UI.CloseHoverBindings then UI:CloseHoverBindings() end
         UI:CancelLibraryDrag()
         if UI.tester then UI.tester:Hide() end
         if UI.testMouseShield then UI.testMouseShield:Hide() end
@@ -2017,29 +2092,31 @@ function UI:Create()
     footer:SetHeight(50)
     self.status = label(footer, "", 11, C.muted)
     self.status:SetPoint("TOPLEFT", 12, -10)
-    self.status:SetWidth(326)
+    self.status:SetWidth(440)
     self.status:SetHeight(34)
     local preview = button(footer, "Review", 84, function() UI:OpenReview() end)
     self.reviewButton=preview
-    preview:SetPoint("RIGHT", -390, 0)
+    preview:SetPoint("RIGHT", -282, 0)
     self.restore = button(footer, "Backups", 92, function() UI:ShowPage("Safety") end)
-    self.restore:SetPoint("RIGHT", -292, 0)
+    self.restore:SetPoint("RIGHT", -184, 0)
     self.apply = button(footer, APPLY_LABEL, 128, function() UI:UseSelectedPreset() end, true)
-    self.apply:SetPoint("RIGHT", -154, 0)
+    self.apply:SetPoint("RIGHT", -10, 0)
     tooltip(self.apply,APPLY_LABEL,APPLY_DETAIL)
-    self.optimize=button(footer,"Optimize",134,function() UI:Optimize() end,true)
-    self.optimize:SetPoint("RIGHT",-10,0)
-    tooltip(self.optimize,"Optimize and apply a new layout","Creates a full-level preset from your controls, preserves your existing presets, backs up current bindings and bars, then fills Blizzard's action bars.")
+    self.saveRecommendation=button(footer,"Save as new preset",166,function() UI:SaveRecommendation() end,true)
+    self.saveRecommendation:SetPoint("RIGHT",-10,0); self.saveRecommendation:Hide()
     self.events = CreateFrame("Frame", nil, f)
     self.events:RegisterEvent("PLAYER_REGEN_DISABLED")
     self.events:RegisterEvent("PLAYER_REGEN_ENABLED")
     self.events:RegisterEvent("MODIFIER_STATE_CHANGED")
     self.events:RegisterEvent("UPDATE_SHAPESHIFT_FORM")
     self.events:RegisterEvent("UPDATE_STEALTH")
+    for event in pairs(K.CurrentBindings and K.CurrentBindings.Events or {UPDATE_BINDINGS=true,ACTIONBAR_SLOT_CHANGED=true,ACTIONBAR_PAGE_CHANGED=true}) do pcall(self.events.RegisterEvent,self.events,event) end
     self.events:SetScript("OnEvent", function(_, event)
         if not f:IsShown() then return end
         if K.Engine and K.Engine.busy then UI:UpdateBusyState(); return end
+        if K.CurrentBindings and K.CurrentBindings.Events[event] then K.CurrentBindings:Invalidate(); UI.currentBindingPlan=nil end
         if event=="PLAYER_REGEN_DISABLED" then
+            if UI.CloseHoverBindings then UI:CloseHoverBindings() end
             if UI.capture and UI.capture:IsShown() then UI:EndCapture() end
             UI:UpdateBindingTester()
         elseif event=="PLAYER_REGEN_ENABLED" then UI:UpdateBindingTester() end
@@ -2049,22 +2126,26 @@ function UI:Create()
         elseif K.QueueRefresh then K:QueueRefresh()
         else UI:Refresh() end
     end)
-    self.activePage = "Setup"
-    self.pages.Setup:Show()
+    self.activePage = "Bindings"
+    self.bindingSource="current"
+    self.pages.Bindings:Show()
     f:Hide()
 end
 function UI:Refresh()
     if not self.frame then return end
     if not K.db then self:Notice("Waiting for character data to load."); return end
     if self:UpdateBusyState() then return end
-    if self.pendingOptimizeBindings then
-        self.pendingOptimizeBindings=nil
-        self.activePage="Bindings"
-        for id,page in pairs(self.pages) do page:SetShown(id=="Bindings"); selectTab(self.nav[id],id=="Bindings") end
-    end
-    local p = self:Call(K, K.PreviewCached and "PreviewCached" or "Preview")
-    self.previewFailed = type(p) ~= "table"
-    self.plan = type(p) == "table" and p or K.plan or self.plan or {}
+    if self.bindingSource=="draft" or self.activePage~="Bindings" then
+        local p = self:Call(K, K.PreviewCached and "PreviewCached" or "Preview")
+        self.previewFailed=type(p)~="table"
+        self.draftPlan=type(p)=="table" and p or K.plan or self.draftPlan or {}
+    else self.previewFailed=false end
+    self.plan=self.draftPlan or {}
+    if self.bindingSource=="current" then
+        if not self.currentBindingPlan then self.currentBindingPlan=K.CurrentBindings and K.CurrentBindings:Get() or {actions={},class=self.plan.class} end
+        self.bindingPlan=self.currentBindingPlan
+    elseif self.bindingSource=="recommendation" then self.bindingPlan=self.recommendationPlan or {actions={}}
+    else self.bindingPlan=self.plan end
     local s = settings()
     local setup = self.pages.Setup
     local flavors = {auto="Auto-detect client",forever="WoW Forever",era="Classic Era",retail="Retail"}
@@ -2082,7 +2163,8 @@ function UI:Refresh()
     setup.hardware:SetText(tostring(#buttons) .. " side buttons: " .. (#buttons > 0 and table.concat(buttons, ", ") or "none recorded"))
     end
     local className = UnitClass and UnitClass("player") or self.plan.class or "Character"
-    self.subtitle:SetText(className .. "  ·  " .. (flavors[self.plan.flavor or s.flavor or "auto"] or "World of Warcraft").."  ·  Editing: "..tostring(K.db.activePreset or "Preset"))
+    local context=self.bindingSource=="current" and "Current character bindings" or self.bindingSource=="recommendation" and "Recommendation preview - not saved or applied" or "Editing: "..tostring(K.db.activePreset or "Preset")
+    self.subtitle:SetText(className .. "  ·  " .. (flavors[(self.bindingPlan or {}).flavor or s.flavor or "auto"] or "World of Warcraft").."  ·  "..context)
     truncate(self.subtitle,790)
     tooltip(self.subtitleTip, "Client details", "Build " .. tostring(self.plan.build or "unknown"))
     if self.activePage == "Bindings" then self:RenderBindings()
@@ -2091,21 +2173,28 @@ function UI:Refresh()
     elseif self.activePage == "Safety" then self:RenderSafety()
     elseif self.activePage == "Share" then self:RenderShare()
     elseif self.activePage == "Settings" then K.SettingsUI:Render(self.pages.Settings,self,self.widgets) end
+    if self.hoverBindings and self.hoverBindings.active then self:RenderHoverBindings() end
     self:RenderNativeBars()
     self.reviewButton:SetText(self.operationError and "Details" or "Review")
     for id, b in pairs(self.nav) do selectTab(b, id == self.activePage) end
     local errors = #(self.plan.errors or {})
     local combat = InCombatLockdown and InCombatLockdown()
-    self.optimize:SetEnabled(not combat)
-    setup.optimize:SetEnabled(not combat)
-    color(self.optimize.text,combat and C.muted or C.accent)
-    self.apply:SetEnabled(not combat and errors == 0 and not self.previewFailed)
+    local editable=self.bindingSource=="draft"
+    local recommendation=self.bindingSource=="recommendation" and self.activePage=="Bindings"
+    self.apply:SetShown(not recommendation); self.saveRecommendation:SetShown(recommendation)
+    self.saveRecommendation:SetEnabled(not combat)
+    self.apply:SetEnabled(editable and not combat and errors == 0 and not self.previewFailed)
+    self.reviewButton:SetEnabled(self.operationError~=nil or self.bindingSource~="current")
     self.restore:SetEnabled(true)
-    color(self.apply.text, (combat or errors > 0 or self.previewFailed) and C.muted or C.accent)
+    color(self.apply.text, (not editable or combat or errors > 0 or self.previewFailed) and C.muted or C.accent)
     if combat then self.status:SetText("In combat. Preset switching and restoring are paused."); color(self.status, C.warning)
     elseif self.previewFailed then self.status:SetText("This preset could not be prepared. Open Review to check it."); color(self.status, C.error)
     elseif self.operationError then self.status:SetText(self.operationError.summary); color(self.status,C.error)
     elseif self.notice then self.status:SetText(self.notice); color(self.status, self.noticeError and C.error or C.muted)
+    elseif self.bindingSource=="current" then
+        local failed=#((self.bindingPlan or {}).errors or {})>0
+        self.status:SetText(failed and "Current bindings could not be read completely. Hover Current bindings for details." or "Current character bindings - read-only. Preset draft edits are separate."); color(self.status,failed and C.error or C.muted)
+    elseif self.bindingSource=="recommendation" then self.status:SetText("Recommendation preview only. No preset created; no game changes."); color(self.status,C.muted)
     elseif errors > 0 then self.status:SetText(errors .. " binding issue(s) to fix. Open Review before applying this preset."); color(self.status, C.error)
     else
         local cov = self.plan.coverage or {}
@@ -2122,6 +2211,12 @@ function UI:Refresh()
 end
 function UI:Open()
     self:Create()
+    if self.CloseHoverBindings then self:CloseHoverBindings() end
+    self.bindingSource="current"; self.activePage="Bindings"; self.selectedAction=nil; self.notice=nil
+    self.search=nil; self.pages.Bindings.search:SetText(""); self.bindingView="keyboard"; self.pinnedLayer=""; self.lastTest=nil
+    self.currentBindingPlan=nil; self.keyIcons=nil; self.availableActionPages=nil
+    if K.CurrentBindings then K.CurrentBindings:Invalidate() end
+    for id,page in pairs(self.pages) do page:SetShown(id=="Bindings") end
     if not self.escapeModal then
         self.restoreEscapeFrame = nil
         specialFrame("KeybindOptimizerWindow", true)

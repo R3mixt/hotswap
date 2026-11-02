@@ -8,8 +8,8 @@ Status: the author reports that the CurseForge project has been created. The pro
 - `publishing/curseforge-description.md`: player-facing description.
 - `publishing/logo.png`: original project logo; `logo.svg` is its editable source.
 - `CHANGELOG.md`: release notes.
-- `dist/HotSwap-0.4.3-CurseForge.zip`: **the only ZIP to upload to CurseForge**, produced by `python package.py`.
-- `dist/HotSwap-0.4.3-developer-source-NOT-FOR-UPLOAD.zip`: separate development archive; **do not upload this to CurseForge**.
+- `dist/HotSwap-0.4.4-CurseForge.zip`: **the only ZIP to upload to CurseForge**, produced by `python package.py`.
+- `dist/HotSwap-0.4.4-developer-source-NOT-FOR-UPLOAD.zip`: separate development archive; **do not upload this to CurseForge**.
 - SHA-256 manifests: verify the file you upload matches the reviewed build.
 
 The upload ZIP must contain `KeybindOptimizer/KeybindOptimizer.toc` immediately inside the addon folder, with the listed Lua files beside it. Upload the ZIP unchanged; do not add an outer HotSwap/version folder or upload the source archive. Packaging verifies this shape and every TOC load path before producing the upload file.

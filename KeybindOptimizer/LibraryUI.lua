@@ -288,7 +288,7 @@ function UI:ToggleLibrary()
 end
 function UI:SyncLibrary(refresh)
     if not self.pages or not self.pages.Bindings then return end
-    local show=self.activePage=="Bindings" and self.bindingView~="list" and self.libraryOpen~=false and not self.escapeModal and not (K.Engine and K.Engine.busy)
+    local show=self.bindingSource=="draft" and self.activePage=="Bindings" and self.bindingView~="list" and self.libraryOpen~=false and not self.escapeModal and not (K.Engine and K.Engine.busy)
     if show and not self.library then self:BuildLibrary() end
     if self.library then
         local changed=self.library:IsShown()~=show

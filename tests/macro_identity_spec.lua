@@ -67,9 +67,10 @@ end
 function Tests.macro_identity_optimize_repeats_with_sorted_banks_and_original_restore()
   local k=ready(); local original=k.Copy(Mock.bindings)
   for iteration=1,2 do
-    equal(k.Presets:Optimize(),"pending"); finish()
+    local created,why,name=k.Presets:CreateRecommended(); assert(created,why)
+    equal(k.Presets:Activate(name),"pending"); finish()
     verifyPlaced(k,k.db.appliedPlan)
-    assert(k.db.appliedPreset:find("Optimized Druid",1,true),"Optimize did not activate its preset")
+    assert(k.db.appliedPreset:find("Recommended Druid",1,true),"Optimize did not activate its preset")
   end
   equal(k:Restore(),"pending"); finish()
   sameMap(Mock.bindings,original)

@@ -1,5 +1,5 @@
 local function settingsUI()
-    local k=TestAddon; k:Init(); k.UI:Open(); k.UI.nav.Settings:Click()
+    local k=TestAddon; k:Init(); k.UI:Open(); k.UI:SetBindingSource("draft"); k.UI.nav.Settings:Click()
     return k,k.UI.pages.Settings
 end
 
@@ -95,7 +95,7 @@ function Tests.settings_ui_appearance_is_local_immediate_and_fits_the_keyboard_w
     assert(k.UI.library:IsShown(),"Fit fixture did not include the spellbook")
     assert(k.UI.actualWindowScale*1180<=970.01 and k.UI.actualWindowScale*620<=670.01,"Window scaling exceeded viewport")
     assert(k.db.preferences.windowScale==1.3,"Fitting a small viewport overwrote the preferred scale")
-    k.UI.frame:Hide(); k.UI:Open()
+    k.UI.frame:Hide(); k.UI:Open(); k.UI:SetBindingSource("draft")
     assert(k.UI.frame:GetAlpha()==0.6,"Opening reset opacity")
     k.UI:ShowPage("Settings"); page.resetAppearance:Click()
     assert(k.db.preferences.windowOpacity==1 and k.db.preferences.windowScale==1,"Reset appearance did not restore defaults")

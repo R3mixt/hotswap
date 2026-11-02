@@ -1,7 +1,7 @@
 -- These fixtures exercise full catalogs/visible reservations with account overflow explicitly enabled.
 local function nativeUI()
     TestAddon:Init(); TestAddon:GetSettings().allowAccountMacros=true; Mock.async=true
-    TestAddon.UI:Open()
+    TestAddon.UI:Open(); TestAddon.UI:SetBindingSource("draft")
     return TestAddon
 end
 local function eq(a,b,why) assert(a==b,(why or "value")..": expected "..tostring(b)..", got "..tostring(a)) end
@@ -15,30 +15,31 @@ local function watch(owner,name)
     return count
 end
 
-function Tests.native_ui_optimize_waits_for_worker_before_claiming_success_or_changing_pages()
+function Tests.native_ui_recommendations_require_save_and_apply_before_starting_the_worker()
     local k=nativeUI()
     k:UpdateSetting("bindingOverrides",{["druid.rejuvenation"]="SHIFT-F24"})
-    k.UI.pages.Setup.optimize:Click()
-    assert(k.Engine.busy and k.UI.awaitingOptimize,"Optimize skipped its pending UI state")
-    assert(k.UI.busyOverlay:IsVisible(),"Pending Optimize has no visible progress")
-    eq(k.UI.activePage,"Setup","Optimize changed screens before installation completed")
-    assert(not k.db.appliedPreset,"Pending Optimize was shown as installed")
+    local count=#k.Presets:List(); Mock:ResetWrites()
+    k.UI:ShowPage("Presets"); k.UI.pages.Presets.recommendations:Click()
+    eq(k.UI.bindingSource,"recommendation","Preview did not identify its unsaved source")
+    eq(#k.Presets:List(),count,"Preview created a preset before review")
+    assert(not k.Engine.busy and #Mock.writes==0,"Preview applied game changes")
+    assert(k.UI.saveRecommendation:IsShown() and not k.UI.apply:IsShown(),"Preview skipped explicit draft creation")
+    k.UI.saveRecommendation:Click()
+    eq(k.UI.bindingSource,"draft","Saving did not open an editable draft")
+    eq(#k.Presets:List(),count+1,"Saving failed to create a new preset")
+    assert(not k.db.enabled and #Mock.writes==0,"Saving a draft activated its bindings")
+    eq(k.db.presets.Leveling.settings.bindingOverrides["druid.rejuvenation"],"SHIFT-F24","Recommendation discarded the earlier draft")
+    k.UI.apply:Click()
+    assert(k.Engine.busy and k.UI.busyOverlay:IsVisible(),"Explicit Apply skipped the bounded worker")
     local planCalls=watch(k.Planner,"Build")
     for _=1,5 do k.UI:Refresh() end
-    eq(planCalls.value,0,"Progress updates rebuilt the plan while setup was running")
-    assert(not k.UI.optimize:IsEnabled() and not k.UI.apply:IsEnabled(),"Duplicate setup actions remain available")
-    local wheel=k.db.settings.wheel
-    k.UI:Stage("wheel",not wheel)
-    eq(k.db.settings.wheel,wheel,"Progress cover allowed editing an in-flight preset")
+    eq(planCalls.value,0,"Progress rebuilt the plan")
+    assert(not k.UI.apply:IsEnabled(),"Apply remains available during installation")
     local ok,why,frames=Mock:Drain(); assert(ok,why); assert(frames>1,"Setup did not yield across frames")
     Mock:Advance(0.2)
-    eq(k.UI.activePage,"Bindings","Successful Optimize did not reveal the finished layout")
-    assert(not k.UI.awaitingOptimize and not k.UI.busyOverlay:IsShown(),"Completion left stale busy UI")
-    eq(k.db.appliedPreset,"Optimized Druid","Wrong optimized preset installed")
-    eq(k.db.presets.Leveling.settings.bindingOverrides["druid.rejuvenation"],"SHIFT-F24","Optimize discarded the original draft")
-    eq(Mock.bindings["1"],"ACTIONBUTTON1","Optimize bypassed Blizzard's current action page")
-    assert(not _G.KBO_ActionDock,"Optimize created a replacement action bar")
-    assert(k.UI.tester:IsShown() and k.UI.reviewButton:IsEnabled(),"Completion did not restore normal UI controls")
+    eq(k.db.appliedPreset,"Recommended Druid","Wrong draft was installed")
+    eq(Mock.bindings["1"],"ACTIONBUTTON1","Apply bypassed the native main bar")
+    assert(not _G.KBO_ActionDock,"Apply created a replacement combat bar")
 end
 
 function Tests.native_ui_busy_cover_releases_capture_and_escape_closes_only_the_window()
@@ -61,7 +62,7 @@ function Tests.native_ui_busy_cover_releases_capture_and_escape_closes_only_the_
     Mock.combat=false; Mock:Fire("PLAYER_REGEN_ENABLED")
     local ok,why=Mock:Drain(); assert(ok,why)
     assert(not k.UI.frame:IsShown(),"Background completion reopened a closed window")
-    k.UI:Open()
+    k.UI:Open(); k.UI:SetBindingSource("draft")
     assert(k.UI.tester:IsShown() and not k.UI.busyOverlay:IsShown(),"Reopening retained stale progress input state")
 end
 

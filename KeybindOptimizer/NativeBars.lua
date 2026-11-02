@@ -158,7 +158,7 @@ function N:Prepare(plan)
    if a.barSlot and ((druid and formPages[a.form]) or not druid) then
     local index=a.barSlot
     main[index]=main[index] or {actions={},key=a.key}
-    if main[index].key~=a.key then return nil,"Main-bar position "..index.." must use the same key in every form. Rebind its linked position or Optimize a new preset." end
+    if main[index].key~=a.key then return nil,"Main-bar position "..index.." must use the same key in every form. Rebind its linked position or preview recommendations for a new preset." end
     main[index].actions[#main[index].actions+1]=a
    else extra[#extra+1]=a end
   end

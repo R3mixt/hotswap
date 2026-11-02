@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.4.4 beta — 2026-11-02
+
+- Open on the current character's actual bindings and native bar contents, including movement, mouse controls and current pet slots. Do not substitute class recommendations or reserve future spells in this view.
+- Replace the prominent Optimize action with Presets > Preview recommendations. Preview without creating macros, presets or game bindings; save a separate recommended draft only when requested, then explicitly Apply & save.
+- Add Hover bind: a native scrollable spell grid that includes future abilities, talents and configured ranks. Hover an ability and press its new key; the keyboard and preset draft update together.
+- Keep linked action-bar positions and existing swap/protection rules. Support Shift/Ctrl, side buttons and wheel bindings; reserve Alt, movement and primary clicks.
+- Add Done - keep draft and Apply & save. Hover mode consumes input without casting, ends on Escape, closing or combat, and releases capture before applying.
+- Add fresh-character regressions confirming login does not alter inherited account bindings or create input capture; explicit Apply only saves the character binding set.
+
 ## 0.4.3 beta — 2026-11-02
 
 - Display readable action labels on verified generated native macro buttons while preserving their internal names, bodies and bindings. T and Shift-T show Trinket 1 and Trinket 2.

@@ -2,18 +2,21 @@
 
 Build a comfortable keyboard layout, keep it consistent across your class, and switch saved setups when your playstyle changes.
 
-Hot Swap places spells and generated macros on **Blizzard's original action bars**. Its in-game keyboard editor shows what each key does, including Shift and Ctrl layers, mouse buttons, and optional wheel bindings. The interface uses WoW's own frames and controls.
+Hot Swap places spells and generated macros on **Blizzard's original action bars**. Its in-game keyboard opens on your current game bindings, read-only, including native pet controls. Saved preset drafts provide a separate editor for Shift and Ctrl layers, mouse buttons, and optional wheel bindings. The interface uses WoW's own frames and controls.
 
-**0.4.3 beta:** Classic Era and Hardcore are the current test clients; Forever is the final release target. Automated tests exercise the actual Lua modules with mocked WoW APIs. Live-client acceptance testing is still pending. Retail and other Classic expansions are not supported release targets.
+**0.4.4 beta:** Classic Era and Hardcore are the current test clients; Forever is the final release target. Automated tests exercise the actual Lua modules with mocked WoW APIs. Live-client acceptance testing is still pending. Retail and other Classic expansions are not supported release targets.
 
 ## Set up your keys
 
-- Start with recommended layouts for all nine Classic classes, then customize them. Druid uses the native Base, Cat, Bear, and Moonkin action pages; travel and aquatic forms share Base, and Prowl shares Cat.
-- Click a key to rebind it, or drag an action from the miniature spellbook. Browse class and spec groups, individual spell ranks, items, existing personal macros, and game controls.
+- Inspect your current bindings first. On **Presets → Preview recommendations**, inspect a temporary layout for any of the nine Classic classes, then **Save as new preset** to keep a unique editable copy. Existing presets remain intact; previewing creates no saved preset or live changes. Druid uses the native Base, Cat, Bear, and Moonkin action pages; travel and aquatic forms share Base, and Prowl shares Cat.
+- Explicitly select a saved preset draft, then click a key to rebind it, or drag an action from the miniature spellbook. Browse class and spec groups, individual spell ranks, items, existing personal macros, and game controls.
+- While editing a saved preset draft, choose **Bindings → Hover bind** for a scrollable grid of planned spells, including future talents and custom ranks. Hover an ability and press a key, a Shift/Ctrl combination, a side mouse button or the wheel. Linked form positions and existing control protections still apply; Alt and primary mouse clicks remain reserved.
 - See spell icons and tooltips before abilities are learned. Reserved bindings remain available as you level.
 - Test key combinations in the keyboard view without casting spells.
 - Record the mouse buttons your client receives and choose whether to use the wheel and middle click. Alt stays reserved for self-casting, with separate camera and movement shortcuts.
 - Generate mouseover, focus, self, or cursor macros where the action and client support them. Your existing personal macro text is not imported or overwritten.
+
+In Hover bind, **Done - keep draft** saves the edits in your preset without installing them; **Apply & save** installs them with a named backup. The wheel binds over a spell and scrolls over blank grid space. No spells cast while the mode is active. Escape closes a confirmation first, then leaves the mode; closing the window or entering combat also releases capture.
 
 Generated macros use **character-specific slots by default**. Each preset can opt into **Settings → Action bars → Allow account-wide macro overflow** when it needs extra shared slots. Existing owned account macros are reused without being moved; personal macros are never overwritten.
 
@@ -24,6 +27,10 @@ If space is limited, future spell keys, icons and tooltips stay reserved in the 
 Trinket keys follow equipment slots **13 and 14**, so replacing a trinket does not require renaming a macro. Other item bindings follow item IDs. Save manual alternatives for each key, see when the selected item is missing, and choose a different saved item when needed. Missing items remain inactive until usable; the addon does not silently pick another alternative.
 
 Create, duplicate, rename, import, and export complete presets. Leveling, Dungeon, and PvP provide starting modes. Assign shortcuts to switch saved setups **outside combat**. Edits stay separate from the layout currently installed until you choose **Apply & save**.
+
+## Pet controls
+
+The current view resolves bound pet-slot commands to Blizzard's native pet actions and icons. Hunter and warlock recommendations include pet abilities and attack/follow/passive commands. Presets do not save or restore pet-bar ordering, autocast settings or separate layouts for different pets; Blizzard retains those controls.
 
 ## Apply and recover
 
@@ -37,11 +44,13 @@ Setup and recovery run in small steps with a progress indicator. They cannot sta
 
 The **Settings** tab offers window opacity and scale, plus optional diagnostic logging that starts off. Logs stay local, retain the latest 200 entries, and can be viewed, copied or cleared. Opaque failure details remain readable independently of window transparency and explain whether nothing changed, recovery succeeded, or a backup needs attention.
 
+New characters can inherit custom or missing controls from WoW's saved account bindings. Hot Swap makes no binding changes on a fresh character's login. Explicit Apply & save installs a character-specific layout while preserving the account map; it does not automatically repair account binding files.
+
 ## Get started
 
 1. Install the `KeybindOptimizer` folder in your chosen client's `Interface/AddOns` directory. The folder name is retained for compatibility; the addon is displayed as **Hot Swap**.
 2. Open **Hot Swap** from the Escape menu, the AddOns settings page, or `/hotswap`.
-3. Choose your mouse options. **Optimize** creates and installs a recommended preset with a backup. Alternatively, edit a preset in **Bindings** and **Items**, review it, then choose **Apply & save** outside combat.
+3. Choose your mouse options. Inspect actual bindings on **Bindings**, or use **Presets → Preview recommendations → Save as new preset** to create an editable draft. You can also edit an existing saved preset. Review it, then choose **Apply & save** outside combat; only that step installs the layout and records a backup.
 4. Wait for completion and keep the backup until you have checked movement, forms, modifiers, and recovery in your client.
 
 The defaults are configurable recommendations, not a verified worldwide optimum or a completed top-20-player consensus. Automatic best-food/water selection is not implemented. Hot Swap does not choose a combat rotation or trigger actions without your input.

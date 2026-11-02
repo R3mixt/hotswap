@@ -2,7 +2,7 @@ local function initUI(allowFixtureOverflow)
   TestAddon:Init()
   -- These activation scenarios need all spells in the cross-spec Druid fixture.
   if allowFixtureOverflow then TestAddon:GetSettings().allowAccountMacros=true end
-  TestAddon.UI:Open()
+  TestAddon.UI:Open(); TestAddon.UI:SetBindingSource("draft")
   return TestAddon
 end
 local function eq(a,b,why) assert(a==b,(why or "value")..": expected "..tostring(b)..", got "..tostring(a)) end

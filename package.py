@@ -25,8 +25,8 @@ TOC = "KeybindOptimizer.toc"
 MODULES = (
     "Core.lua", "Diagnostics.lua", "API.lua", "Protection.lua", "Profiles.lua", "Macros.lua", "Items.lua",
     "LibraryData.lua", "Availability.lua", "TalentBindings.lua", "Library.lua", "NativeBars.lua", "Planner.lua",
-    "Engine.lua", "AvailabilityEngine.lua", "Presets.lua", "ItemsUI.lua", "UI.lua", "LibraryUI.lua",
-    "SettingsUI.lua", "Launcher.lua",
+    "Engine.lua", "AvailabilityEngine.lua", "Presets.lua", "CurrentBindings.lua", "ItemsUI.lua", "UI.lua", "LibraryUI.lua",
+    "HoverBindingsUI.lua", "SettingsUI.lua", "Launcher.lua",
 )
 RUNTIME_FILES = (TOC, *MODULES, "README.md")
 SOURCE_FILES = (

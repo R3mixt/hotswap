@@ -547,9 +547,9 @@ end
 function Tests.ui_opens_and_closes_without_installing_anything()
   local k=init()
   Mock:ResetWrites()
-  k.UI:Toggle()
+  k.UI:Toggle(); if k.UI.frame:IsShown() then k.UI:SetBindingSource("draft") end
   assert(k.UI.frame and k.UI.frame:IsShown(),"Options window did not open")
-  k.UI:Toggle()
+  k.UI:Toggle(); if k.UI.frame:IsShown() then k.UI:SetBindingSource("draft") end
   assert(not k.UI.frame:IsShown(),"Options window did not close")
   equal(#Mock.writes,0,"opening UI changed game settings")
 end
@@ -808,7 +808,7 @@ end
 
 function Tests.ui_mouse_calibration_and_wheel_checkbox_stage_only()
   local k=init()
-  k.UI:Toggle(); Mock:ResetWrites()
+  k.UI:Toggle(); if k.UI.frame:IsShown() then k.UI:SetBindingSource("draft") end; Mock:ResetWrites()
   local found=false
   for _,row in ipairs(k.UI.pages.Setup.checks) do if row.settingKey=="wheel" then found=true; row:Click() end end
   assert(found,"Wheel checkbox missing")
@@ -824,7 +824,7 @@ end
 
 function Tests.ui_navigation_keeps_every_configuration_page_reachable()
   local k=init()
-  k.UI:Toggle(); Mock:ResetWrites()
+  k.UI:Toggle(); if k.UI.frame:IsShown() then k.UI:SetBindingSource("draft") end; Mock:ResetWrites()
   for _,name in ipairs({"Setup","Presets","Bindings","Items","Safety","Share","Setup"}) do
     local navigation=assert(k.UI.nav[name],"Missing navigation for "..name)
     navigation:Click()
@@ -844,7 +844,7 @@ end
 
 function Tests.ui_key_capture_still_stages_modifier_bindings_and_cancels_cleanly()
   local k=init()
-  k.UI:Toggle()
+  k.UI:Toggle(); if k.UI.frame:IsShown() then k.UI:SetBindingSource("draft") end
   local action
   for _,a in ipairs(k.UI.plan.actions) do if a.id=="druid.rejuvenation" then action=a end end
   assert(action,"Fixture action not present in binding editor")
@@ -876,15 +876,16 @@ end
 
 function Tests.native_options_templates_keep_controls_and_close_behavior()
   local k=init()
-  k.UI:Toggle()
+  k.UI:Toggle(); if k.UI.frame:IsShown() then k.UI:SetBindingSource("draft") end
   equal(k.UI.frame.template,"BasicFrameTemplateWithInset","native options window")
   equal(k.UI.frame.TitleText:GetText(),"Hot Swap","native title region")
   equal(k.UI.apply.template,"UIPanelButtonTemplate","native apply button")
   equal(k.UI.pages.Bindings.search.template,"InputBoxTemplate","native binding search field")
   for name,tab in pairs(k.UI.nav) do
     equal(tab.template,"PanelTabButtonTemplate","native Forever tab "..name)
-    equal(tab.selected,name=="Setup","initial selected tab "..name)
+    equal(tab.selected,name=="Bindings","initial selected tab "..name)
   end
+  k.UI:ShowPage("Setup")
   local wheel
   for _,row in ipairs(k.UI.pages.Setup.checks) do if row.settingKey=="wheel" then wheel=row.checkbox end end
   assert(wheel,"Native wheel checkbox missing")
@@ -903,7 +904,7 @@ end
 function Tests.native_options_select_classic_tab_template()
   local k=init()
   WOW_PROJECT_ID=WOW_PROJECT_CLASSIC
-  k.UI:Toggle()
+  k.UI:Toggle(); if k.UI.frame:IsShown() then k.UI:SetBindingSource("draft") end
   for name,tab in pairs(k.UI.nav) do
     equal(tab.template,"CharacterFrameTabButtonTemplate","native Classic tab "..name)
     tab:Click()
@@ -923,7 +924,7 @@ local function observeCalls(owner,method)
 end
 
 function Tests.escape_finishes_mouse_calibration_without_closing_parent_window()
-  local k=init(); k.UI:Toggle(); k.UI:BeginCapture("mouse")
+  local k=init(); k.UI:Toggle(); if k.UI.frame:IsShown() then k.UI:SetBindingSource("draft") end; k.UI:ShowPage("Setup"); k.UI:BeginCapture("mouse")
   k.UI:CaptureInput("BUTTON8")
   Mock:ResetWrites()
   -- Unlike calling CaptureInput directly, dispatch also runs the default
@@ -942,7 +943,7 @@ function Tests.escape_finishes_mouse_calibration_without_closing_parent_window()
 end
 
 function Tests.escape_special_window_dispatch_closes_only_current_modal()
-  local k=init(); k.UI:Toggle(); k.UI:BeginCapture("mouse")
+  local k=init(); k.UI:Toggle(); if k.UI.frame:IsShown() then k.UI:SetBindingSource("draft") end; k.UI:BeginCapture("mouse")
   -- Exercise Blizzard's real live UISpecialFrames loop without first routing
   -- through the frame OnKeyDown callback. OnHide must also end capture safely.
   assert(CloseSpecialWindows(),"Calibration is missing from Escape handling")
@@ -954,7 +955,7 @@ function Tests.escape_special_window_dispatch_closes_only_current_modal()
 end
 
 function Tests.visible_event_burst_coalesces_into_one_preview_scan()
-  local k=init(); k.UI:Toggle()
+  local k=init(); k.UI:Toggle(); if k.UI.frame:IsShown() then k.UI:SetBindingSource("draft") end
   local builds=observeCalls(k.Planner,"Build")
   local spells=observeCalls(k.API,"ScanSpellbook")
   local items=observeCalls(k.Items,"Scan")
@@ -975,7 +976,7 @@ function Tests.visible_event_burst_coalesces_into_one_preview_scan()
 end
 
 function Tests.hidden_options_do_not_build_plans_for_inventory_or_spell_events()
-  local k=init(); k.UI:Toggle(); k.UI:Toggle()
+  local k=init(); k.UI:Toggle(); if k.UI.frame:IsShown() then k.UI:SetBindingSource("draft") end; k.UI:Toggle(); if k.UI.frame:IsShown() then k.UI:SetBindingSource("draft") end
   local builds=observeCalls(k.Planner,"Build")
   local spells=observeCalls(k.API,"ScanSpellbook")
   local items=observeCalls(k.Items,"Scan")
@@ -984,7 +985,7 @@ function Tests.hidden_options_do_not_build_plans_for_inventory_or_spell_events()
   equal(builds.count,0,"Hidden options rebuilt a plan")
   equal(spells.count,0,"Hidden options scanned the spellbook")
   equal(items.count,0,"Hidden options scanned inventory")
-  k.UI:Toggle()
+  k.UI:Toggle(); if k.UI.frame:IsShown() then k.UI:SetBindingSource("draft") end
   equal(builds.count,1,"Opening options did not consume the invalidated state exactly once")
 end
 
@@ -993,7 +994,7 @@ function Tests.failed_item_info_notification_does_not_create_a_query_refresh_loo
   Mock.bagItems[0]={{id=990099}}
   Mock.onItemRequest=function(id) Mock:Fire("GET_ITEM_INFO_RECEIVED",id,false) end
   local builds=observeCalls(k.Planner,"Build")
-  k.UI:Toggle()
+  k.UI:Toggle(); if k.UI.frame:IsShown() then k.UI:SetBindingSource("draft") end
   for i=1,8 do Mock:Advance(0.2); k.UI:Refresh() end
   equal(Mock.itemRequests[990099],1,"Uncached failed item was repeatedly requested by its own result event")
   assert(builds.count<=2,"Item result produced an unbounded preview loop: "..builds.count)
@@ -1004,7 +1005,7 @@ function Tests.failed_item_info_notification_does_not_create_a_query_refresh_loo
 end
 
 function Tests.repeated_visible_refresh_reuses_reviewed_plan_without_rescanning()
-  local k=init(); k.UI:Toggle()
+  local k=init(); k.UI:Toggle(); if k.UI.frame:IsShown() then k.UI:SetBindingSource("draft") end
   local builds=observeCalls(k.Planner,"Build")
   local spells=observeCalls(k.API,"ScanSpellbook")
   local items=observeCalls(k.Items,"Scan")
@@ -1015,7 +1016,7 @@ function Tests.repeated_visible_refresh_reuses_reviewed_plan_without_rescanning(
 end
 
 function Tests.apply_button_does_not_repeat_heavy_preview_work_in_same_callback()
-  local k=init(); k.UI:Toggle()
+  local k=init(); k.UI:Toggle(); if k.UI.frame:IsShown() then k.UI:SetBindingSource("draft") end
   local builds=observeCalls(k.Planner,"Build")
   local bindingRows=observeCalls(k.UI,"RenderBindings")
   local inventoryRows=observeCalls(k.UI,"RenderItems")
@@ -1031,7 +1032,7 @@ function Tests.apply_button_does_not_repeat_heavy_preview_work_in_same_callback(
 end
 
 function Tests.apply_uses_fresh_spellbook_even_after_ui_preview_was_cached()
-  local k=init(); k.UI:Toggle()
+  local k=init(); k.UI:Toggle(); if k.UI.frame:IsShown() then k.UI:SetBindingSource("draft") end
   Mock:Learn(990123,"Learned After Preview")
   local ok,why=k:Apply(); assert(ok,why)
   local found=false
@@ -1050,7 +1051,7 @@ function Tests.item_completion_during_preview_is_not_lost_when_build_returns()
     Mock.itemInfo[id]={name="Loaded During Scan",effect="Useful effect"}
     Mock:Fire("GET_ITEM_INFO_RECEIVED",id,true)
   end
-  k.UI:Toggle()
+  k.UI:Toggle(); if k.UI.frame:IsShown() then k.UI:SetBindingSource("draft") end
   Mock:Advance(0.2)
   local selected
   for _,action in ipairs(k.UI.plan.actions) do if action.id=="item.utility" then selected=action end end
@@ -1076,7 +1077,7 @@ function Tests.unlearned_spell_metadata_keeps_real_icon_and_localized_tooltip_id
   equal(aimed.label,"Gezielter Schuss","Unlearned visible spell label")
   equal(aimed.icon,135130,"Unlearned visible spell icon")
   equal(aimed.displayIcon,135130,"Unlearned metadata icon")
-  k.UI:Open(); k.UI:ShowPage("Bindings")
+  k.UI:Open(); k.UI:SetBindingSource("draft"); k.UI:ShowPage("Bindings")
   assert(k.UI:AssignBinding(aimed,"U"))
   assert(k:Apply())
   local applied=actionByID(k.db.appliedPlan,aimed.id)
@@ -1119,7 +1120,7 @@ local function hunterKeyboard()
   Mock:Learn(75,"Auto Shot"); Mock:Learn(2973,"Raptor Strike")
   Mock.catalog[19434]={id=19434,name="Aimed Shot",icon=135130}
   local k=init(); k:GetSettings().flavor="era"
-  k.UI:Open(); k.UI:ShowPage("Bindings")
+  k.UI:Open(); k.UI:SetBindingSource("draft"); k.UI:ShowPage("Bindings")
   return k,k.UI.pages.Bindings.keyboard
 end
 
@@ -1188,7 +1189,7 @@ end
 function Tests.first_open_bindings_in_combat_does_not_capture_or_reconfigure_keyboard_input()
   local k=init()
   Mock.strictInputRestrictions=true; Mock.combat=true
-  k.UI:Open(); k.UI:ShowPage("Bindings")
+  k.UI:Open(); k.UI:SetBindingSource("draft"); k.UI:ShowPage("Bindings")
   assert(not k.UI.tester or not k.UI.tester:IsVisible(),"Opening in combat activated a key consumer")
   Mock:KeyDown("1")
   equal(Mock.propagatedKeys[#Mock.propagatedKeys],"1","Opening bindings in combat blocked gameplay input")
@@ -1301,7 +1302,7 @@ end
 function Tests.keyboard_displays_qwerty_form_specific_icons_and_persistent_heals()
   local k=init()
   for _,spell in ipairs(Mock.spells) do spell.icon=1000000+spell.id end
-  k.UI:Open(); k.UI:ShowPage("Bindings")
+  k.UI:Open(); k.UI:SetBindingSource("draft"); k.UI:ShowPage("Bindings")
   local board=k.UI.pages.Bindings.keyboard
   assert(board and board:IsShown(),"Visual keyboard is not the initial bindings view")
   for base in ("QWERTYUIOPASDFGHJKLZXCVBNM"):gmatch(".") do assert(board.keys[base],"Missing QWERTY key "..base) end
@@ -1321,7 +1322,7 @@ function Tests.keyboard_displays_qwerty_form_specific_icons_and_persistent_heals
 end
 
 function Tests.keyboard_modifier_events_change_layers_without_scans_or_protected_writes()
-  local k=init(); k.UI:Open(); k.UI:ShowPage("Bindings")
+  local k=init(); k.UI:Open(); k.UI:SetBindingSource("draft"); k.UI:ShowPage("Bindings")
   local board=k.UI.pages.Bindings.keyboard
   local builds=observeCalls(k.Planner,"Build")
   local spells=observeCalls(k.API,"ScanSpellbook")
@@ -1352,7 +1353,7 @@ function Tests.keyboard_modifier_events_change_layers_without_scans_or_protected
 end
 
 function Tests.keyboard_click_and_picker_reassign_only_selected_action_and_self_alias()
-  local k=init(); k.UI:Open(); k.UI:ShowPage("Bindings")
+  local k=init(); k.UI:Open(); k.UI:SetBindingSource("draft"); k.UI:ShowPage("Bindings")
   local page=k.UI.pages.Bindings
   page.keyboard.keys.Q:Click()
   equal(k.UI.selectedAction.id,"druid.rejuvenation","clicking occupied key selects its action")
@@ -1382,7 +1383,7 @@ function Tests.keyboard_click_and_picker_reassign_only_selected_action_and_self_
 end
 
 function Tests.keyboard_same_form_swap_requires_confirmation_and_cross_form_collision_stays_blocked()
-  local k=init(); k.UI:Open(); k.UI:ShowPage("Bindings")
+  local k=init(); k.UI:Open(); k.UI:SetBindingSource("draft"); k.UI:ShowPage("Bindings")
   local heal=actionByID(k.UI.plan,"druid.rejuvenation")
   Mock:ResetWrites()
   assert(not k.UI:AssignBinding(heal,"E"),"Colliding keys swapped before confirmation")
@@ -1404,7 +1405,7 @@ function Tests.keyboard_same_form_swap_requires_confirmation_and_cross_form_coll
 end
 
 function Tests.keyboard_existing_game_binding_replacement_stages_without_false_conflict()
-  local k=init(); k.UI:Open(); k.UI:ShowPage("Bindings")
+  local k=init(); k.UI:Open(); k.UI:SetBindingSource("draft"); k.UI:ShowPage("Bindings")
   Mock:RegisterBindingCommand("TOGGLEACHIEVEMENT","BINDING_HEADER_INTERFACE")
   Mock.bindings.U="TOGGLEACHIEVEMENT"
   local heal=actionByID(k.UI.plan,"druid.rejuvenation")
@@ -1417,7 +1418,7 @@ function Tests.keyboard_existing_game_binding_replacement_stages_without_false_c
 end
 
 function Tests.occupied_keyboard_key_can_change_action_using_mouse_controls_only()
-  local k=init(); k.UI:Open(); k.UI:ShowPage("Bindings")
+  local k=init(); k.UI:Open(); k.UI:SetBindingSource("draft"); k.UI:ShowPage("Bindings")
   local page=k.UI.pages.Bindings
   Mock:ResetWrites()
   page.keyboard.keys.Q:Click()

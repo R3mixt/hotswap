@@ -214,7 +214,7 @@ function Tests.backup_restore_preserves_item_draft_and_marks_it_unapplied_agains
   equal(installed,1001,"Backup restore silently installed the staged potion")
   assert(k.dirty and k.Presets:HasUnappliedChanges(),"Preserved potion draft is falsely shown as applied")
   assert(has(why,"unapplied"),"Restore feedback does not distinguish saved draft edits")
-  k.UI:Open()
+  k.UI:Open(); k.UI:SetBindingSource("draft")
   local status=k.UI.status:GetText()
   assert(has(status,"Not in use") or has(status,"unapplied"),"Restored item draft footer falsely reports Active: "..tostring(status))
 end
@@ -231,7 +231,7 @@ function Tests.backup_restore_preserves_global_hotkey_draft_and_requires_apply_b
   equal(Mock.bindings["CTRL-SHIFT-F23"],command,"Backup did not restore the actual old mode hotkey")
   equal(Mock.bindings["CTRL-SHIFT-F24"],nil,"Backup restore silently installed the draft mode hotkey")
   assert(k.dirty and k.Presets:HasUnappliedChanges(),"Preserved hotkey draft is falsely shown as applied")
-  k.UI:Open()
+  k.UI:Open(); k.UI:SetBindingSource("draft")
   local status=k.UI.status:GetText()
   assert(has(status,"Not in use") or has(status,"unapplied"),"Restored hotkey draft footer falsely reports Active: "..tostring(status))
   local backups=#k.Engine:ListBackups()

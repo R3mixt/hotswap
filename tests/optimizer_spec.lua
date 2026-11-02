@@ -10,33 +10,38 @@ function Tests.optimize_preserves_original_draft_and_hardware_but_rebuilds_bindi
     local apply=k.Engine.Apply
     k.Engine.Apply=function(_,plan) k.db.enabled=true; k.db.appliedPlan=k.Copy(plan); return true,'done' end
     local ok,why,name=k.Presets:Optimize(); assert(ok,why)
-    assert(name=='Optimized Druid' and k.db.activePreset==name)
+    assert(name=='Recommended Druid' and k.db.activePreset==name)
     assert(k.db.presets.Leveling.settings==original and original.bindingOverrides['druid.rejuvenation']=='SHIFT-F24')
     assert(not next(k.db.settings.bindingOverrides) and not next(k.db.settings.fallbackBindings))
     assert(k.db.settings.wheel==false and k.db.settings.mouseButtons.BUTTON4 and not k.db.settings.mouseButtons.BUTTON5)
     assert(k.db.presets[name].items.potion==456 and k.db.presets[name].equipment[13]==789)
-    assert(k.Presets:Optimize()); assert(k.db.activePreset=='Optimized Druid (2)')
+    assert(k.Presets:Optimize()); assert(k.db.activePreset=='Recommended Druid (2)')
+    assert(not k.db.enabled, 'Recommendation creation applied game bindings')
     k.Engine.Apply=apply
 end
 
-function Tests.optimize_failure_keeps_new_draft_and_restores_original_selection()
+function Tests.recommendation_generation_never_calls_apply_even_when_it_would_fail()
     local k=TestAddon; k:Init(); local source=k.db.settings
-    k:GetSettings().allowAccountMacros=true
-    local apply=k.Engine.Apply; k.Engine.Apply=function() return false,'injected failure' end
-    local ok,why,name=k.Presets:Optimize(); assert(not ok and why:find('injected failure',1,true))
-    assert(k.db.activePreset=='Leveling' and k.db.settings==source and k.db.presets[name])
+    local apply=k.Engine.Apply; k.Engine.Apply=function() error('Apply must be explicit') end
+    Mock:ResetWrites()
+    local ok,why,name=k.Presets:Optimize(); assert(ok,why)
+    assert(k.db.activePreset==name and k.db.presets.Leveling.settings==source)
+    assert(#Mock.writes==0 and not k.db.enabled and not k.db.lastBindingBackupID)
     k.Engine.Apply=apply
-    Mock.combat=true; local count=#k.Presets:List()
+    k.Engine.busy=true; local count=#k.Presets:List()
     assert(not k.Presets:Optimize() and #k.Presets:List()==count)
+    k.Engine.busy=false
 end
 
-function Tests.optimize_installs_native_layout_with_backup_and_keeps_global_mode_hotkeys()
+function Tests.recommended_draft_requires_explicit_apply_then_backs_up_and_keeps_mode_hotkeys()
     local k=TestAddon; k:Init(); k.db.settings.flavor='era'
     k:GetSettings().allowAccountMacros=true
     k.db.settings.bindingOverrides['druid.rejuvenation']='SHIFT-F24'
     assert(k.Presets:SetHotkey('PvP','SHIFT-F23'))
     local modeID=k.db.presets.PvP.id
     local ok,why,name=k.Presets:Optimize(); assert(ok,why)
+    assert(not k.db.enabled, 'Creating recommended draft changed live state')
+    assert(k.Presets:Activate(name))
     assert(k.db.enabled and k.db.appliedPreset==name and k.db.appliedPlan.nativeLayout)
     assert(k.db.presets.Leveling.settings.bindingOverrides['druid.rejuvenation']=='SHIFT-F24')
     assert(k.db.presets.PvP.hotkey=='SHIFT-F23' and not k.db.presets[name].hotkey)

@@ -1,5 +1,5 @@
 local function startBarUI()
-    local k=TestAddon; k:Init(); k.UI:Open()
+    local k=TestAddon; k:Init(); k.UI:Open(); k.UI:SetBindingSource("draft")
     -- UI tests exercise the NativeBars capability contract; real toggle/page
     -- detection and installation have separate NativeBars integration tests.
     k.NativeBars.GetBarOptions=function(_,plan,settings)

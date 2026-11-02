@@ -2,7 +2,7 @@ local function operationUI(allowFixtureOverflow)
     local k=TestAddon; k:Init()
     -- Apply/rollback scenarios use the artificial all-talents Druid fixture.
     if allowFixtureOverflow then k:GetSettings().allowAccountMacros=true end
-    k.UI:Open(); Mock.async=true
+    k.UI:Open(); k.UI:SetBindingSource("draft"); Mock.async=true
     return k
 end
 function Tests.operation_failure_details_preserve_full_binding_error_after_review_and_reopen()
@@ -27,7 +27,7 @@ function Tests.operation_failure_details_preserve_full_binding_error_after_revie
     assert(not dialog:IsShown() and k.UI.frame:IsShown(),"Escape closed the parent window")
     k.UI.reviewButton:Click()
     assert(k.UI.operationError==error and dialog:IsShown(),"Review cleared the last operation failure")
-    dialog.close:Click(); Mock:Advance(0.05); k.UI.frame:Hide(); k.UI:Open()
+    dialog.close:Click(); Mock:Advance(0.05); k.UI.frame:Hide(); k.UI:Open(); k.UI:SetBindingSource("draft")
     assert(k.UI.operationError==error and k.UI.reviewButton:GetText()=="Details","Closing the window lost the failure")
     k.UI.reviewButton:Click(); dialog.dismiss:Click(); Mock:Advance(0.05)
     assert(not k.UI.operationError and k.UI.reviewButton:GetText()=="Review","Explicit dismissal did not clear details")

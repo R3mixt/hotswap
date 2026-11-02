@@ -269,25 +269,56 @@ function P:OnActivationComplete(ok)
     end
     if K.QueueRefresh then K:QueueRefresh() end
 end
-function P:Optimize(name)
+local function recommendation()
+    local _,class=UnitClass("player")
+    local source=K.db.presets[K.db.activePreset]
+    local preset={settings=K.Copy(K:GetSettings()),items=K.Copy(source.items or {}),equipment=K.Copy(source.equipment or {}),sourceClass=class}
+    for _,key in ipairs({"bindingOverrides","fallbackBindings","actionOverrides","customActions"}) do preset.settings[key]={} end
+    return preset
+end
+function P:PreviewRecommendations()
     if busy() or self.activating then return false,waitMessage end
-    if InCombatLockdown and InCombatLockdown() then return false,"Leave combat before optimizing bindings." end
+    if not K.db then K:Init() end
+    local preset=recommendation()
+    -- The planner's existing collaborators read the selected preset. Give
+    -- them a detached view for this synchronous, read-only build, then restore
+    -- it even on failure. Never insert a draft or consume a preset ID here.
+    -- A shallow DB copy intentionally avoids copying potentially large backup
+    -- history; only the preset map and selected configuration are substituted.
+    local savedDB,savedPlan,savedValid,savedRevision,savedClass,savedDirty=K.db,K.plan,K.previewValid,K.previewRevision,K.playerClass,K.dirty
+    local view={}; for key,value in pairs(savedDB) do view[key]=value end
+    view.presets={}; for name,value in pairs(savedDB.presets) do view.presets[name]=value end
+    local previewSelected=K.Copy(preset)
+    local selected=savedDB.presets[savedDB.activePreset]
+    previewSelected.id,previewSelected.hotkey=selected.id,selected.hotkey
+    view.presets[view.activePreset]=previewSelected; view.settings=previewSelected.settings
+    K.db=view
+    local ok,plan=pcall(K.Planner.Build,K.Planner,true)
+    K.db,K.plan,K.previewValid,K.previewRevision,K.playerClass,K.dirty=savedDB,savedPlan,savedValid,savedRevision,savedClass,savedDirty
+    if not ok then return false,tostring(plan) end
+    plan.recommendation=true; plan.presetName=nil; plan.presetID=nil
+    return plan,preset
+end
+function P:CreateRecommended(name,snapshot)
+    if busy() or self.activating then return false,waitMessage end
     if not K.db then K:Init() end
     local className,class=UnitClass("player")
-    local base,why=validName(name or ("Optimized "..(className or class or "preset")))
+    local base,why=validName(name or ("Recommended "..(className or class or "preset")))
     if not base then return false,why end
+    if snapshot and (type(snapshot)~="table" or type(snapshot.settings)~="table" or snapshot.sourceClass~=class) then
+        return false,"Preview recommendations for this character before saving them."
+    end
     local target=base; local suffix=2
     while K.db.presets[target] do local tail=" ("..suffix..")"; target=base:sub(1,48-#tail)..tail; suffix=suffix+1 end
-    local preset=K.Copy(K.db.presets[K.db.activePreset])
+    local preset=K.Copy(snapshot or recommendation())
     preset.id=self:NewID(); preset.hotkey=nil; preset.sourceClass=class
-    preset.settings.bindingOverrides={}; preset.settings.fallbackBindings={}; preset.settings.actionOverrides={}; preset.settings.customActions={}
     K.db.presets[target]=preset
-    -- Activate captures the original selection, so a failed install leaves
-    -- the new optimized draft available without discarding the user's draft.
-    local ok,message=self:Activate(target)
-    if not ok then return false,message.." The optimized draft was saved as "..target..".",target end
-    return ok,ok=="pending" and message or ("Using "..target..". Your previous preset is preserved."),target
+    self:Select(target)
+    return true,"Saved "..target.." as a draft. No game bindings changed. Apply & save installs it.",target
 end
+-- Compatibility entry point: recommendation generation no longer installs
+-- anything. Every caller must explicitly activate a saved draft to apply it.
+function P:Optimize(name) return self:CreateRecommended(name) end
 function P:ActivateByID(id)
     local name=self:FindID(id)
     if not name then return false,"That preset no longer exists. Use your current preset to update its hotkeys." end

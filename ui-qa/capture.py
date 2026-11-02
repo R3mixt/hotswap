@@ -99,11 +99,19 @@ anchors={'TOPLEFT':(0,1),'TOP':(.5,1),'TOPRIGHT':(1,1),'LEFT':(0,.5),'CENTER':(.
 cases=[('Setup','setup',None,None),('Presets','presets',None,None),('Bindings','bindings','caster',''),('Bindings','bindings-shift','caster','SHIFT-'),('Bindings','bindings-cat','cat',''),('Bindings','bindings-test','cat',''),('Items','items',None,None),('Safety','safety',None,None),('Share','share',None,None),('Bindings','library-spells','caster',''),('Bindings','library-ranks','caster',''),('Bindings','library-items','caster',''),('Bindings','library-macros','caster','')]
 cases.extend([('Setup','action-bars',None,None),('Settings','settings',None,None),('Settings','diagnostic-log',None,None),('Setup','operation-error',None,None)])
 cases.extend([('Settings','settings-controls',None,None),('Settings','settings-bars',None,None),('Settings','settings-window',None,None),('Settings','settings-diagnostics',None,None),('Bindings','talent-choices','caster',''),('Bindings','talent-own','caster','')])
+cases.append(('Bindings','hover-bind','caster',''))
+cases.extend([('Bindings','bindings-current',None,''),('Bindings','bindings-recommendation','caster','')])
 for page,filename,form,layer in cases:
     lua.execute('for _,name in ipairs({"nativeBarsDialog","diagnosticLogDialog","operationErrorDialog","talentDialog"}) do local f=K.UI[name]; if f then f:Hide() end end')
     if filename.startswith('settings-') or filename.startswith('talent-'):
         lua.execute('K.UI:ClearOperationError()')
     lua.globals().K.UI.libraryOpen=filename.startswith('library-')
+    if filename == 'bindings-current':
+        lua.execute('Mock.bindings["1"]="ACTIONBUTTON1"; Mock.actions[1]={"spell",5176}; K.UI:ClearOperationError(); K.UI:SetBindingSource("current")')
+    elif filename == 'bindings-recommendation':
+        lua.execute('K.UI:ClearOperationError(); K.UI:PreviewRecommendations()')
+    else:
+        lua.execute('K.UI:SetBindingSource("draft")')
     if form:lua.globals().K.UI.SetActionPage(lua.globals().K.UI,form)
     if layer is not None:lua.globals().K.UI.pinnedLayer=layer
     lua.globals().K.UI.ShowPage(lua.globals().K.UI,page)
@@ -114,6 +122,8 @@ for page,filename,form,layer in cases:
         lua.execute('K.TalentBindings:SetChoices("druid.form_moonkin",{"druid.form_moonkin","druid.natures_swiftness","druid.swiftmend"}); K.UI:Refresh(); for _,a in ipairs(K.UI.plan.actions) do if a.id=="druid.form_moonkin" then K.UI:OpenTalentChoices(a); break end end')
     if filename == 'talent-own':
         lua.execute('K.TalentBindings:SetMode("druid.form_moonkin","separate"); K.UI:Refresh(); for _,a in ipairs(K.UI.plan.actions) do if a.id=="druid.form_moonkin" then K.UI:OpenTalentChoices(a); break end end')
+    if filename == 'hover-bind':
+        lua.execute('K.UI:ClearOperationError(); K.UI:OpenHoverBindings()')
     if filename == 'action-bars':
         lua.globals().K.UI.OpenNativeBars(lua.globals().K.UI)
     if filename == 'diagnostic-log':
