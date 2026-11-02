@@ -4,7 +4,7 @@ Build a comfortable keyboard layout, keep it consistent across your class, and s
 
 Hot Swap places spells and generated macros on **Blizzard's original action bars**. Its in-game keyboard editor shows what each key does, including Shift and Ctrl layers, mouse buttons, and optional wheel bindings. The interface uses WoW's own frames and controls.
 
-**0.4.2 beta:** Classic Era and Hardcore are the current test clients; Forever is the final release target. Automated tests exercise the actual Lua modules with mocked WoW APIs. Live-client acceptance testing is still pending. Retail and other Classic expansions are not supported release targets.
+**0.4.3 beta:** Classic Era and Hardcore are the current test clients; Forever is the final release target. Automated tests exercise the actual Lua modules with mocked WoW APIs. Live-client acceptance testing is still pending. Retail and other Classic expansions are not supported release targets.
 
 ## Set up your keys
 

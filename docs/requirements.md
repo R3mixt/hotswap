@@ -1,4 +1,4 @@
-# Requirement map — 0.4.2 beta
+# Requirement map — 0.4.3 beta
 
 The final release targets WoW Forever. Classic Era / Hardcore is the temporary development target. Retail is not a supported release target. Automated tests use Lua 5.1 with mocked game APIs; a passing suite does not certify protected execution inside either client.
 

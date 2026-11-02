@@ -58,6 +58,16 @@ def read_manifest(source: Path) -> tuple[str, tuple[str, ...]]:
 
 def run_validation() -> tuple[str, int]:
     """Run current sources; a stale success report never authorizes a build."""
+    packaging = subprocess.run(
+        [sys.executable, "-m", "unittest", "discover", "-s", str(ROOT / "tests"),
+         "-p", "test_package.py", "-v"],
+        cwd=ROOT, text=True, encoding="utf-8", errors="replace",
+        stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+    )
+    packaging_match = re.search(r"Ran ([1-9]\d*) tests? in", packaging.stdout)
+    if packaging.returncode or not packaging_match:
+        raise RuntimeError("Current packaging regression suite did not pass:\n" + packaging.stdout)
+    print(f"Packaging regression tests: {packaging_match[1]} passed")
     result = subprocess.run(
         [sys.executable, str(ROOT / "tests" / "run_tests.py")],
         cwd=ROOT, text=True, encoding="utf-8", errors="replace",
@@ -67,7 +77,7 @@ def run_validation() -> tuple[str, int]:
     if result.returncode or not match or int(match[1]) != int(match[2]) or int(match[2]) == 0:
         raise RuntimeError("Current Lua 5.1 regression suite did not pass:\n" + result.stdout)
     print(match.group(0))
-    return result.stdout, int(match[2])
+    return packaging.stdout + "\n" + result.stdout, int(match[2])
 
 
 def copy_files(source: Path, destination: Path, names: tuple[str, ...]) -> None:
@@ -93,6 +103,8 @@ Built: {date}
 - {total}/{total} regression scenarios passed using the actual addon modules in Lua 5.1 with mocked WoW APIs.
 - The TOC matches the explicit {len(MODULES)}-module runtime allowlist and dependency order.
 - Both ZIP archives were checked for exact expected file lists and CRC integrity before publication.
+- The CurseForge ZIP has one addon root, its matching TOC directly inside it, and every TOC load file present.
+- The Python packaging regression suite passed before building the archives.
 - Packaging uses fresh temporary staging; previous release files and local Python dependencies are excluded.
 
 These checks do not launch WoW. In-game protected actions, taint, actual input routing, casting and server-specific behavior still require client testing. See compatibility.md. The complete test log and regression sources are included in the separate source archive.
@@ -115,6 +127,41 @@ def write_archive(directory: Path, archive: Path, prefix: str) -> None:
                         if line.strip() and not line.lstrip().startswith("#"))
         if modules != MODULES:
             raise ValueError(f"Packaged TOC order changed: {archive.name}")
+
+
+def validate_runtime_archive(archive: Path) -> str:
+    """Validate the installable ZIP layout, independently of its filename.
+
+    Developer archives intentionally have an extra wrapper. They must never
+    pass this check if accidentally selected as the runtime upload artifact.
+    """
+    root = Path(TOC).stem
+    toc_name = f"{root}/{TOC}"
+    with zipfile.ZipFile(archive) as bundle:
+        names = bundle.namelist()
+        if (not names or len(names) != len(set(names))
+                or any("\\" in name or name.startswith("/")
+                       or ".." in name.split("/") for name in names)):
+            raise ValueError(f"Invalid runtime ZIP paths: {archive.name}")
+        if ({name.split("/", 1)[0] for name in names} != {root}
+                or any("/" not in name for name in names)):
+            raise ValueError(f"Runtime ZIP must contain only the {root}/ addon root: {archive.name}")
+        files = {entry.filename for entry in bundle.infolist() if not entry.is_dir()}
+        if toc_name not in files:
+            raise ValueError(f"Runtime ZIP is missing the immediate matching TOC: {toc_name}")
+        toc = bundle.read(toc_name).decode("utf-8-sig")
+        entries = tuple(line.strip() for line in toc.splitlines()
+                        if line.strip() and not line.lstrip().startswith("#"))
+        for entry in entries:
+            relative = entry.replace("\\", "/")
+            if (relative.startswith("/") or ":" in relative
+                    or any(part in {"", ".", ".."} for part in relative.split("/"))):
+                raise ValueError(f"Unsafe packaged TOC load path: {entry}")
+            if f"{root}/{relative}" not in files:
+                raise ValueError(f"Runtime ZIP is missing a TOC load file: {entry}")
+        if entries != MODULES:
+            raise ValueError(f"Packaged TOC order changed: {archive.name}")
+    return toc_name
 
 
 def checked_output(output: Path) -> tuple[Path, Path]:
@@ -149,7 +196,8 @@ def package(output: Path) -> tuple[Path, Path]:
             raise ValueError(f"Missing or linked release source: {name}")
     log, total = run_validation()
     output.mkdir(parents=True, exist_ok=True)
-    archive_names = (f"HotSwap-{version}.zip", f"HotSwap-{version}-source.zip")
+    archive_names = (f"HotSwap-{version}-CurseForge.zip",
+                     f"HotSwap-{version}-developer-source-NOT-FOR-UPLOAD.zip")
     # Staging in output keeps replacement on one volume. Move old loose files
     # aside only after both ZIPs verify, and roll that move back on failure.
     with TemporaryDirectory(prefix=".hotswap-build-", dir=output) as temporary:
@@ -175,6 +223,7 @@ def package(output: Path) -> tuple[Path, Path]:
             if path.is_file() and not path.is_symlink() and path.suffix in {".lua", ".py"}:
                 copy_files(ROOT, source, (path.relative_to(ROOT).as_posix(),))
         write_archive(addon, stage / archive_names[0], "KeybindOptimizer")
+        toc_path = validate_runtime_archive(stage / archive_names[0])
         write_archive(source, stage / archive_names[1], f"HotSwap-{version}-source")
         checked_output(output)  # Recheck after tests/build, immediately before moving old files.
         previous = stage / "previous-addon"
@@ -195,6 +244,7 @@ def package(output: Path) -> tuple[Path, Path]:
             checksum.replace(output / checksum.name)
             print(f"Packaged {output / name} ({(output / name).stat().st_size:,} bytes)")
     print(f"TOC: {len(MODULES)} modules; ZIP integrity: passed; SHA-256 manifests written")
+    print(f"CurseForge upload structure: passed; TOC: {toc_path}")
     return output / archive_names[0], output / archive_names[1]
 
 

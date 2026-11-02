@@ -387,6 +387,63 @@ function N:ContentFor(action) return contentFor(action) end
 function N:ReadSlot(index) return readSlot(index) end
 function N:SameContent(a,b) return sameContent(a,b) end
 local macroButtonPrefixes={"ActionButton","MultiBarBottomLeftButton","MultiBarBottomRightButton","MultiBarRightButton","MultiBarLeftButton","MultiBar5Button","MultiBar6Button","MultiBar7Button"}
+local function indexMacroLabels()
+ -- Build from the installed plan, never a different editing draft. Native
+ -- Update hooks then do constant-time slot/name lookups without planning.
+ N.macroLabelsBySlot={}; N.macroLabelsByName={}
+ local plan=K.db and K.db.enabled and K.db.appliedPlan
+ if not plan then return end
+ local actions={}
+ for _,a in ipairs(plan.actions or {}) do
+  if a.kind~="macroref" and a.macroName and a.body then
+   actions[a.id]=a
+   N.macroLabelsByName[a.macroName]=N.macroLabelsByName[a.macroName] or a
+  end
+ end
+ for _,entry in ipairs(plan.nativeLayout and plan.nativeLayout.placements or {}) do
+  N.macroLabelsBySlot[entry.slot]=actions[entry.actionID]
+ end
+end
+local function macroLabelAction(button)
+ -- The main bar's effective action changes with paging/forms. Its fixed ID
+ -- and original action attribute do not reliably identify the visible slot.
+ local at=button and button.action
+ if type(at)~="number" and button and button.GetAttribute then at=button:GetAttribute("action") end
+ if type(at)~="number" or not GetActionInfo or not GetMacroInfo then return end
+ local kind,index=GetActionInfo(at)
+ if kind~="macro" then return nil,"" end
+ local name,_,body=GetMacroInfo(index)
+ if not K.db or not K.db.enabled or not name or not body or (K.db.ownedMacros or {})[name]~=body then return nil,name end
+ local a=N.macroLabelsBySlot and N.macroLabelsBySlot[at]
+ if not a or a.macroName~=name or a.body~=body then a=N.macroLabelsByName and N.macroLabelsByName[name] end
+ if a and a.macroName==name and a.body==body then return a,name end
+ return nil,name
+end
+local function friendlyMacroLabel(a)
+ if a.itemSlot==13 then return "Trinket 1" end
+ if a.itemSlot==14 then return "Trinket 2" end
+ return a.label or a.displayName or a.spellName or a.name
+end
+local function setMacroTooltip(button)
+ local tooltip=GameTooltip
+ if not tooltip or not tooltip.IsOwned or not tooltip:IsOwned(button) then return end
+ local a=macroLabelAction(button)
+ if not a or (a.itemSlot~=13 and a.itemSlot~=14) then return end
+ local item=GetInventoryItemID and GetInventoryItemID("player",a.itemSlot)
+ local title=a.itemSlot==13 and "Upper trinket" or "Lower trinket"
+ if not item then
+  tooltip:SetText(title,1,0.82,0)
+  tooltip:AddLine("No trinket equipped. This key uses an on-use trinket equipped in this slot.",1,1,1,true)
+ else
+  -- Keep Blizzard's item tooltip, including stats and cooldown information.
+  -- A missing GetItemSpell result is not conclusive proof of a passive item.
+  tooltip:AddLine(title.." (slot "..a.itemSlot.."). This key follows the equipped trinket.",1,0.82,0,true)
+  local name=K.API:ItemInfo(item)
+  if not name then tooltip:AddLine("Loading item details.",0.7,0.7,0.7,true)
+  elseif not K.API:ItemSpell(item) then tooltip:AddLine("No usable item effect reported.",0.7,0.7,0.7,true) end
+ end
+ tooltip:Show()
+end
 local function setMacroText(button)
  if combat() then N.pendingMacroText=true; return end
  local name=button and button.Name
@@ -394,6 +451,16 @@ local function setMacroText(button)
   local global=button:GetName(); name=global and _G[global.."Name"]
  end
  if not name or type(name.SetAlpha)~="function" then return end
+ N.macroLabelText=N.macroLabelText or setmetatable({},{__mode="k"})
+ local a,nativeName=macroLabelAction(button)
+ local text=a and friendlyMacroLabel(a)
+ if text then
+  name:SetText(text); N.macroLabelText[name]=text
+ elseif N.macroLabelText[name] then
+  -- Restore only our own stale text; never replace a new personal/native label.
+  if name:GetText()==N.macroLabelText[name] then name:SetText(nativeName or "") end
+  N.macroLabelText[name]=nil
+ end
  local shown=not K.db or not K.db.preferences or K.db.preferences.showMacroNames~=false
  N.macroNameAlpha=N.macroNameAlpha or setmetatable({},{__mode="k"})
  if not shown then
@@ -415,7 +482,9 @@ function N:ApplyMacroTextPreference()
  end
  if combat() then self.pendingMacroText=true; return false end
  self.pendingMacroText=nil
+ indexMacroLabels()
  self.macroTextHooks=self.macroTextHooks or setmetatable({},{__mode="k"})
+ self.macroTooltipHooks=self.macroTooltipHooks or setmetatable({},{__mode="k"})
  for _,prefix in ipairs(macroButtonPrefixes) do for index=1,12 do
   local button=_G[prefix..index]
   if button then
@@ -426,11 +495,17 @@ function N:ApplyMacroTextPreference()
     elseif button.HookScript then button:HookScript("OnShow",setMacroText) end
     self.macroTextHooks[button]=true
    end
+   if not self.macroTooltipHooks[button] and hooksecurefunc and type(button.SetTooltip)=="function" then
+    hooksecurefunc(button,"SetTooltip",setMacroTooltip); self.macroTooltipHooks[button]=true
+   end
    setMacroText(button)
   end
  end end
  if not self.legacyMacroTextHook and type(ActionButton_Update)=="function" and hooksecurefunc then
   hooksecurefunc("ActionButton_Update",setMacroText); self.legacyMacroTextHook=true
+ end
+ if not self.legacyMacroTooltipHook and type(ActionButton_SetTooltip)=="function" and hooksecurefunc then
+  hooksecurefunc("ActionButton_SetTooltip",setMacroTooltip); self.legacyMacroTooltipHook=true
  end
  return true
 end

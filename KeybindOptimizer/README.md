@@ -1,8 +1,8 @@
-# Hot Swap 0.4.2
+# Hot Swap 0.4.3
 
 A configurable World of Warcraft addon for stable class bindings, druid form pages, mouseover/focus macros, Alt self-cast, and selectable on-use items.
 
-**Status: installable beta.** Version 0.4.2 creates generated macros in character-specific slots by default and reserves future spell positions when macro space is limited. Account-wide overflow is an explicit preset option. Bindings and mouse controls outside the selected preset remain unchanged. The actual Lua modules are checked using Lua 5.1 and mocked WoW APIs; real-client behavior still needs a retest. Geometry previews approximate artwork and fonts and are not game screenshots.
+**Status: installable beta.** Version 0.4.3 gives generated native buttons readable action labels, explains empty trinket bindings, and clearly identifies the CurseForge upload ZIP. Generated macros remain character-specific by default, with future spell positions reserved when space is limited. Account-wide overflow is an explicit preset option. Bindings and mouse controls outside the selected preset remain unchanged. The actual Lua modules are checked using Lua 5.1 and mocked WoW APIs; real-client behavior still needs a retest. Geometry previews approximate artwork and fonts and are not game screenshots.
 
 ## Install and open
 
@@ -61,6 +61,8 @@ The interface reuses its preview between relevant changes, updates only the visi
 **Settings → Controls** lets each preset preserve movement, camera/selection, chat, targeting, other interface controls, and casting settings. **Spells only** checks all six. Checked categories keep their existing keys, including custom remaps; automatic spell assignments choose another free key. A manually pinned spell on a protected key must be changed before Apply. Unrelated keys are preserved regardless of these checkboxes. Protection takes effect with **Apply & save** and travels with preset exports.
 
 **Settings → Action bars** includes **Hide unavailable spells on action bars**, which leaves unknown spell slots empty, and **Adapt to learned talents**, which does this for talent abilities only. Slots and keys stay reserved. Learning or resetting talents refreshes the applied layout outside combat, without applying draft edits or overwriting personal bar changes. Blizzard's **Always Show Action Bars** setting may still show empty button borders; Hot Swap does not hide protected native button frames.
+
+Native buttons show readable action labels instead of internal macro IDs. T shows **Trinket 1** (upper slot 13), and Shift-T shows **Trinket 2** (lower slot 14). Empty-slot tooltips explain what belongs there; equipped-item tooltips retain Blizzard's item details. Macro names and bodies remain unchanged internally so existing bindings and backups stay valid.
 
 Generated macros use character-specific slots by default. **Allow account-wide macro overflow** permits additional macros in the shared account bank when character slots are full. This is a per-preset option, saved in exports and installed with **Apply & save**. Existing owned account macros can still be reused; they are not automatically moved into character slots. Personal macros are never overwritten to make room.
 

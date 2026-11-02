@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.4.3 beta — 2026-11-02
+
+- Display readable action labels on verified generated native macro buttons while preserving their internal names, bodies and bindings. T and Shift-T show Trinket 1 and Trinket 2.
+- Explain empty trinket slots in tooltips while preserving equipped-item details and distinguishing uncached item data.
+- Name the addon upload `HotSwap-0.4.3-CurseForge.zip` and clearly mark the separate developer source archive as not for upload. Add an explicit root-folder/TOC/load-file check before publishing a package. The previous runtime ZIP already contained its TOC; the reported rejection could not be reproduced locally.
+
 ## 0.4.2 beta — 2026-11-02
 
 - Use character-specific slots for new generated macros by default. Account-wide overflow is an explicit preset option under Settings > Action bars.

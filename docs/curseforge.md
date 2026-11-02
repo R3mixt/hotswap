@@ -8,9 +8,13 @@ Status: the author reports that the CurseForge project has been created. The pro
 - `publishing/curseforge-description.md`: player-facing description.
 - `publishing/logo.png`: original project logo; `logo.svg` is its editable source.
 - `CHANGELOG.md`: release notes.
-- `dist/HotSwap-0.4.2.zip`: game installation ZIP produced by `python package.py`.
-- `dist/HotSwap-0.4.2-source.zip`: separate development archive; do not use as the primary game-install file.
+- `dist/HotSwap-0.4.3-CurseForge.zip`: **the only ZIP to upload to CurseForge**, produced by `python package.py`.
+- `dist/HotSwap-0.4.3-developer-source-NOT-FOR-UPLOAD.zip`: separate development archive; **do not upload this to CurseForge**.
 - SHA-256 manifests: verify the file you upload matches the reviewed build.
+
+The upload ZIP must contain `KeybindOptimizer/KeybindOptimizer.toc` immediately inside the addon folder, with the listed Lua files beside it. Upload the ZIP unchanged; do not add an outer HotSwap/version folder or upload the source archive. Packaging verifies this shape and every TOC load path before producing the upload file.
+
+The author reported a missing-TOC rejection for version 0.4.2. The local runtime archive does contain the correctly placed TOC and all referenced files. The source archive has an extra outer folder; which exact file was submitted and the full rejection text have not been verified. Do not describe the old runtime file as missing its TOC or claim this rebuild has been accepted by CurseForge.
 
 The default license is All Rights Reserved with permission for personal gameplay. It does not grant others permission to republish modified copies. A broader open-source license can be chosen deliberately later.
 

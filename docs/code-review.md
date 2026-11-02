@@ -82,3 +82,12 @@ New macro creation is character-only unless the preset explicitly enables accoun
 Independent runtime review checked storage policy propagation, restoration, macro ownership and manual-edit preservation. Existing full-catalog test fixtures now explicitly enable overflow where capacity is unrelated to their assertions; fresh-character/default-policy tests retain the real character-only default. New regressions exercise all nine starting classes at 30 free slots, distinct character databases sharing one account bank, explicit character-first overflow, future spell activation across Warrior stance pages, exhausted-bank no-write failures and recovery.
 
 The error Details panel now has an opaque native backing independent of main-window opacity. Focused UI tests and geometry checks cover the new staged checkbox, readable failure details and reservation notice. The final suite count and ZIP integrity result are recorded by release packaging. Actual client security, input routing and rendering remain subject to compatibility.md.
+
+
+## 0.4.3 follow-up — 2 November 2026
+
+The reported T-button text `KBO_5e1cc3d3` is the content-derived name for `#showtooltip 13` followed by `/use 13`. Native Blizzard buttons display macro names independently from the item icon/tooltip. Cosmetic labels now use the installed action's readable name (Trinket 1/2 for slots 13/14), leaving stored macro identities and secure bindings intact. A bounded presentation index avoids running the planner or spellbook scan on button updates. Every lookup checks the current effective native action and exact owned macro contents, preserving personal or changed macros and following native page switches. Visibility preferences and combat deferral remain unchanged.
+
+Empty trinket tooltips are derived from the live inventory slot. Equipped-item details remain native; optional item-spell data is described as reported availability, not proof of a passive effect. Tests cover modern and legacy hooks, optional arguments/returns, personal edits, page changes, visibility, combat deferral, tooltip ownership and current item metadata.
+
+The 0.4.2 runtime ZIP has the expected immediate `KeybindOptimizer/KeybindOptimizer.toc`; local integrity/manifest checks did not reproduce a missing TOC. The reported upload was identified only by version. New artifacts explicitly distinguish the CurseForge upload from developer source and validate the upload's root/TOC/load-file shape before publication. External CurseForge acceptance is not claimed.
