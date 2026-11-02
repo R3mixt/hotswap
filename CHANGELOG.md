@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.4.9 beta - 2026-11-02
+
+- Fixed Current layouts failing to apply because future abilities exhausted character macro slots.
+- Unlearned spells and missing items now reserve their chosen positions without creating macros.
+- Learned spells and available items use native actions and bindings wherever possible.
+- Reserved actions activate automatically when learned or acquired, outside combat, while respecting manual binding and action-bar changes.
+- Existing Current layouts and pending drafts are upgraded automatically. Unused, unchanged addon-owned macros are cleaned up safely.
+- Actions that require macros use character-specific slots. If space is unavailable, those actions remain reserved without blocking the rest of Apply.
+- Personal macros and unrelated controls are preserved.
+
+
 ## 0.4.8 beta — 2026-11-02
 
 - Stage hover-bind replacements and supported preset swaps immediately without confirmation dialogs. Keep hover input active for successive edits. Ordinary click/drag editing retains its confirmation flow; Apply still installs the staged layout.

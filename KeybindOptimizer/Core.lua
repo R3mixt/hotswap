@@ -1,6 +1,6 @@
 local addonName, K = ...
 _G.KeybindOptimizer = K
-K.name, K.version = addonName or "KeybindOptimizer", "0.4.8"
+K.name, K.version = addonName or "KeybindOptimizer", "0.4.9"
 K.defaults = {
     wheel = true, middle = true, ctrl = true,
     mouseButtons = { BUTTON4 = true, BUTTON5 = true },
@@ -342,6 +342,7 @@ if CreateFrame then
                 end
                 K:MaintainMouseControls()
             end
+            if K.CurrentBindings then K.CurrentBindings:QueueRefresh() end
             if not K.db.welcomed then K:Print("Type /hotswap to review your layout. Nothing changes until you apply it."); K.db.welcomed=true end
         elseif K.db then
             if event=="UPDATE_BINDINGS" then
@@ -359,6 +360,7 @@ if CreateFrame then
                 K:RefreshAvailabilityStatus()
             end
             K:InvalidatePreview()
+            if K.CurrentBindings and (spellsChanged or event=="BAG_UPDATE_DELAYED" or event=="PLAYER_EQUIPMENT_CHANGED" or event=="GET_ITEM_INFO_RECEIVED" or event=="PLAYER_REGEN_ENABLED" or event=="UPDATE_MACROS") then K.CurrentBindings:QueueRefresh() end
             if spellsChanged or event=="PLAYER_REGEN_ENABLED" then K:MaintainLearnedActions() end
             if event=="BAG_UPDATE_DELAYED" or event=="PLAYER_EQUIPMENT_CHANGED" or event=="GET_ITEM_INFO_RECEIVED" or event=="PLAYER_REGEN_ENABLED" then K:MaintainItemBindings() end
             if event=="PLAYER_REGEN_ENABLED" and K.needsRefresh then

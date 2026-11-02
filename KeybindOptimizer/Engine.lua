@@ -614,10 +614,10 @@ function E:Apply(plan)
     end
     return self:StartJob(job)
 end
-function E:ApplyCurrentEdits()
+function E:ApplyCurrentEdits(refreshEdits)
     if self.busy or inCombat() then return false,"Leave combat and wait for the current operation." end
-    if not K.CurrentBindings:HasEdits() then return true,"No current binding changes to apply." end
-    local edits=K.Copy(K.CurrentBindings:Edits())
+    if not refreshEdits and not K.CurrentBindings:HasEdits() then return true,"No current binding changes to apply." end
+    local edits=K.CurrentBindings:PrepareEdits(K.Copy(refreshEdits or K.CurrentBindings:Edits()))
     local function validate()
         for key,expected in pairs(edits.expectedKeys) do if (GetBindingAction(key) or "")~=expected then error("Current binding changed on "..key..". Discard pending edits and try again.") end end
         for at,expected in pairs(edits.expectedSlots) do if not K.NativeBars:SameContent(K.NativeBars:ReadSlot(at),expected or nil) then error("Current action slot changed: "..at..". Discard pending edits and try again.") end end
@@ -629,9 +629,36 @@ function E:ApplyCurrentEdits()
             if entry.body then entry.nativeMacro=true; macroPlan.actions[#macroPlan.actions+1]=entry end
         end
     end
-    local needed,available=K.Macros:Budget(macroPlan)
-    if needed>available then return self:Reject("Need "..needed.." free character macro slots for these reservations; only "..available.." are available. Free character macro slots and try again. Your Current edits are kept.","current-edit") end
-    local job={kind="current-edit",previous=runtimeState(),created={},probeKeys=edits.expectedKeys}
+    local _,available=K.Macros:Budget(macroPlan)
+    local allocated,ready={},{}
+    table.sort(macroPlan.actions,function(a,b) return tostring(a.label)<tostring(b.label) end)
+    for _,entry in ipairs(macroPlan.actions) do
+        local body=entry.body
+        local owned=K.Macros:FindOwned(K.Macros:Name(body),body)
+        if owned or allocated[body] or available>0 then
+            if not owned and not allocated[body] then available=available-1; allocated[body]=true end
+            ready[#ready+1]=entry
+        else
+            -- Keep macro-only actions reserved instead of blocking unrelated
+            -- spells/items or borrowing account-wide macro space.
+            entry.desiredBody=body; entry.previewCommand=entry.command
+            entry.body=nil; entry.macroName=nil; entry.nativeMacro=nil
+            entry.pending=true; entry.command=false; entry.content=false
+        end
+    end
+    macroPlan.actions=ready
+    for key,entry in pairs(edits.entries or {}) do edits.keys[key]=entry.command end
+    if refreshEdits then
+        local changed=false; local saved=K.db.currentLayout or {keys={},slots={}}
+        for _,pair in ipairs({{edits.entries or {},saved.keys},{edits.slots,saved.slots}}) do
+            for id,entry in pairs(pair[1]) do
+                local old=pair[2][id]
+                if not old or entry.command~=old.command or entry.pending~=old.pending or not K.NativeBars:SameContent(entry.content,old.content) then changed=true end
+            end
+        end
+        if not changed then return true,"Reservations unchanged." end
+    end
+    local job={kind=refreshEdits and "current-refresh" or "current-edit",previous=runtimeState(),created={},probeKeys=edits.expectedKeys}
     job.steps=snapshotSteps(job); job.rollback=rollbackJob
     addStep(job.steps,validate,"Rechecking current controls",true,false)
     for _,step in ipairs(macroSteps(macroPlan,job.created)) do job.steps[#job.steps+1]=step end
@@ -666,9 +693,21 @@ function E:ApplyCurrentEdits()
         end
         for at,entry in pairs(edits.slots) do saved.slots[at]=K.Copy(entry) end
         K.db.currentLayout=saved
-        K.CurrentBindings:Discard()
+        if not refreshEdits then K.CurrentBindings:Discard() else K.CurrentBindings:Invalidate() end
+        local cleanup={}
+        for _,map in ipairs({job.previous.currentLayout and job.previous.currentLayout.keys or {},job.previous.currentLayout and job.previous.currentLayout.slots or {}}) do
+            for _,entry in pairs(map) do if entry.macroName and entry.body then cleanup[entry.macroName]=entry.body end end
+        end
+        -- Account bindings are not modified by Current edits. A macro still
+        -- referenced there must survive even though character bindings moved.
+        for _,command in pairs(job.before.accountBindings or {}) do
+            local name=command:match("^MACRO (.+)$"); if name then cleanup[name]=nil end
+        end
+        if K.AvailabilityEngine then K.AvailabilityEngine:QueueCleanup(cleanup) end
         job.entry.status="applied"; K.db.lastBindingBackupID=job.entry.id
-        return "Current binding changes applied. Backup saved: "..job.entry.name
+        local reserved=0
+        for _,map in ipairs({saved.keys,saved.slots}) do for _,entry in pairs(map) do if entry.pending and not entry.detached then reserved=reserved+1 end end end
+        return "Current layout saved."..(reserved>0 and (" "..reserved.." unavailable action(s) reserved; they activate when available, outside combat.") or "").." Backup: "..job.entry.name
     end
     return self:StartJob(job)
 end

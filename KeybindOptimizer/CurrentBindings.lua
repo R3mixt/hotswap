@@ -279,9 +279,13 @@ function C:Rebind(action,key)
  if not key or key=="ESCAPE" or key:match("BUTTON[12]$") then return false,"Choose a valid key other than Escape or the primary mouse buttons." end
  if not action or not action.key then return false,"Choose a current binding." end
  if action.key=="ESCAPE" or action.key:match("BUTTON[12]$") then return false,"Keep Escape and primary mouse controls on their current keys." end
- local command=action.command
- if not command or command=="" then return false,"This binding changed. Review Current again." end
  if action.key==key then return true end
+ local command=action.command
+ if action.currentEntry and action.currentEntry.pending and not action.liveSlot then
+  self:StageKey(key,false,action.currentEntry); self:StageKey(action.key,false)
+  return true,"Reservation moved. Apply changes saves it."
+ end
+ if not command or command=="" then return false,"This binding changed. Review Current again." end
  local metadata; if not action.liveSlot then metadata=action.currentEntry end
  self:StageKey(key,command,metadata); self:StageKey(action.key,false)
  return true,"Binding moved in your Current layout. Apply changes installs it."
@@ -307,13 +311,11 @@ function C:StageEntry(entry,key)
   data.name=exact.name; data.spellID=spellID; data.rank=rank
   data.icon=data.icon or exact.icon; data.label=data.label or name
   data.command="SPELL "..name
-  if exact.known then data.content={kind="spell",id=spellID}
-  else data.futureBody="#showtooltip "..name.."\n/cast "..name end
+
  elseif d and d.kind=="item" then
   local valid,why=K.Library:ValidateDescriptor(d); if not valid then return false,why end
   data.itemID=d.itemID; data.command="ITEM item:"..d.itemID
-  -- A macro reserves a native position even when the item is not in bags.
-  data.futureBody="#showtooltip item:"..d.itemID.."\n/use item:"..d.itemID
+
  elseif d and d.kind=="macroref" then
   local name,_,body=GetMacroInfo(GetMacroIndexByName(d.macroName))
   if name~=d.macroName or K.Macros:Name(body or "")~=d.macroFingerprint then return false,"This local macro changed. Select it again." end
@@ -322,22 +324,95 @@ function C:StageEntry(entry,key)
  elseif d and d.kind=="emote" and K.Library:Emotes()[d.emote] then
   data.body=K.Library:Emotes()[d.emote]; data.command="MACRO "..K.Macros:Name(data.body)
  else return false,"Choose a spell, item, local macro or supported game command." end
+ data=self:ResolveEntry(data)
  local e=self:Edits(); self:Build(); local live=self:EditingView().byKey[key]
- if (data.content or data.futureBody or data.body) and live and live.liveSlot then
+ if (data.content or data.pending or data.body) and live and live.liveSlot then
   local at=live.liveSlot
   local supported=false; for _,slot in ipairs(K.NativeBars:ManagedSlots()) do if slot==at then supported=true; break end end
   if not supported then return false,"This temporary action slot cannot be edited safely. Choose a normal action-bar key or an empty key." end
   if e.expectedSlots[at]==nil then e.expectedSlots[at]=K.NativeBars:ReadSlot(at) or false end
   if e.expectedKeys[key]==nil then e.expectedKeys[key]=GetBindingAction(key) or "" end
-  data.body=data.body or data.futureBody
   if data.body then data.content={kind="macro",name=K.Macros:Name(data.body),body=data.body} end
   e.slots[at]=data
  else
-  data.body=data.body or data.futureBody
   if data.body then data.command="MACRO "..K.Macros:Name(data.body) end
   self:StageKey(key,data.command,data)
  end
  return true,"Action added to your Current layout. Apply changes installs it, including future ability reservations."
+end
+-- Normalize both new entries and drafts saved by earlier macro-heavy versions.
+-- Only primitive spell/item entries are converted; local/custom macro bodies
+-- are never interpreted or rewritten.
+function C:ResolveEntry(entry)
+ local data=K.Copy(entry)
+ if data.spellID then
+  local book=K.API:GetCachedSpellbook()
+  local exact=K.API:ResolveExact(data.spellID,book)
+  data.name=data.name or (exact and exact.name)
+  local learned=data.rank and exact and exact.known and exact or not data.rank and book.byName[data.name]
+  local cast=data.name or data.label
+  if data.rank and data.rank~="" then cast=cast.."("..data.rank..")" end
+  data.previewCommand="SPELL "..cast
+  data.command=learned and data.previewCommand or false
+  data.content=learned and {kind="spell",id=learned.id} or false
+  data.pending=not learned or nil
+  data.body=nil; data.futureBody=nil; data.macroName=nil; data.macroIndex=nil; data.nativeMacro=nil
+ elseif data.itemID then
+  K.Items:GetCached()
+  local item=K.Items:Resolve(data.itemID)
+  local available=item and not item.missing
+  data.previewCommand="ITEM item:"..data.itemID
+  data.command=available and data.previewCommand or false
+  data.content=available and {kind="item",id=data.itemID} or false
+  data.pending=not available or nil
+  data.body=nil; data.futureBody=nil; data.macroName=nil; data.macroIndex=nil; data.nativeMacro=nil
+ elseif data.desiredBody then
+  data.body=data.desiredBody; data.command="MACRO "..K.Macros:Name(data.body)
+  data.content={kind="macro",name=K.Macros:Name(data.body),body=data.body}; data.pending=nil
+ end
+ return data
+end
+function C:PrepareEdits(edits)
+ for at,entry in pairs(edits.slots) do edits.slots[at]=self:ResolveEntry(entry) end
+ for key,entry in pairs(edits.entries or {}) do
+  edits.entries[key]=self:ResolveEntry(entry); edits.keys[key]=edits.entries[key].command
+ end
+ return edits
+end
+local function sameEntry(a,b)
+ return a.command==b.command and a.pending==b.pending and K.NativeBars:SameContent(a.content,b.content)
+end
+function C:RefreshEdits()
+ local saved=K.db.currentLayout; if not saved then return end
+ local edits={keys={},entries={},slots={},expectedKeys={},expectedSlots={}}
+ local pending=self.edits
+ for at,entry in pairs(saved.slots or {}) do
+  if not (pending and pending.slots[at]) and not entry.detached then
+   if K.NativeBars:SameContent(K.NativeBars:ReadSlot(at),entry.content) then
+    local resolved=self:ResolveEntry(entry)
+    if not sameEntry(entry,resolved) then edits.slots[at]=resolved; edits.expectedSlots[at]=entry.content or false end
+   else entry.detached=true end
+  end
+ end
+ for key,entry in pairs(saved.keys or {}) do
+  if not (pending and pending.expectedKeys[key]~=nil) and not entry.detached then
+   if GetBindingAction(key)==(entry.command or "") and (not entry.body or K.Macros:FindExact(entry.macroName or tostring(entry.command):match("^MACRO (.+)$"),entry.body)) then
+    local resolved=self:ResolveEntry(entry)
+    if not sameEntry(entry,resolved) then edits.keys[key]=resolved.command; edits.entries[key]=resolved; edits.expectedKeys[key]=entry.command or "" end
+   else entry.detached=true end
+  end
+ end
+ if next(edits.keys) or next(edits.slots) then return edits end
+end
+function C:QueueRefresh()
+ if not K.db or not K.db.currentLayout then return end
+ if not self.refreshFrame then self.refreshFrame=CreateFrame("Frame") end
+ self.refreshFrame:SetScript("OnUpdate",function(frame)
+  if K.Engine.busy or (InCombatLockdown and InCombatLockdown()) then return end
+  frame:SetScript("OnUpdate",nil)
+  local ok,edits=pcall(C.RefreshEdits,C)
+  if ok and edits then K.Engine:ApplyCurrentEdits(edits) end
+ end)
 end
 function C:Annotate(action,entry)
  if not entry then return action end
@@ -349,7 +424,12 @@ function C:Annotate(action,entry)
   local known=entry.rank and K.API:IsKnown(entry.spellID) or not entry.rank and book.byName[entry.name]
   action.known=known and true or false; action.availabilityState=action.known and "ready" or "unlearned"
   action.liveEmpty=nil; action.category="Spells"
- elseif entry.itemID then action.kind="item"; action.itemID=entry.itemID; action.liveEmpty=nil; action.category="Items" end
+ elseif entry.itemID then action.kind="item"; action.itemID=entry.itemID; action.liveEmpty=nil; action.category="Items"; action.known=not entry.pending end
+ if entry.pending then
+  action.liveEmpty=nil; action.known=false
+  action.availabilityState="reserved"
+  action.availabilityLabel=entry.desiredBody and "Reserved: waiting for character macro space" or "Reserved: activates when available, outside combat"
+ end
  return action
 end
 function C:EditingView()
@@ -358,22 +438,29 @@ function C:EditingView()
  plan.readOnly=false; plan.byID={}; plan.byKey={}; plan.actions={}
  local commands={}
  for _,a in ipairs(raw.actions) do commands[a.key]=a.command end
- for key,command in pairs(e and e.keys or {}) do commands[key]=command or nil end
+ for key,entry in pairs(saved.keys or {}) do
+  if entry.pending and not entry.detached and GetBindingAction(key)=="" then commands[key]=entry.previewCommand or "Reserved action" end
+ end
+ for key,command in pairs(e and e.keys or {}) do
+  local entry=e.entries and e.entries[key]
+  commands[key]=command or entry and entry.pending and (entry.previewCommand or "Reserved action") or nil
+ end
  for key,command in pairs(commands) do
   local a=self:Describe(command,key,plan.actionPage,plan.actionPageType)
   local staged=e and a.liveSlot and e.slots[a.liveSlot]
   local prior=a.liveSlot and saved.slots[a.liveSlot]
   local entry=staged or e and e.entries and e.entries[key]
-  if not entry and prior and K.NativeBars:SameContent(K.NativeBars:ReadSlot(a.liveSlot),prior.content) then entry=prior end
-  if not entry and saved.keys[key] and saved.keys[key].command==command then
+  if not entry and prior and not prior.detached and K.NativeBars:SameContent(K.NativeBars:ReadSlot(a.liveSlot),prior.content) then entry=prior end
+  if not entry and saved.keys[key] and not saved.keys[key].detached and (saved.keys[key].command==command or saved.keys[key].pending and GetBindingAction(key)=="") then
    local candidate=saved.keys[key]
    if not candidate.body or K.Macros:FindExact(command:match("^MACRO (.+)$"),candidate.body) then entry=candidate end
   end
   if staged then
-   local preview=self:Describe(staged.command,key,plan.actionPage,plan.actionPageType)
+   local preview=self:Describe(staged.previewCommand or staged.command or "Reserved action",key,plan.actionPage,plan.actionPageType)
    preview.liveSlot=a.liveSlot; preview.nativeSlot=a.liveSlot; preview.command=command; a=preview
   end
-  self:Annotate(a,entry); a.readOnly=false; a.current=true
+  self:Annotate(a,entry); if entry and entry.pending and not a.liveSlot then a.command=false end
+  a.readOnly=false; a.current=true
   plan.actions[#plan.actions+1]=a; plan.byID[a.id]=a; plan.byKey[key]=a
  end
  table.sort(plan.actions,function(a,b) return a.key<b.key end)

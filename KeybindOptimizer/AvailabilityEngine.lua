@@ -126,6 +126,7 @@ end
 local function macroReferenced(name)
  local index=GetMacroIndexByName(name)
  if not index or index==0 then return false end
+ if GetCursorInfo then local kind,id=GetCursorInfo(); if kind=="macro" and id==index then return true end end
  if not GetBindingKey or GetBindingKey("MACRO "..name) then return true end
  -- Inspect every slot in the native page range, including currently hidden
  -- bars and possession pages that normal preset placement deliberately skips.

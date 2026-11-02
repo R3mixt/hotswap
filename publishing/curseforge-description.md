@@ -2,15 +2,15 @@
 
 Build a comfortable keyboard layout, keep it consistent across your class, and switch saved setups when your playstyle changes.
 
-Hot Swap places spells and generated macros on **Blizzard's original action bars**. Its in-game keyboard opens on your current game bindings, read-only, including native pet controls. Saved preset drafts provide a separate editor for Shift and Ctrl layers, mouse buttons, and optional wheel bindings. The interface uses WoW's own frames and controls.
+Hot Swap places spells and generated macros on **Blizzard's original action bars**. Its in-game keyboard opens on your current game bindings in edit mode, including native pet controls. Build your own Current layout with the spellbook or Hover bind, including future spells and missing items. Future reservations do not consume macro slots. Saved preset drafts provide a separate editor for Shift and Ctrl layers, mouse buttons, and optional wheel bindings. The interface uses WoW's own frames and controls.
 
-**0.4.4 beta:** Classic Era and Hardcore are the current test clients; Forever is the final release target. Automated tests exercise the actual Lua modules with mocked WoW APIs. Live-client acceptance testing is still pending. Retail and other Classic expansions are not supported release targets.
+**0.4.9 beta:** Classic Era and Hardcore are the current test clients; Forever is the final release target. Automated tests exercise the actual Lua modules with mocked WoW APIs. Live-client acceptance testing is still pending. Retail and other Classic expansions are not supported release targets.
 
 ## Set up your keys
 
 - Inspect your current bindings first. On **Presets → Preview recommendations**, inspect a temporary layout for any of the nine Classic classes, then **Save as new preset** to keep a unique editable copy. Existing presets remain intact; previewing creates no saved preset or live changes. Druid uses the native Base, Cat, Bear, and Moonkin action pages; travel and aquatic forms share Base, and Prowl shares Cat.
-- Explicitly select a saved preset draft, then click a key to rebind it, or drag an action from the miniature spellbook. Browse class and spec groups, individual spell ranks, items, existing personal macros, and game controls.
-- While editing a saved preset draft, choose **Bindings → Hover bind** for a scrollable grid of planned spells, including future talents and custom ranks. Hover an ability and press a key, a Shift/Ctrl combination, a side mouse button or the wheel. Linked form positions and existing control protections still apply; Alt and primary mouse clicks remain reserved.
+- Edit Current directly or select a saved preset draft, then click a key to rebind it, or drag an action from the miniature spellbook. Browse class and spec groups, individual spell ranks, items, existing personal macros, and game controls.
+- Choose **Bindings → Hover bind** for a scrollable grid of spells, including future talents and custom ranks. Hover an ability and press a key, a Shift/Ctrl combination, a side mouse button or the wheel. Hover binding changes do not require individual confirmations. Linked form positions and existing control protections still apply; Alt and primary mouse clicks remain reserved.
 - See spell icons and tooltips before abilities are learned. Reserved bindings remain available as you level.
 - Test key combinations in the keyboard view without casting spells.
 - Record the mouse buttons your client receives and choose whether to use the wheel and middle click. Alt stays reserved for self-casting, with separate camera and movement shortcuts.
@@ -20,7 +20,7 @@ In Hover bind, **Done - keep draft** saves the edits in your preset without inst
 
 Generated macros use **character-specific slots by default**. Each preset can opt into **Settings → Action bars → Allow account-wide macro overflow** when it needs extra shared slots. Existing owned account macros are reused without being moved; personal macros are never overwritten.
 
-If space is limited, future spell keys, icons and tooltips stay reserved in the editor while their native bar positions remain empty. Managed positions fill outside combat as you learn spells, subject to available macro space. This does not change your visibility preferences. Fully learned layouts can still exceed the character bank: free macro slots or explicitly enable account-wide overflow when needed.
+Current uses native actions for simple spells and items. Future spells and missing items reserve their positions without macros and activate outside combat when available. Macro-only Current actions wait for character macro space without blocking the rest of Apply. Preset drafts with targeting or other macro features may still need macro slots; their future positions remain reserved when space is limited.
 
 ## Keep items and modes organized
 

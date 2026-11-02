@@ -396,6 +396,8 @@ local function commandDenied(command)
   return (command=="TARGETFOCUS" or command=="FOCUSTARGET") and Mock.build:match("^1%.15%.")~=nil
 end
 local function dynamicCommand(command)
+  -- Native binding strings accepted by SetBinding/SetBindingSpell/SetBindingItem.
+  if command:match("^SPELL [^%c]+$") or command:match("^ITEM [^%c]+$") then return true end
   if command:match("^MACRO [^%c]+$") or command:match("^CLICK [^:%s%c]+:[%w]+$") then return true end
   local emote=command:match("^EMOTE ([A-Z_]+)$")
   if emote then
