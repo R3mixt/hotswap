@@ -283,3 +283,37 @@ function Tests.native_ui_item_drop_keeps_missing_choices_and_uses_verified_targe
     eq(k.UI.pages.Bindings.keyboard.keys["1"].targetBadge:GetText(),"S","Item targeting badge disagrees with selected mode")
     eq(action(k,"druid.claw.cat").name,"Claw","Item drop changed another form page")
 end
+
+function Tests.native_ui_apply_and_save_buttons_install_drafts_and_save_game_bindings()
+    local k=nativeUI(); k.UI:ShowPage("Presets")
+    local page=k.UI.pages.Presets
+    eq(k.UI.apply:GetText(),"Apply & save","Footer final action has the old label")
+    eq(page.usePreset:GetText(),"Apply & save","Preset final action differs from the footer")
+    eq(k.UI.apply:GetWidth(),128,"Apply label has insufficient button space")
+    assert(page.detail.description:GetText():find("Draft edits are saved automatically",1,true),"Automatic draft saving is unexplained")
+    assert(k.UI.apply.tipDetail:find("macros",1,true) and k.UI.apply.tipDetail:find("save the game's bindings",1,true),"Final action does not explain installation and saving")
+    local function selectDraft(name)
+        Mock:ResetWrites()
+        local prior=k.db.appliedPreset
+        for _,row in ipairs(page.list.rows) do if row.presetName==name then row:Click(); break end end
+        eq(k.db.activePreset,name,"Preset list did not select its draft")
+        eq(k.db.appliedPreset,prior,"Selecting a draft switched the active game setup")
+        eq(#Mock.writes,0,"Selecting a preset wrote live game state")
+        assert(page.detail.state:GetText():find("draft",1,true),"Selected preset was not identified as a draft")
+    end
+    selectDraft("Dungeon")
+    k.UI.apply:Click()
+    assert(k.Engine.busy,"Footer Apply & save did not start installation")
+    local ok,why=Mock:Drain(); assert(ok,why); Mock:Advance(0.2)
+    eq(k.db.appliedPreset,"Dungeon","Footer Apply & save installed a different preset")
+    assert(#k.Engine:ListBackups()>0,"Applying a draft omitted its backup")
+    local saved=false
+    for _,write in ipairs(Mock.writes) do if write[1]=="savebindings" then saved=true end end
+    assert(saved,"Apply & save did not save the game's bindings")
+    selectDraft("PvP")
+    page.usePreset:Click()
+    assert(k.Engine.busy,"Preset Apply & save did not start installation")
+    ok,why=Mock:Drain(); assert(ok,why); Mock:Advance(0.2)
+    eq(k.db.appliedPreset,"PvP","Preset Apply & save installed a different draft")
+    assert(page.detail.state:GetText()=="This preset is active","Successful apply still displays an unapplied draft")
+end

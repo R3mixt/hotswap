@@ -115,17 +115,23 @@ function K.Macros:Name(body)
     for i=1,#body do hash=(hash*33+body:byte(i))%2147483647 end
     return "KBO_"..string.format("%08x",hash)
 end
-function K.Macros:FindOwned(name,body)
+function K.Macros:FindExact(name,body)
+    if type(name)~="string" or type(body)~="string" then return nil end
     local index=GetMacroIndexByName and GetMacroIndexByName(name) or 0
     if index and index>0 then
-        local found,_,current=GetMacroInfo(index)
-        if found==name and current==body and K.db.ownedMacros[name]==body then return index,name end
+        local found,icon,current=GetMacroInfo(index)
+        if found==name and current==body then return index,name,icon end
     end
+end
+function K.Macros:FindOwned(name,body)
+    local ownedMacros=K.db.ownedMacros or {}
+    local index=self:FindExact(name,body)
+    if index and ownedMacros[name]==body then return index,name end
     -- A user-owned macro can occupy the hash name. Reuse our prior suffixed name.
-    for owned,expected in pairs(K.db.ownedMacros or {}) do
+    for owned,expected in pairs(ownedMacros) do
         if expected==body then
-            local i=GetMacroIndexByName(owned)
-            if i and i>0 then local found,_,current=GetMacroInfo(i); if found==owned and current==body then return i,owned end end
+            local i=self:FindExact(owned,body)
+            if i then return i,owned end
         end
     end
 end

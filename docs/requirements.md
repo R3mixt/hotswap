@@ -1,4 +1,4 @@
-# Requirement map — 0.3.0 beta
+# Requirement map — 0.3.1 beta
 
 The final release targets WoW Forever. Classic Era / Hardcore is the temporary development target. Retail is not a supported release target. Automated tests use Lua 5.1 with mocked game APIs; a passing suite does not certify protected execution inside either client.
 
@@ -7,6 +7,7 @@ The final release targets WoW Forever. Classic Era / Hardcore is the temporary d
 | Feral leveling, stable keys across specs | One Druid layout, stable support keys and reserved talent positions | Recommendations are editable; no universal optimum is claimed |
 | All classes and levels | Nine Era/Forever catalogs, future ability reservations and learned-spell coverage fallback | Current-client data determines names, icons, available ranks and actual knowledge |
 | Original WoW action bars | Populates Blizzard main and extra bars; enables the bars it uses | No replacement combat bars; vehicle/override ownership remains Blizzard's |
+| Action-bar visibility settings | Setup lists required, optional and unsupported bars; optional choices persist per preset and transfer in exports | Required bars always enable; hidden frames remain available; delayed settings refresh respects combat |
 | Correct Druid pages | Base, Cat, Bear and Moonkin native pages | Prowl stays Cat; Travel/Aquatic use Base; changing a position's key updates every linked page |
 | Optimize button | Creates and activates a new optimized preset while retaining the previous preset | Validation and named backup precede live mutation |
 | Complete preset modes | Create, duplicate, rename, delete, edit and activate complete layouts on Presets tab | No fixed preset count; individual layouts and import payloads have defensive size bounds |

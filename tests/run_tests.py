@@ -88,7 +88,7 @@ def reload_from_saved_variables():
         assert(GetActionInfo(1), 'Reload lost native bar contents')
         assert(TestAddon:Restore(), 'Reload lost rollback snapshot')
         assert(Mock.bindings.F=='ASSISTTARGET', 'Reload rollback did not restore original F')
-        assert(GetMacroInfo(1)=='UserMacro', 'Reload rollback removed personal macro')
+        assert(GetMacroInfo(GetMacroIndexByName("UserMacro"))=='UserMacro', 'Reload rollback removed personal macro')
     """)
 
 

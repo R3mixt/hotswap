@@ -39,7 +39,7 @@ function Tests.native_flyout_restore_uses_spellbook_slot_not_flyout_id_as_spell(
  assert(GetActionInfo(3)=="flyout" and select(2,GetActionInfo(3))==88)
 end
 function Tests.native_macro_references_preserve_user_content_and_consume_no_new_macro_slots()
- local k=init(); local body=select(3,GetMacroInfo(1))
+ local k=init(); local body=select(3,GetMacroInfo(GetMacroIndexByName("UserMacro")))
  local a={id="test.ref",kind="macroref",label="UserMacro",macroName="UserMacro",macroFingerprint=k.Macros:Name(body),key="NUMPAD9",form="all"}
  local plan={class="DRUID",settings=k:GetSettings(),actions={a}}
  assert(k.NativeBars:Prepare(plan))
@@ -48,8 +48,8 @@ function Tests.native_macro_references_preserve_user_content_and_consume_no_new_
  assert(k.NativeBars:Apply(plan))
  local kind,index=GetActionInfo(a.nativeSlot)
  assert(kind=="macro" and index==1)
- EditMacro(1,nil,nil,"/say changed")
+ EditMacro(GetMacroIndexByName("UserMacro"),nil,nil,"/say changed")
  local ok,why=k.NativeBars:Prepare(plan)
  assert(not ok and why:find("missing or changed",1,true),"Changed macro reference installed without review")
- assert(select(3,GetMacroInfo(1))=="/say changed","Reference validation overwrote personal content")
+ assert(select(3,GetMacroInfo(GetMacroIndexByName("UserMacro")))=="/say changed","Reference validation overwrote personal content")
 end

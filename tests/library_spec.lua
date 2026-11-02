@@ -60,10 +60,10 @@ function Tests.library_user_macro_reference_is_not_copied_and_modified_reference
     assert(entry and not entry.generated)
     local ok,id=k.Library:Stage(entry); assert(ok)
     local a=actionFor(k,id); assert(a.kind=='macroref' and a.known and not a.body)
-    assert(k:Apply()); assert(GetMacroInfo(1)=='UserMacro')
-    EditMacro(1,nil,nil,'/say I changed my macro')
+    assert(k:Apply()); assert(GetMacroInfo(GetMacroIndexByName("UserMacro"))=='UserMacro')
+    EditMacro(GetMacroIndexByName("UserMacro"),nil,nil,'/say I changed my macro')
     local plan=k:Preview(); assert(#plan.errors>0,'Changed user macro reference was silently accepted')
-    assert(not k:Apply()); assert(GetMacroInfo(1)=='UserMacro')
+    assert(not k:Apply()); assert(GetMacroInfo(GetMacroIndexByName("UserMacro"))=='UserMacro')
 end
 function Tests.library_stage_undo_and_import_are_data_only_and_preserve_rank_replacements()
     local k=libraryInit(); local rank={descriptor={kind='spell',spellID=5176,name='Wrath',rank='Rank 1',targeting='harm'}}

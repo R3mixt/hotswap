@@ -97,11 +97,14 @@ K.UI:Open()
 ''')
 anchors={'TOPLEFT':(0,1),'TOP':(.5,1),'TOPRIGHT':(1,1),'LEFT':(0,.5),'CENTER':(.5,.5),'RIGHT':(1,.5),'BOTTOMLEFT':(0,0),'BOTTOM':(.5,0),'BOTTOMRIGHT':(1,0)}
 cases=[('Setup','setup',None,None),('Presets','presets',None,None),('Bindings','bindings','caster',''),('Bindings','bindings-shift','caster','SHIFT-'),('Bindings','bindings-cat','cat',''),('Bindings','bindings-test','cat',''),('Items','items',None,None),('Safety','safety',None,None),('Share','share',None,None),('Bindings','library-spells','caster',''),('Bindings','library-ranks','caster',''),('Bindings','library-items','caster',''),('Bindings','library-macros','caster','')]
+cases.append(('Setup','action-bars',None,None))
 for page,filename,form,layer in cases:
     lua.globals().K.UI.libraryOpen=filename.startswith('library-')
     if form:lua.globals().K.UI.SetActionPage(lua.globals().K.UI,form)
     if layer is not None:lua.globals().K.UI.pinnedLayer=layer
     lua.globals().K.UI.ShowPage(lua.globals().K.UI,page)
+    if filename == 'action-bars':
+        lua.globals().K.UI.OpenNativeBars(lua.globals().K.UI)
     if filename == 'bindings-test':
         lua.globals().K.UI.TestKeyDown(lua.globals().K.UI,'1')
     if filename == 'share':
@@ -115,7 +118,7 @@ for page,filename,form,layer in cases:
         def ident(value):
             if value is None:return None
             return int(value['qid']) if value['qid'] else 0
-        n={'id':int(f.qid),'kind':f.kind,'parent':ident(f.parent),'all':ident(f.all),'scrollHost':ident(f.scrollHost),'shown':bool(f.shown),'w':f.width,'h':f.height,'text':str(f.GetText(f) or ''),'font':f.fontsize or 12,'wrap':f.wrap is not False,'justify':f.justify or 'LEFT','points':[], 'template':f.template, 'texture':f.texture if isinstance(f.texture,str) else None,'selected':bool(f.selected),'checked':bool(f.checked),'enabled':f.enabled is not False,'keycap':bool(f.base)}
+        n={'id':int(f.qid),'kind':f.kind,'strata':f.strata,'parent':ident(f.parent),'all':ident(f.all),'scrollHost':ident(f.scrollHost),'shown':bool(f.shown),'w':f.width,'h':f.height,'text':str(f.GetText(f) or ''),'font':f.fontsize or 12,'wrap':f.wrap is not False,'justify':f.justify or 'LEFT','points':[], 'template':f.template, 'texture':f.texture if isinstance(f.texture,str) else None,'selected':bool(f.selected),'checked':bool(f.checked),'enabled':f.enabled is not False,'keycap':bool(f.base)}
         if f.backdrop:n['backdrop']={k:v for k,v in f.backdrop.items() if k in ('bgFile','edgeFile','edgeSize')}
         parent=f.parent
         # Native button state textures are displayed conditionally by the client.
@@ -161,7 +164,11 @@ for page,filename,form,layer in cases:
         p=nodes[i]['parent']
         return 0 if not p else depth(p)+1
     # Template child regions can be created before their owning frame.
-    ordered=sorted(nodes.items(),key=lambda row:(depth(row[0]),row[0]))
+    strata_order={'BACKGROUND':0,'LOW':1,'MEDIUM':2,'HIGH':3,'DIALOG':4,'FULLSCREEN':5,'FULLSCREEN_DIALOG':6,'TOOLTIP':7}
+    def strata(i):
+        n=nodes[i]
+        return strata_order.get(n['strata'],2) if n['strata'] else (strata(n['parent']) if n['parent'] else 2)
+    ordered=sorted(nodes.items(),key=lambda row:(strata(row[0]),depth(row[0]),row[0]))
     for i,n in ordered:
         if not visible(i):continue
         x,y,w,h=bounds(i)

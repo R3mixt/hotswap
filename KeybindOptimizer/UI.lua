@@ -12,6 +12,8 @@ local C = {
     error = {1, 0.43, 0.43, 1}, white = {1, 1, 1, 1},
 }
 local unpack = unpack or table.unpack
+local APPLY_LABEL="Apply & save"
+local APPLY_DETAIL="Back up your current setup, install this preset's keybinds, macros and action-bar settings, then save the game's bindings. Draft edits are already saved in this preset."
 local function color(fs, c) fs:SetTextColor(unpack(c or C.text)) end
 local function box(kind, parent, fill, name)
     local f = CreateFrame(kind or "Frame", name, parent, BackdropTemplateMixin and "BackdropTemplate" or nil)
@@ -211,7 +213,7 @@ function UI:UpdateBusyState()
         for _,name in ipairs({"Setup","Presets","Bindings","Items","Safety","Share"}) do
             local page=pages[name]
             if page then
-                for _,control in ipairs({"optimize","new","duplicate","rename","delete","usePreset","hotkey","gearCapture","gearEquip","restoreSelected","original","import"}) do disable(page[control]) end
+                for _,control in ipairs({"optimize","nativeBars","new","duplicate","rename","delete","usePreset","hotkey","gearCapture","gearEquip","restoreSelected","original","import"}) do disable(page[control]) end
                 if page.detail then for _,control in ipairs({"rebind","change","reset","clearKey"}) do disable(page.detail[control]) end end
                 for _,row in ipairs(page.checks or {}) do disable(row); disable(row.checkbox) end
                 for _,row in ipairs(page.list and page.list.rows or {}) do disable(row); disable(row.key) end
@@ -220,7 +222,7 @@ function UI:UpdateBusyState()
         self:ClearInputFocus(); self:EndCapture(); self:CloseMenu()
         if self.CancelLibraryDrag then self:CancelLibraryDrag() end
         if self.library then self.library:Hide() end
-        for _,name in ipairs({"confirm","picker","review","nameDialog"}) do
+        for _,name in ipairs({"confirm","picker","review","nameDialog","nativeBarsDialog"}) do
             local modal=self[name]; if modal then modal:Hide() end
         end
         self:ResetKeyTest()
@@ -465,7 +467,7 @@ function UI:AssignBinding(action, key)
     if not action then return false end
     if action.presetName then
         local ok,why=self:Call(K.Presets,"SetHotkey",action.presetName,key)
-        if ok then self:EndCapture(); if self.picker then self.picker:Hide() end; self:Refresh(); self:Notice(why or "Hot Swap key saved. Use a preset to enable it.") end
+        if ok then self:EndCapture(); if self.picker then self.picker:Hide() end; self:Refresh(); self:Notice(why or "Hot Swap key saved. Choose Apply & save to enable it.") end
         return ok
     end
     key = K.API and K.API.NormalizeKey and K.API:NormalizeKey(key) or key
@@ -514,7 +516,7 @@ function UI:AssignBinding(action, key)
                 for _,candidate in ipairs(otherGroup) do overrides[candidate.id]=oldKey end
                 UI.selectedAction=action
                 UI:Stage("bindingOverrides",overrides)
-                UI:Notice(linked and "Positions swapped in every form. Use preset installs them." or "Bindings swapped in this preset. Use preset installs them.")
+                UI:Notice(linked and "Positions swapped in every form. Apply & save installs them." or "Bindings swapped in this preset. Apply & save installs them.")
             end)
             return false
         end
@@ -525,14 +527,14 @@ function UI:AssignBinding(action, key)
         return false
     end
     -- Replacing an existing game binding is expected when installing a preset.
-    -- This edit is only staged; the explicit Use preset action performs it.
+    -- This edit is only staged; the explicit Apply & save action performs it.
     local overrides = copy(settings().bindingOverrides)
     for _,candidate in ipairs(group) do overrides[candidate.id]=key end
     self:EndCapture()
     if self.picker then self.picker:Hide() end
     self.selectedAction = action
     self:Stage("bindingOverrides", overrides)
-    self:Notice((#group>1 and "Position saved in every form: " or "Binding saved to ") .. keyName(key) .. ". Use preset installs it.")
+    self:Notice((#group>1 and "Position saved in every form: " or "Binding saved to ") .. keyName(key) .. ". Apply & save installs it.")
     return true
 end
 function UI:CaptureInput(key)
@@ -560,7 +562,7 @@ function UI:CaptureInput(key)
     if self.captureMode == "preset" then
         if full:find("ALT%-") then self.captureHint:SetText("Alt stays reserved for self-cast. Use a free key, Shift, or Ctrl."); return end
         local ok, why = self:Call(K.Presets, "SetHotkey", a.presetName, full)
-        if ok then self:EndCapture(); self:Refresh(); self:Notice("Hot Swap key saved. Use a preset to enable the updated shortcut.")
+        if ok then self:EndCapture(); self:Refresh(); self:Notice("Hot Swap key saved. Choose Apply & save to enable the updated shortcut.")
         elseif why then self.captureHint:SetText(why) end
         return
     end
@@ -629,13 +631,89 @@ function UI:BeginCapture(mode, action)
     self.captureTitle:SetText(mode == "mouse" and "Record your mouse buttons" or (mode == "preset" and "Hot Swap key for " or "Edit ") .. tostring(action.label or action.id))
     self.captureHint:SetText(mode == "mouse" and "Press each side button once." or "Press the new key, mouse button, or wheel direction. Hold Shift or Ctrl if needed.")
     local linked=mode=="key" and #self:LinkedBindings(action)>1
-    self.captureNote:SetText(mode == "mouse" and "Recorded buttons are kept. Escape or Done finishes. Use preset installs your changes." or (linked and "Escape cancels. This action-bar position changes in every form. Use preset installs it." or "Escape cancels this key change. Use preset installs your changes."))
+    self.captureNote:SetText(mode == "mouse" and "Recorded buttons are kept. Escape or Done finishes. Apply & save installs your changes." or (linked and "Escape cancels. This action-bar position changes in every form. Apply & save installs it." or "Escape cancels this key change. Apply & save installs your changes."))
     self.captureDone.text:SetText(mode == "mouse" and "Done" or (mode=="key" and "Done" or "Cancel"))
     self:RenderCaptureTarget()
     if self.capture.targetMode:IsShown() then self.captureHint:SetText("Press a new key to rebind, or choose Targeting below. Hold Shift or Ctrl for a modified key.") end
     self.capture:EnableKeyboard(true)
     if self.capture.SetPropagateKeyboardInput then self.capture:SetPropagateKeyboardInput(false) end
     self.capture:Show()
+end
+
+function UI:SetNativeBarPreference(toggle,shown)
+    if K.Engine and K.Engine.busy then self:UpdateBusyState(); return false end
+    if type(shown)~="boolean" then return false end
+    -- Required bars come from the planned layout, not the stored preference.
+    -- Recheck the row before staging so a stale checkbox cannot hide one.
+    local options=K.NativeBars:GetBarOptions(self.plan,settings())
+    for _,option in ipairs(options) do
+        if option.toggle==toggle and option.available and not option.required then
+            local preferences=copy(settings().nativeBars)
+            preferences[toggle]=shown
+            self:Stage("nativeBars",preferences)
+            return true
+        end
+    end
+    return false
+end
+function UI:RenderNativeBars()
+    local f=self.nativeBarsDialog
+    if not f or not f:IsShown() then return end
+    local options=K.NativeBars:GetBarOptions(self.plan,settings())
+    for _,row in ipairs(f.rows) do row:Hide() end
+    for index,option in ipairs(options) do
+        local row=f.rows[index]
+        if not row then
+            row=listRow(f); row:SetSize(760,44)
+            row.check=CreateFrame("CheckButton",nil,row,"UICheckButtonTemplate")
+            row.check:SetSize(26,26); row.check:SetPoint("LEFT",6,0)
+            if row.check.text then row.check.text:Hide() end
+            row.name=label(row,"",12); row.name:SetPoint("TOPLEFT",43,-6)
+            row.current=label(row,"",10,C.muted); row.current:SetPoint("TOPLEFT",43,-24)
+            row.state=label(row,"",11,C.muted); row.state:SetPoint("RIGHT",-12,0)
+            row.state:SetWidth(350); row.state:SetJustifyH("RIGHT")
+            local function toggle() UI:SetNativeBarPreference(row.option.toggle,not row.effective) end
+            row:SetScript("OnClick",toggle); row.check:SetScript("OnClick",toggle)
+            f.rows[index]=row
+        end
+        local effective=option.requested
+        if effective==nil then effective=option.shown end
+        if option.required then effective=true end
+        row.option,row.effective=option,effective and true or false
+        row:SetPoint("TOPLEFT",50,-120-(index-1)*47)
+        row.name:SetText(option.label); color(row.name,option.available and C.text or C.muted)
+        row.current:SetText(option.available and (option.shown and "Currently shown" or "Currently hidden") or "This client does not provide this bar.")
+        if not option.available then row.state:SetText("Unavailable on this client")
+        elseif option.required then row.state:SetText("Required by preset")
+        elseif option.requested==nil then row.state:SetText("Keep current visibility")
+        else row.state:SetText(option.requested and "Show when applied" or "Hide when applied") end
+        color(row.state,option.required and C.accent or C.muted)
+        row.check:SetChecked(row.effective)
+        row:SetEnabled(option.available and not option.required)
+        row.check:SetEnabled(option.available and not option.required)
+        tooltip(row,option.label,option.required and "Hot Swap enables this bar automatically so the preset's actions remain visible." or option.available and "Choose its visibility for this preset. Apply & save installs the change." or "This client does not provide the bar, so it cannot be enabled here.")
+        row:Show()
+    end
+end
+function UI:OpenNativeBars()
+    if K.Engine and K.Engine.busy then self:UpdateBusyState(); return end
+    self:CloseMenu(); self:ClearInputFocus()
+    if not self.nativeBarsDialog then
+        local f=box("Frame",self.frame,C.bg,"KeybindOptimizerNativeBars")
+        f:SetAllPoints(self.frame); f:SetFrameStrata("DIALOG"); f:SetFrameLevel(self.frame:GetFrameLevel()+50)
+        f:EnableMouse(true); f.rows={}
+        label(f,"Action bars",22):SetPoint("TOPLEFT",50,-43)
+        local note=label(f,"Bars needed by this preset are always enabled. Choose which other Blizzard bars to show.\nThese preferences stay in the draft until you choose Apply & save.",12,C.muted)
+        note:SetPoint("TOPLEFT",50,-80); note:SetWidth(755)
+        f.reset=button(f,"Use defaults",145,function() UI:Stage("nativeBars",{}) end)
+        f.reset:SetPoint("BOTTOMLEFT",50,50)
+        tooltip(f.reset,"Use default bar visibility","Clear explicit choices. Required bars stay enabled; unused bars keep their current visibility when you choose Apply & save.")
+        f.done=button(f,"Done",110,function() f:Hide() end,true); f.done:SetPoint("BOTTOMRIGHT",-50,50)
+        f:SetScript("OnHide",function() UI:EndModal(f) end)
+        self.nativeBarsDialog=f
+    end
+    self:BeginModal(self.nativeBarsDialog,"KeybindOptimizerNativeBars")
+    self.nativeBarsDialog:Show(); self:RenderNativeBars()
 end
 
 function UI:BuildSetup(page)
@@ -665,6 +743,9 @@ function UI:BuildSetup(page)
         page.advanced:SetShown(not page.advanced:IsShown())
     end)
     advanced:SetPoint("TOPLEFT", 0, -284)
+    page.nativeBars=button(page,"Action bars",145,function() UI:OpenNativeBars() end)
+    page.nativeBars:SetPoint("TOPLEFT",175,-284)
+    tooltip(page.nativeBars,"Blizzard action bars","Show additional native bars, inspect bars required by your preset, and distinguish hidden bars from bars unavailable on this client.")
     page.nativeNote=label(page,"Uses Blizzard's main and form bars, plus the extra bars it needs.\nFuture spells keep their places as you level.",11,C.muted)
     page.nativeNote:SetPoint("TOPLEFT",0,-249); page.nativeNote:SetWidth(615)
     local optimize=box("Frame",page)
@@ -674,7 +755,7 @@ function UI:BuildSetup(page)
     detail:SetPoint("TOPLEFT",13,-43); detail:SetWidth(142)
     page.optimize=button(optimize,"Optimize",140,function() UI:Optimize() end,true)
     page.optimize:SetPoint("TOPLEFT",14,-96); page.optimize:SetHeight(32)
-    local note=label(optimize,"Backs up bindings and bars, then uses the new layout. Keeps your saved presets.",10,C.muted)
+    local note=label(optimize,"Backs up bindings and bars, then applies the new layout. Keeps your saved presets.",10,C.muted)
     note:SetPoint("TOPLEFT",13,-141); note:SetWidth(142)
     page.advanced = box("Frame", page)
     page.advanced:SetPoint("TOPLEFT", 0, -117)
@@ -1206,7 +1287,7 @@ function UI:BuildBindings(page)
     end)
     detail.reset:SetPoint("TOPRIGHT", -12, -12)
     detail.reset:SetEnabled(false)
-    detail.note = label(detail, "Use preset installs your changes.", 10, C.muted)
+    detail.note = label(detail, "Apply & save installs your changes.", 10, C.muted)
     detail.note:SetPoint("TOPRIGHT", -12, -46)
     page.detail = detail
     self:BuildKeyboard(page)
@@ -1311,7 +1392,7 @@ function UI:BindingDetail(a)
     local pinned=false
     for _,action in ipairs(linked) do if (settings().bindingOverrides or {})[action.id]~=nil then pinned=true; break end end
     d.reset:SetEnabled(a.presetName~=nil or pinned)
-    d.note:SetText(#linked>1 and "This action-bar position changes in every form." or "Use preset installs your changes.")
+    d.note:SetText(#linked>1 and "This action-bar position changes in every form." or "Apply & save installs your changes.")
     d.reset.text:SetText(a.presetName and "Clear key" or "Reset key")
     d.rebind:SetEnabled(true)
     d.change:SetEnabled(a.key ~= nil and a.kind ~= "system" and not a.presetName)
@@ -1380,7 +1461,7 @@ function UI:BuildShare(page)
     page.help:SetPoint("BOTTOMLEFT",0,21); page.help:SetWidth(600); page.help:SetHeight(42)
     page.import=button(page,"Import presets",150,function()
         local ok,why=UI:Call(K,"Import",e:GetText())
-        UI.shareResult=why or (ok and "Presets imported. Choose one on the Presets tab and use it when ready." or "Paste valid exported preset text first.")
+        UI.shareResult=why or (ok and "Presets imported. Select a draft, then choose Apply & save when ready." or "Paste valid exported preset text first.")
         UI.shareError=not ok
         if ok then e:ClearFocus(); UI:Refresh() else UI:RenderShare() end
     end,true); page.import:SetPoint("BOTTOMRIGHT",0,25)
@@ -1388,7 +1469,7 @@ end
 function UI:RenderShare()
     local page=self.pages and self.pages.Share
     if not page then return end
-    page.message:SetText(self.shareResult or ("Selected: "..tostring(K.db and K.db.activePreset or "none").."  ·  Imports are saved for review before use."))
+    page.message:SetText(self.shareResult or ("Selected: "..tostring(K.db and K.db.activePreset or "none").."  ·  Imported drafts stay inactive until Apply & save."))
     color(page.message,self.shareError and C.error or C.muted)
     local hasText=page.transfer:GetText()~=""
     page.copy:SetEnabled(hasText); page.import:SetEnabled(hasText)
@@ -1414,7 +1495,7 @@ end
 function UI:BuildPresets(page)
     label(page,"Presets",18):SetPoint("TOPLEFT")
     page.active=label(page,"",11,C.accent); page.active:SetPoint("TOPRIGHT",-2,-5); page.active:SetWidth(540); page.active:SetJustifyH("RIGHT")
-    label(page,"Select a saved setup to edit. Use preset installs bindings and bars, with a backup first.",11,C.muted):SetPoint("TOPLEFT",0,-29)
+    label(page,"Select a preset to edit its draft. Apply & save backs up and installs your changes.",11,C.muted):SetPoint("TOPLEFT",0,-29)
     page.list=scroll(page); page.list:SetPoint("TOPLEFT",0,-57); page.list:SetPoint("BOTTOMLEFT",0,94); page.list:SetWidth(232)
     page.new=button(page,"New",108,function()
         UI:PromptPresetName("New preset","",function(name) return UI:Call(K.Presets,"Create",name,false) end)
@@ -1425,7 +1506,7 @@ function UI:BuildPresets(page)
     local d=box("Frame",page); d:SetPoint("TOPLEFT",248,-57); d:SetPoint("TOPRIGHT",0,-57); d:SetHeight(235); page.detail=d
     d.title=label(d,"",17); d.title:SetPoint("TOPLEFT",14,-13); truncate(d.title,358)
     d.state=label(d,"",11,C.muted); d.state:SetPoint("TOPLEFT",14,-42); d.state:SetWidth(515)
-    d.description=label(d,"Bindings, controls, mouse options and items are saved together. Edits are saved automatically.",11,C.muted)
+    d.description=label(d,"Draft edits are saved automatically. Apply & save installs the selected draft in the game.",11,C.muted)
     d.description:SetPoint("TOPLEFT",14,-68); d.description:SetWidth(515)
     label(d,"Hot Swap key",12):SetPoint("TOPLEFT",14,-111)
     d.hotkey=button(d,"Set key",130,function()
@@ -1433,7 +1514,7 @@ function UI:BuildPresets(page)
         UI:BeginCapture("preset",{id="preset."..tostring(name),label=name,presetName=name})
     end); d.hotkey:SetPoint("TOPLEFT",134,-103)
     d.clearKey=button(d,"Clear",68,function() UI:Call(K.Presets,"ClearHotkey",K.db.activePreset); UI:Refresh() end); d.clearKey:SetPoint("TOPLEFT",270,-103)
-    d.keyHint=label(d,"Switches the complete setup out of combat. Use a preset to enable updated shortcuts.",10,C.muted)
+    d.keyHint=label(d,"Switches the complete setup out of combat. Apply & save enables updated shortcuts.",10,C.muted)
     d.keyHint:SetPoint("TOPLEFT",14,-140); d.keyHint:SetWidth(515)
     d.rename=button(d,"Rename",100,function()
         local name=K.db.activePreset
@@ -1443,7 +1524,8 @@ function UI:BuildPresets(page)
         local name=K.db.activePreset
         UI:Confirm("Delete "..name.."?","Remove this saved preset. Your active game setup is kept.",function() UI:Call(K.Presets,"Delete",name); UI:Refresh() end)
     end); d.delete:SetPoint("BOTTOMLEFT",122,17)
-    d.use=button(d,"Use preset",128,function() UI:UseSelectedPreset() end,true); d.use:SetPoint("BOTTOMRIGHT",-14,17)
+    d.use=button(d,APPLY_LABEL,128,function() UI:UseSelectedPreset() end,true); d.use:SetPoint("BOTTOMRIGHT",-14,17)
+    tooltip(d.use,APPLY_LABEL,APPLY_DETAIL)
     page.rename,page.delete,page.usePreset,page.hotkey=d.rename,d.delete,d.use,d.hotkey
     local bindings=button(page,"Edit bindings",132,function() UI:ShowPage("Bindings") end); bindings:SetPoint("TOPLEFT",248,-305)
     local items=button(page,"Edit items",110,function() UI:ShowPage("Items") end); items:SetPoint("TOPLEFT",388,-305)
@@ -1479,14 +1561,14 @@ function UI:RenderPresets()
     list:UpdateHeight(math.max(50,#names*50))
     local preset=K.db and K.db.presets and K.db.presets[selected] or {}
     local d=page.detail; d.title:SetText(selected or "Choose a preset")
-    d.state:SetText(selected==active and (K.dirty and "Editing the active preset · changes are not in use yet" or "This preset is active") or "Editing this preset · your active game setup is unchanged")
+    d.state:SetText(selected==active and (K.dirty and "Editing the active preset's draft · changes are not applied yet" or "This preset is active") or "Editing this preset's draft · your active setup is unchanged")
     d.hotkey.text:SetText(preset.hotkey and keyName(preset.hotkey) or "Set key")
     d.clearKey:SetEnabled(preset.hotkey~=nil)
     d.delete:SetEnabled(#names>1 and selected~=active)
     local combat=InCombatLockdown and InCombatLockdown()
     d.use:SetEnabled(not combat and not self.previewFailed and #((self.plan or {}).errors or {})==0)
     d.hotkey:SetEnabled(not combat)
-    d.use.text:SetText("Use preset")
+    d.use.text:SetText(APPLY_LABEL)
 end
 
 UI.widgets={button=button,label=label,box=box,scroll=scroll,edit=edit,tooltip=tooltip,truncate=truncate,color=color,colors=C,keyName=keyName,listRow=listRow,actionPageNames=actionPageNames}
@@ -1542,7 +1624,7 @@ function UI:RenderSafety()
         row.selection:SetShown(backup.id==self.selectedBackup); row:Show()
     end
     if not list.empty then list.empty=label(list.child,"",12,C.muted); list.empty:SetPoint("TOPLEFT",10,-18); list.empty:SetWidth(740) end
-    list.empty:SetText(#backups==0 and "No named backups yet. Using a preset creates one automatically." or "")
+    list.empty:SetText(#backups==0 and "No named backups yet. Apply & save creates one automatically." or "")
     list:UpdateHeight(math.max(65,#backups*56))
     page.selected:SetText(chosen and ("Selected: "..chosen.name) or "Your original setup is also kept separately.")
     local combat=InCombatLockdown and InCombatLockdown()
@@ -1563,7 +1645,7 @@ function UI:OpenReview()
         f.expected:SetPoint("TOPLEFT",40,-110)
         f.list=scroll(f); f.list:SetPoint("TOPLEFT",40,-153); f.list:SetPoint("BOTTOMRIGHT",-40,85)
         local close=button(f,"Close",100,function() f:Hide() end); close:SetPoint("BOTTOMRIGHT",-40,40)
-        label(f,"Use preset backs up and installs the bindings and Blizzard action bars.",11,C.muted):SetPoint("BOTTOMLEFT",40,48)
+        label(f,"Apply & save backs up and installs the bindings and Blizzard action bars.",11,C.muted):SetPoint("BOTTOMLEFT",40,48)
         f:SetScript("OnHide",function() UI:EndModal(f) end)
         self.review=f
     end
@@ -1579,7 +1661,7 @@ function UI:RenderReview()
     f.expected.text:SetText((self.reviewExpanded and "Hide" or "Show").." expected replacements ("..#replacements..")")
     for _,entry in ipairs(p.errors or {}) do lines[#lines+1]={text=message(entry),tone=C.error} end
     for _,entry in ipairs(coverage.missing or {}) do lines[#lines+1]={text="Unbound spell: "..message(entry),tone=C.error} end
-    if errors==0 then lines[#lines+1]={text="Existing game bindings are replaced automatically when you use this preset. They do not block it.",tone=C.muted} end
+    if errors==0 then lines[#lines+1]={text="Apply & save replaces existing game bindings automatically after creating a backup.",tone=C.muted} end
     if self.reviewExpanded then
         for _,entry in ipairs(replacements) do
             lines[#lines+1]={text=keyName(entry.key)..": "..bindingLabel(entry.previous).." -> "..tostring(entry.label or "Preset action"),tone=C.muted}
@@ -1667,6 +1749,7 @@ function UI:Create()
         if UI.picker then UI.picker:Hide() end
         if UI.review then UI.review:Hide() end
         if UI.nameDialog then UI.nameDialog:Hide() end
+        if UI.nativeBarsDialog then UI.nativeBarsDialog:Hide() end
     end)
     specialFrame("KeybindOptimizerWindow", true)
     local title = f.TitleText or label(f, "", 14, C.accent)
@@ -1737,18 +1820,19 @@ function UI:Create()
     footer:SetHeight(50)
     self.status = label(footer, "", 11, C.muted)
     self.status:SetPoint("TOPLEFT", 12, -10)
-    self.status:SetWidth(345)
+    self.status:SetWidth(326)
     self.status:SetHeight(34)
     local preview = button(footer, "Review", 84, function() UI.notice=nil; UI:OpenReview() end)
     self.reviewButton=preview
-    preview:SetPoint("RIGHT", -374, 0)
+    preview:SetPoint("RIGHT", -390, 0)
     self.restore = button(footer, "Backups", 92, function() UI:ShowPage("Safety") end)
-    self.restore:SetPoint("RIGHT", -276, 0)
-    self.apply = button(footer, "Use preset", 112, function() UI:UseSelectedPreset() end, true)
+    self.restore:SetPoint("RIGHT", -292, 0)
+    self.apply = button(footer, APPLY_LABEL, 128, function() UI:UseSelectedPreset() end, true)
     self.apply:SetPoint("RIGHT", -154, 0)
+    tooltip(self.apply,APPLY_LABEL,APPLY_DETAIL)
     self.optimize=button(footer,"Optimize",134,function() UI:Optimize() end,true)
     self.optimize:SetPoint("RIGHT",-10,0)
-    tooltip(self.optimize,"Optimize and use a new layout","Creates a full-level preset from your controls, preserves your existing presets, backs up current bindings and bars, then fills Blizzard's action bars.")
+    tooltip(self.optimize,"Optimize and apply a new layout","Creates a full-level preset from your controls, preserves your existing presets, backs up current bindings and bars, then fills Blizzard's action bars.")
     self.events = CreateFrame("Frame", nil, f)
     self.events:RegisterEvent("PLAYER_REGEN_DISABLED")
     self.events:RegisterEvent("PLAYER_REGEN_ENABLED")
@@ -1809,6 +1893,7 @@ function UI:Refresh()
     elseif self.activePage == "Items" then self:RenderItems()
     elseif self.activePage == "Safety" then self:RenderSafety()
     elseif self.activePage == "Share" then self:RenderShare() end
+    self:RenderNativeBars()
     for id, b in pairs(self.nav) do selectTab(b, id == self.activePage) end
     local errors = #(self.plan.errors or {})
     local combat = InCombatLockdown and InCombatLockdown()
@@ -1821,11 +1906,11 @@ function UI:Refresh()
     if combat then self.status:SetText("In combat. Preset switching and restoring are paused."); color(self.status, C.warning)
     elseif self.previewFailed then self.status:SetText("This preset could not be prepared. Open Review to check it."); color(self.status, C.error)
     elseif self.notice then self.status:SetText(self.notice); color(self.status, self.noticeError and C.error or C.muted)
-    elseif errors > 0 then self.status:SetText(errors .. " binding issue(s) to fix. Open Review before using this preset."); color(self.status, C.error)
+    elseif errors > 0 then self.status:SetText(errors .. " binding issue(s) to fix. Open Review before applying this preset."); color(self.status, C.error)
     else
         local cov = self.plan.coverage or {}
         local active=K.db.enabled and K.db.appliedPreset
-        self.status:SetText(string.format("%s / %s spells  |  %s expected replacements%s", tostring(cov.bound or 0), tostring(cov.total or 0), tostring(#(self.plan.conflicts or {})), (K.dirty or K.db.activePreset~=active) and "  |  Not in use" or "  |  Active"))
+        self.status:SetText(string.format("%s / %s spells  |  %s expected replacements%s", tostring(cov.bound or 0), tostring(cov.total or 0), tostring(#(self.plan.conflicts or {})), (K.dirty or K.db.activePreset~=active) and "  |  Draft (unapplied)" or "  |  Active"))
         color(self.status,C.muted)
     end
 end

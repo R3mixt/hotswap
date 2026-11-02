@@ -57,7 +57,7 @@ function UI:SetActionTarget(mode)
         if candidate.id==action.id then self.captureAction=candidate; self.selectedAction=candidate; self:BindingDetail(candidate); break end
     end
     self:RenderCaptureTarget()
-    self.captureHint:SetText("Targeting saved. Press a new key to rebind, or Escape to finish.")
+    self.captureHint:SetText("Targeting saved to the draft. Press a new key to rebind, or Escape to finish.")
 end
 function UI:FitWindows()
     if not self.frame then return end
@@ -113,9 +113,9 @@ function UI:DropLibraryEntry(key)
         local function replace(destination)
             if destination.selfKey==key and destination.key~=key then self:Notice("Self-cast follows the normal spell. Drop onto its normal key to replace it.",true); return end
             local scope=destination.form and destination.form~="all" and ("This changes the "..(actionPageNames[destination.form] or destination.form).." page only.") or "This shared action is used in every form."
-            UI:Confirm("Replace "..keyName(key).."?",(entry.label or entry.name).." will replace "..(destination.label or destination.id)..".\n\n"..scope.." Use preset installs the change.",function()
+            UI:Confirm("Replace "..keyName(key).."?",(entry.label or entry.name).." will replace "..(destination.label or destination.id)..".\n\n"..scope.." Apply & save installs the change.",function()
                 local ok,why=UI:Call(K.Library,"Place",entry,destination.id)
-                if ok then UI.selectedAction=destination; UI:Refresh(); UI:Notice(why or "Action replaced in the preset. Use preset installs it.") end
+                if ok then UI.selectedAction=destination; UI:Refresh(); UI:Notice(why or "Action replaced in the preset. Apply & save installs it.") end
             end)
         end
         if #destinations>1 then

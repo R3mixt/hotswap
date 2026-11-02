@@ -395,7 +395,7 @@ function Tests.apply_and_restore_preserve_original_bindings_settings_and_persona
   equal(Mock.modified.FOCUSCAST,"NONE","installed focus modifier")
   equal(Mock.cvars.autoSelfCast,"0","installed auto self-cast")
   assert(contains(Mock.bindings.T,"MULTIACTIONBAR"),"Trinket key not installed on an original bar")
-  local userName,_,body=GetMacroInfo(1)
+  local userName,_,body=GetMacroInfo(GetMacroIndexByName("UserMacro"))
   equal(userName,"UserMacro","personal macro name")
   equal(body,"/say preserved","personal macro body")
   ok,err=k:Restore()
@@ -404,7 +404,7 @@ function Tests.apply_and_restore_preserve_original_bindings_settings_and_persona
   sameMap(Mock.bindingSets[2],originalCharacter,"restored inactive character bindings")
   sameMap(Mock.modified,originalModified,"restored modifiers")
   sameMap(Mock.cvars,originalCVars,"restored CVars")
-  equal(GetMacroInfo(1),"UserMacro","personal macro survives Restore")
+  equal(GetMacroInfo(GetMacroIndexByName("UserMacro")),"UserMacro","personal macro survives Restore")
   local account,character=GetNumMacros()
   equal(account+character,1,"generated macros removed")
 end
@@ -485,14 +485,15 @@ function Tests.restore_preserves_user_edited_generated_macro()
   assert(idx>0,"Restore deleted user-edited generated macro")
   local _,_,body=GetMacroInfo(idx)
   equal(body,"/say now my own content","edited macro text")
-  equal(GetMacroInfo(1),"UserMacro","original personal macro")
+  equal(GetMacroInfo(GetMacroIndexByName("UserMacro")),"UserMacro","original personal macro")
 end
 
 function Tests.native_actions_follow_macro_indices_after_unrelated_macro_deletion()
   local k=init()
+  CreateMacro("000 Unrelated",1,"/say unrelated",false)
   assert(k:Apply())
   -- Delete unrelated first account macro; generated account indices may move.
-  DeleteMacro(1)
+  DeleteMacro(GetMacroIndexByName("000 Unrelated"))
   local ok,err=k.Engine:Activate(k.db.appliedPlan)
   assert(ok,err)
   for _,a in ipairs(k.db.appliedPlan.actions) do
@@ -714,7 +715,7 @@ function Tests.form_maintenance_failure_restores_original_setup()
   assert(not k.db.enabled,"Failed form maintenance left stale layout active")
   sameMap(Mock.bindings,original,"form failure restore bindings")
   local a,c=GetNumMacros(); equal(a+c,1,"form failure generated macros cleaned up")
-  equal(GetMacroInfo(1),"UserMacro","form failure personal macro")
+  equal(GetMacroInfo(GetMacroIndexByName("UserMacro")),"UserMacro","form failure personal macro")
 end
 
 function Tests.form_maintenance_defers_protected_writes_until_combat_ends()

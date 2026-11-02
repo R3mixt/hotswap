@@ -9,7 +9,15 @@ function GetActionBarToggles() return unpack(Mock.actionToggles) end
 function SetActionBarToggles(...)
   Mock:Write("actiontoggles",...); Mock.actionToggles={...}
 end
-function MultiActionBar_Update() Mock.barUpdates=(Mock.barUpdates or 0)+1 end
+function MultiActionBar_Update()
+  Mock.barUpdates=(Mock.barUpdates or 0)+1
+  -- Mirror Blizzard's visibility controller, including its normal-bar gate.
+  -- Frame presence is a capability; a hidden bar is still available for use.
+  for index,name in ipairs({"MultiBarBottomLeft","MultiBarBottomRight","MultiBarRight","MultiBarLeft","MultiBar5","MultiBar6","MultiBar7"}) do
+    local frame=_G[name]
+    if frame then frame:SetShown(MainActionBar:IsShown() and Mock.actionToggles[index] and true or false) end
+  end
+end
 function GetActionBarPage() return Mock.actionPage end
 function ChangeActionBarPage(page) Mock:Write("actionpage",page); Mock.actionPage=page end
 C_ActionBar={GetActionBarPage=GetActionBarPage,SetActionBarPage=ChangeActionBarPage}
@@ -26,17 +34,56 @@ function PlaceAction(slot)
   Mock.actions[slot]=Mock.cursor and {unpack(Mock.cursor)} or nil
   Mock.cursor=nil
 end
-local originalDeleteMacro=DeleteMacro
-function DeleteMacro(index)
-  if type(index)=="string" then index=GetMacroIndexByName(index) end
-  local last=index<=120 and 120 or 150
-  originalDeleteMacro(index)
+-- Macro indices are positions in separate sorted banks, not stable IDs. The
+-- client preserves action references when creation, renaming or deletion moves
+-- a macro. Keep those references by object identity while rebuilding the banks.
+local function macroReferences()
+  local refs={}
   for slot,action in pairs(Mock.actions) do
-    if action[1]=="macro" then
-      if action[2]==index then Mock.actions[slot]=nil
-      elseif action[2]>index and action[2]<=last then action[2]=action[2]-1 end
+    if action[1]=="macro" then refs[#refs+1]={slot=slot,macro=Mock.macros[action[2]]} end
+  end
+  if Mock.cursor and Mock.cursor[1]=="macro" then refs[#refs+1]={cursor=true,macro=Mock.macros[Mock.cursor[2]]} end
+  return refs
+end
+local function sortMacroBanks(refs)
+  local indices={}
+  for _,bounds in ipairs({{1,120},{121,150}}) do
+    local entries={}
+    for index=bounds[1],bounds[2] do
+      if Mock.macros[index] then entries[#entries+1]={macro=Mock.macros[index],previous=index} end
+      Mock.macros[index]=nil
+    end
+    table.sort(entries,function(a,b)
+      local x,y=a.macro.name:lower(),b.macro.name:lower()
+      return x==y and a.previous<b.previous or x<y
+    end)
+    for offset,entry in ipairs(entries) do
+      local index=bounds[1]+offset-1
+      Mock.macros[index]=entry.macro; indices[entry.macro]=index
     end
   end
+  for _,ref in ipairs(refs) do
+    local index=ref.macro and indices[ref.macro]
+    if ref.cursor then Mock.cursor=index and {"macro",index} or nil
+    elseif index then Mock.actions[ref.slot][2]=index
+    else Mock.actions[ref.slot]=nil end
+  end
+  return indices
+end
+local originalCreateMacro,originalEditMacro,originalDeleteMacro=CreateMacro,EditMacro,DeleteMacro
+function CreateMacro(...)
+  local refs=macroReferences(); local index=originalCreateMacro(...)
+  local macro=Mock.macros[index]; local indices=sortMacroBanks(refs)
+  return indices[macro]
+end
+function EditMacro(index,...)
+  if type(index)=="string" then index=GetMacroIndexByName(index) end
+  local refs=macroReferences(); local macro=Mock.macros[index]
+  originalEditMacro(index,...)
+  return sortMacroBanks(refs)[macro]
+end
+function DeleteMacro(index)
+  local refs=macroReferences(); originalDeleteMacro(index); sortMacroBanks(refs)
 end
 function Mock:Drain(limit)
   local frames=0

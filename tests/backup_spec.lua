@@ -64,7 +64,7 @@ function Tests.named_backup_restores_original_account_and_character_binding_sets
   same(Mock.cvars,originalCVars,"Restored CVars")
   equal(Mock.bindingSet,1,"Restored active binding-set choice")
   assert(not k.db.enabled and not k.db.appliedPlan,"Non-Hot Swap backup retained active secure layout")
-  equal(GetMacroInfo(1),"UserMacro","Restoring deleted a personal macro")
+  equal(GetMacroInfo(GetMacroIndexByName("UserMacro")),"UserMacro","Restoring deleted a personal macro")
   equal(k.Engine:ListBackups()[1].status,"restored","Restore did not retain an undo backup")
 end
 
@@ -106,7 +106,7 @@ function Tests.named_restore_failure_rolls_back_both_binding_sets_and_previous_s
   same(Mock.bindingSets[2],character,"Failed restore character bindings")
   assert(k.db.enabled,"Restore failure disabled the prior layout")
   equal(k.db.appliedPlan.settings.wheel,beforePlan.settings.wheel,"Restore failure changed the active plan")
-  equal(GetMacroInfo(1),"UserMacro","Restore rollback deleted personal macro")
+  equal(GetMacroInfo(GetMacroIndexByName("UserMacro")),"UserMacro","Restore rollback deleted personal macro")
 end
 
 function Tests.named_restore_preflight_rejects_full_macro_banks_without_mutation()
@@ -132,7 +132,7 @@ function Tests.named_restore_recreates_missing_generated_macros_without_replacin
   local edited=GetMacroIndexByName(owned)
   local _,_,body=GetMacroInfo(edited)
   equal(body,"/say personal edited copy","Restore overwrote a user's edited macro")
-  equal(GetMacroInfo(1),"UserMacro","Restore overwrote original personal macro")
+  equal(GetMacroInfo(GetMacroIndexByName("UserMacro")),"UserMacro","Restore overwrote original personal macro")
 end
 
 function Tests.binding_command_labels_are_human_readable_and_backup_restore_is_combat_guarded()

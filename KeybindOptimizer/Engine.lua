@@ -111,19 +111,20 @@ function E:CreateMacros(plan,created)
                     if not index or index==0 then error("Could not create "..a.label.." macro.") end
                     K.db.ownedMacros[name]=a.body; created[name]=a.body
                 end
-                bodies[a.body]={name=name,index=index}
+                bodies[a.body]={name=name}
             end
-            a.macroName=bodies[a.body].name; a.macroIndex=bodies[a.body].index
+            a.macroName=bodies[a.body].name
+            -- Indices are only a current lookup result. Later macro creation,
+            -- renaming or deletion may move this macro within its bank.
+            a.macroIndex=K.Macros:FindExact(a.macroName,a.body)
+            if not a.macroIndex then error("Could not verify "..tostring(a.label).." macro.") end
         end
     end
 end
 function E:DeleteOwned(owned)
     for name,body in pairs(owned) do
-        local index=GetMacroIndexByName(name)
-        if index and index>0 then
-            local current,_,text=GetMacroInfo(index)
-            if current==name and text==body then DeleteMacro(index) end
-        end
+        local index=K.Macros:FindExact(name,body)
+        if index then DeleteMacro(index) end
         K.db.ownedMacros[name]=nil
     end
 end
@@ -538,9 +539,9 @@ function E:RepairLearnedActions(plan,itemsOnly)
             end
             if why then return false,why end
             if body~=action.body or (updated.kind=="item" and (updated.icon~=action.icon or updated.label~=action.label or updated.known~=action.known)) then
-                local index,name=K.Macros:FindOwned(action.macroName,action.body)
-                if not index then return false,"A managed macro was edited or removed. Review and apply your preset." end
-                changes[#changes+1]={action=action,updated=updated,index=index,name=name,oldBody=action.body,newBody=body}
+                local index,name=K.Macros:FindExact(action.macroName,action.body)
+                if not index or K.db.ownedMacros[name]~=action.body then return false,"A managed macro was edited or removed. Review and apply your preset." end
+                changes[#changes+1]={action=action,updated=updated,name=name,oldBody=action.body,newBody=body}
             end
         end
     end
@@ -557,12 +558,11 @@ function E:RepairLearnedActions(plan,itemsOnly)
     local job={kind=itemsOnly and "item-maintenance" or "maintenance",plan=plan,steps={},backupReady=true,created={},previous=runtimeState()}
     for _,change in ipairs(operations) do local c=change
         addStep(job.steps,function()
-            local index=GetMacroIndexByName(c.name)
-            local name,_,body=GetMacroInfo(index)
-            if name~=c.name or body~=c.oldBody then error("A managed macro changed before maintenance. Review and apply your preset.") end
+            local index=K.Macros:FindExact(c.name,c.oldBody)
+            if not index or K.db.ownedMacros[c.name]~=c.oldBody then error("A managed macro changed before maintenance. Review and apply your preset.") end
             c.touched=true
             EditMacro(index,nil,c.updated.icon,c.newBody)
-            local _,_,updatedBody=GetMacroInfo(index); if updatedBody~=c.newBody then error("The client rejected an ability macro update.") end
+            if not K.Macros:FindExact(c.name,c.newBody) then error("The client rejected an ability macro update.") end
         end,"Updating learned ability macros",true,true)
     end
     job.rollback=function()
@@ -570,20 +570,26 @@ function E:RepairLearnedActions(plan,itemsOnly)
         for _,change in ipairs(operations) do local c=change
             addStep(steps,function()
                 if not c.touched then return end
-                local index=GetMacroIndexByName(c.name)
-                local name,_,body=GetMacroInfo(index)
-                if name~=c.name or (body~=c.newBody and body~=c.oldBody) then error("A macro was edited while maintenance was running; its personal edits were preserved.") end
-                if body~=c.oldBody then EditMacro(index,nil,nil,c.oldBody) end
+                if K.Macros:FindExact(c.name,c.oldBody) then return end
+                local index=K.Macros:FindExact(c.name,c.newBody)
+                if not index then error("A macro was edited while maintenance was running; its personal edits were preserved.") end
+                EditMacro(index,nil,c.action.icon,c.oldBody)
+                if not K.Macros:FindExact(c.name,c.oldBody) then error("The client rejected restoration of an ability macro.") end
             end,"Restoring ability macros",true,true)
         end
         return steps
     end
     job.commit=function()
+        -- Verify every update before changing any saved action/ownership state.
+        for _,c in ipairs(changes) do
+            c.currentIndex=K.Macros:FindExact(c.name,c.newBody)
+            if not c.currentIndex then error("An updated macro changed before maintenance finished; personal edits were preserved.") end
+        end
         for _,c in ipairs(changes) do
             local a,u=c.action,c.updated
             for key in pairs(a) do a[key]=nil end
             for key,value in pairs(u) do a[key]=K.Copy(value) end
-            a.body=c.newBody
+            a.body=c.newBody; a.macroName=c.name; a.macroIndex=c.currentIndex
             K.db.ownedMacros[c.name]=c.newBody
         end
         if not itemsOnly then plan.formSignature=K.API:FormSignature() end

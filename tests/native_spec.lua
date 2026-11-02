@@ -94,7 +94,7 @@ function Tests.native_job_rolls_back_slot_and_binding_failure_across_separate_fr
   same(Mock.bindings,binds,"Failed native setup binding rollback")
   for slot,data in pairs(original) do equal(Mock.actions[slot][2],data[2],"Failed setup native slot rollback") end
   assert(not k.db.enabled,"Failed native setup was marked installed")
-  equal(GetMacroInfo(1),"UserMacro","Rollback deleted a personal macro")
+  equal(GetMacroInfo(GetMacroIndexByName("UserMacro")),"UserMacro","Rollback deleted a personal macro")
 end
 function Tests.native_job_pauses_in_combat_without_writes_and_resumes_without_losing_controls()
   local k=initNative(); equal(k:Apply(),"pending")

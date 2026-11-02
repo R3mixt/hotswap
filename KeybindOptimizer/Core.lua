@@ -1,12 +1,12 @@
 local addonName, K = ...
 _G.KeybindOptimizer = K
-K.name, K.version = addonName or "KeybindOptimizer", "0.3.0"
+K.name, K.version = addonName or "KeybindOptimizer", "0.3.1"
 K.defaults = {
     wheel = true, middle = true, ctrl = true,
     mouseButtons = { BUTTON4 = true, BUTTON5 = true },
     selfFallback = false, cancelForUtility = true,
     flavor = "auto", primarySchool = "frost", groundAtCursor=false,
-    bindingOverrides = {}, fallbackBindings = {}, actionOverrides = {}, customActions = {}, itemBindings = {},
+    bindingOverrides = {}, fallbackBindings = {}, actionOverrides = {}, customActions = {}, itemBindings = {}, nativeBars = {},
 }
 -- Read-only migration shim for exports made by the retired custom action dock.
 -- These values are accepted and discarded, never applied to native bars.
@@ -43,8 +43,18 @@ function K:Print(message)
     local text = "|cffffd100Hot Swap|r  " .. tostring(message)
     if DEFAULT_CHAT_FRAME then DEFAULT_CHAT_FRAME:AddMessage(text) elseif print then print(text) end
 end
+function K:ValidateNativeBars(value)
+    if type(value)~="table" then return false,"Action-bar preferences must be a table." end
+    for toggle,shown in pairs(value) do
+        if type(toggle)~="number" or toggle<1 or toggle>7 or toggle%1~=0 or type(shown)~="boolean" then
+            return false,"Action-bar preferences must use bar numbers 1 through 7 and true or false."
+        end
+    end
+    return true
+end
 function K:UpdateSetting(key, value)
     if self.Engine and self.Engine.busy then return false,"Wait for the current operation to finish." end
+    if key=="nativeBars" then local ok,why=self:ValidateNativeBars(value); if not ok then return false,why end end
     self:GetSettings()[key] = K.Copy(value)
     self.dirty = true
     self:InvalidatePreview()

@@ -16,7 +16,7 @@ function Draw-QABevel($graphics, $rect, $top, $bottom, $edge) {
     $graphics.DrawLine($pen,$rect.X+2,$rect.Y+2,$rect.Right-3,$rect.Y+2)
     $pen.Dispose()
 }
-foreach ($pageName in @('setup','presets','bindings','bindings-shift','bindings-cat','bindings-test','items','safety','share','library-spells','library-ranks','library-items','library-macros')) {
+foreach ($pageName in @('setup','presets','bindings','bindings-shift','bindings-cat','bindings-test','items','safety','share','library-spells','library-ranks','library-items','library-macros','action-bars')) {
     $nodes = Get-Content -LiteralPath (Join-Path $PSScriptRoot "$pageName.json") -Raw | ConvertFrom-Json
     $canvasWidth = if ($pageName -like 'library-*') { 1180 } else { 860 }
     $bitmap = [System.Drawing.Bitmap]::new($canvasWidth, 652)

@@ -94,7 +94,7 @@ function P:Select(name)
     if previous then previous.settings=K.db.settings end
     K.db.activePreset=name; K.db.settings=preset.settings
     self:Changed()
-    return true,"Editing "..name..". Use preset to activate it."
+    return true,"Editing draft: "..name..". Apply & save activates it."
 end
 function P:Create(name,copyCurrent)
     if busy() then return false,waitMessage end
@@ -136,7 +136,7 @@ function P:Actions()
     local actions={}
     for _,name in ipairs(self:List()) do
         local preset=K.db.presets[name]
-        if preset.hotkey then actions[#actions+1]={id="mode."..preset.id,presetID=preset.id,presetName=name,kind="system",category="Preset",label="Use preset: "..name,command="CLICK KBO_Mode_"..preset.id..":LeftButton",key=preset.hotkey,known=true,form="all"} end
+        if preset.hotkey then actions[#actions+1]={id="mode."..preset.id,presetID=preset.id,presetName=name,kind="system",category="Preset",label="Apply preset: "..name,command="CLICK KBO_Mode_"..preset.id..":LeftButton",key=preset.hotkey,known=true,form="all"} end
     end
     return actions
 end
@@ -208,7 +208,7 @@ function P:SetHotkey(name,key)
     local ok,why=self:ValidateHotkeys()
     if not ok then preset.hotkey=old; return false,why end
     self:Changed()
-    return true,key and ("Preset hotkey saved. Use a preset to enable "..key..".") or "Preset hotkey cleared. Use a preset to update bindings."
+    return true,key and ("Preset hotkey saved. Apply & save enables "..key..".") or "Preset hotkey cleared. Apply & save updates game bindings."
 end
 function P:ClearHotkey(name) return self:SetHotkey(name,nil) end
 function P:EnsureButtons()
@@ -340,6 +340,12 @@ function P:Export(name)
             if type(value)=="boolean" or type(value)=="string" or type(value)=="number" then addLine(lines,"s",presetName,key,type(value),value) end
         end
         for _,key in ipairs(sorted(preset.settings.mouseButtons)) do if preset.settings.mouseButtons[key] then addLine(lines,"m",presetName,key) end end
+        local validBars,barError=K:ValidateNativeBars(preset.settings.nativeBars or {})
+        if not validBars then return nil,barError end
+        for toggle=1,7 do
+            local shown=(preset.settings.nativeBars or {})[toggle]
+            if shown~=nil then addLine(lines,"v",presetName,toggle,shown) end
+        end
         for _,pair in ipairs({{"b","bindingOverrides"},{"f","fallbackBindings"}}) do
             for _,id in ipairs(sorted(preset.settings[pair[2]])) do addLine(lines,pair[1],presetName,id,preset.settings[pair[2]][id]) end
         end
@@ -384,6 +390,8 @@ local function setSetting(settings,key,typ,value)
     return true
 end
 local function validateSettings(settings)
+    local validBars,barError=K:ValidateNativeBars(settings.nativeBars or {})
+    if not validBars then return false,barError end
     if K.Library then local ok,why=K.Library:CheckLimits(settings); if not ok then return false,why end end
     if not ({auto=true,forever=true,era=true,retail=true})[settings.flavor] then return false,"Unknown game version." end
     if not ({frost=true,fire=true})[settings.primarySchool] then return false,"Unknown mage school." end
@@ -445,6 +453,12 @@ function P:Import(text)
             elseif tag=="m" and #fields==3 and preset and fields[3]:match("^BUTTON%d+$") then
                 local n=tonumber(fields[3]:match("%d+")); if n<4 or n>31 then return false,"Invalid mouse button." end
                 preset.settings.mouseButtons[fields[3]]=true
+            elseif tag=="v" and #fields==4 and preset then
+                local toggle=fields[3]:match("^[1-7]$") and tonumber(fields[3])
+                if not toggle or (fields[4]~="true" and fields[4]~="false") or preset.settings.nativeBars[toggle]~=nil then
+                    return false,"Invalid or duplicate action-bar preference on line "..count.."."
+                end
+                preset.settings.nativeBars[toggle]=fields[4]=="true"
             elseif (tag=="b" or tag=="f") and #fields==4 and preset and #fields[3]<=100 and fields[3]:match("^[%w%._%-]+$") and not fields[3]:match("^mode%.") then
                 local key=K.API:NormalizeKey(fields[4]); if not key then return false,"Invalid binding on line "..count.."." end
                 preset.settings[tag=="b" and "bindingOverrides" or "fallbackBindings"][fields[3]]=key

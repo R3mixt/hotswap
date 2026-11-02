@@ -19,3 +19,11 @@ Reviewed 1 November 2026 across runtime, UI, import/export, native actions and r
 The integration run passed **191/191** actual-Lua-5.1 regression scenarios. Packaging reruns the suite and generates a fresh report. Checks cover all class/flavor catalogs, older extra-bar capacity, native snapshots, failure rollback, reload persistence, UI capture, spell/rank/target editing, item alternatives and safe transfer.
 
 No unresolved blocking defect was identified in this review. Protected execution, taint, real input consumption, target/ground casting and textures still require in-game acceptance. Automatic best-food/water selection and a complete top-20 professional-keymap census remain unfinished requirements, not release claims.
+
+## 0.3.1 follow-up — 1 November 2026
+
+The live-client Optimize error exposed a gap in the original test double: it appended new macros without sorting/reindexing the bank. Modeling those moves reproduced the exact NativeBars.lua placement error. The fix uses current name/content/ownership checks at placement, overflow binding, maintenance and recovery. Numeric IDs remain diagnostic results, never stable identities. New regressions cover repeated Optimize, reordering, deletion, personal edits and rollback with action references preserved by the game model.
+
+Bar visibility now has a staged native UI, strict per-preset import/export flags and required-bar enforcement. Tests verify actual mocked frames become visible, nil/legacy flags preserve positions, unused bars retain explicit choices, delayed mirror values refresh correctly, stale proxy cache bits are cleared, Restore supersedes prior requests, and combat stops frame updates. The derived-setting adapter and deferred refresh were independently reviewed against Blizzard's current Era/Forever implementation. The final button is Apply & save; selection only opens a saved draft.
+
+See the generated validation report for the current full-suite count. These reproductions strengthen coverage but do not replace the requested in-game retest.

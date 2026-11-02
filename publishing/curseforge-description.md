@@ -4,7 +4,7 @@ Build a comfortable keyboard layout, keep it consistent across your class, and s
 
 Hot Swap places spells and generated macros on **Blizzard's original action bars**. Its in-game keyboard editor shows what each key does, including Shift and Ctrl layers, mouse buttons, and optional wheel bindings. The interface uses WoW's own frames and controls.
 
-**0.3.0 beta:** Classic Era and Hardcore are the current test clients; Forever is the final release target. The automated suite passes **191 tests using the actual Lua modules with mocked WoW APIs**. Live-client acceptance testing is still pending. Retail and other Classic expansions are not supported release targets.
+**0.3.1 beta:** Classic Era and Hardcore are the current test clients; Forever is the final release target. The automated suite passes **214 tests using the actual Lua modules with mocked WoW APIs**. Live-client acceptance testing is still pending. Retail and other Classic expansions are not supported release targets.
 
 ## Set up your keys
 
@@ -19,11 +19,11 @@ Hot Swap places spells and generated macros on **Blizzard's original action bars
 
 Trinket keys follow equipment slots **13 and 14**, so replacing a trinket does not require renaming a macro. Other item bindings follow item IDs. Save manual alternatives for each key, see when the selected item is missing, and choose a different saved item when needed. Missing items remain inactive until usable; the addon does not silently pick another alternative.
 
-Create, duplicate, rename, import, and export complete presets. Leveling, Dungeon, and PvP provide starting modes. Assign shortcuts to switch saved setups **outside combat**. Edits stay separate from the layout currently installed until you choose **Use preset**.
+Create, duplicate, rename, import, and export complete presets. Leveling, Dungeon, and PvP provide starting modes. Assign shortcuts to switch saved setups **outside combat**. Edits stay separate from the layout currently installed until you choose **Apply & save**.
 
 ## Apply and recover
 
-**Use preset replaces your entire binding map**, populates the original action bars, enables the extra bars it needs, and applies the selected self-cast settings. It records a named backup first, including bindings and affected bar contents. The Backups tab can restore a selected snapshot or the original setup.
+**Apply & save replaces your entire binding map**, populates the original action bars, enables the extra bars it needs, and applies the selected self-cast settings. It records a named backup first, including bindings and affected bar contents. The Backups tab can restore a selected snapshot or the original setup.
 
 Setup and recovery run in small steps with a progress indicator. They cannot start in combat; an operation already underway pauses if combat begins and resumes afterward. Wait for completion before testing the result. Restore your original setup before disabling or removing the addon.
 
@@ -31,7 +31,7 @@ Setup and recovery run in small steps with a progress indicator. They cannot sta
 
 1. Install the `KeybindOptimizer` folder in your chosen client's `Interface/AddOns` directory. The folder name is retained for compatibility; the addon is displayed as **Hot Swap**.
 2. Open **Hot Swap** from the Escape menu, the AddOns settings page, or `/hotswap`.
-3. Choose your mouse options. **Optimize** creates and installs a recommended preset with a backup. Alternatively, edit a preset in **Bindings** and **Items**, review it, then choose **Use preset** outside combat.
+3. Choose your mouse options. **Optimize** creates and installs a recommended preset with a backup. Alternatively, edit a preset in **Bindings** and **Items**, review it, then choose **Apply & save** outside combat.
 4. Wait for completion and keep the backup until you have checked movement, forms, modifiers, and recovery in your client.
 
 The defaults are configurable recommendations, not a verified worldwide optimum or a completed top-20-player consensus. Automatic best-food/water selection is not implemented. Hot Swap does not choose a combat rotation or trigger actions without your input.

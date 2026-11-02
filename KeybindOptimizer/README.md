@@ -1,8 +1,8 @@
-# Hot Swap 0.3.0
+# Hot Swap 0.3.1
 
 A configurable World of Warcraft addon for stable class bindings, druid form pages, mouseover/focus macros, Alt self-cast, and selectable on-use items.
 
-**Status: installable beta.** Version 0.3.0 uses Blizzard's original action bars, adds Optimize and a miniature spellbook editor, and runs installation and recovery in bounded steps across frames. The actual Lua modules pass the bundled regression suite using Lua 5.1 and mocked WoW APIs. These changes still need an in-game retest. Geometry previews approximate the artwork and fonts and are not game screenshots.
+**Status: installable beta.** Version 0.3.1 fixes Optimize's macro-index placement failure and adds native action-bar visibility settings. It uses Blizzard's original action bars, a miniature spellbook editor, and bounded setup/recovery jobs. The actual Lua modules pass the regression suite using Lua 5.1 and mocked WoW APIs; real-client behavior still needs a retest. Geometry previews approximate artwork and fonts and are not game screenshots.
 
 ## Install and open
 
@@ -10,9 +10,11 @@ A configurable World of Warcraft addon for stable class bindings, druid form pag
 2. Use the client folder you intend to test: `_classic_era_` for Era / Hardcore or the Forever client folder when available. Do not install into a different client's AddOns folder.
 3. Restart WoW if it was running while a new addon folder was installed. Enable Hot Swap at character selection.
 4. Open **Hot Swap** from the Escape menu or **Options → AddOns → Hot Swap → Open Hot Swap**. `/hotswap` also works. Select the client automatically or explicitly, record your side buttons, and choose whether to use the wheel and middle click.
-5. Click **Optimize** to create and use a new recommended preset with your selected mouse controls and items. The original preset remains saved. On **Presets**, you can also create or duplicate any custom mode, edit **Bindings**, **Setup**, and **Items**, then choose **Use preset** outside combat.
+5. Click **Optimize** to create and use a new recommended preset with your selected mouse controls and items. The original preset remains saved. On **Presets**, you can also create or duplicate any custom mode, edit **Bindings**, **Setup**, and **Items**, then choose **Apply & save** outside combat.
 
-Opening the window or selecting a preset does not change live bindings. **Use preset** records a named backup first, creates the needed macros, populates the original action bars, enables required extra bars, replaces the entire binding map, sets self-cast options and saves character bindings. Essential movement, mouse camera/selection, chat, targeting and menu controls are included. No outside application, subscription, or library is required to run the addon.
+Opening the window or selecting a preset does not change live bindings. **Apply & save** records a named backup first, creates the needed macros, populates the original action bars, enables required extra bars, replaces the entire binding map, sets self-cast options and saves character bindings. Essential movement, mouse camera/selection, chat, targeting and menu controls are included. No outside application, subscription, or library is required to run the addon.
+
+In **Setup → Action bars**, see which original bars the preset requires and choose whether to show other available bars. Required bars always turn on; an unchecked unused bar can be hidden. **Use defaults** clears optional choices so unused bars retain their current visibility. Changes are saved in the preset and take effect with **Apply & save** or **Optimize**. Hidden bars remain selectable; bars absent from the client are marked unavailable. Visibility may take a moment to update while WoW receives its settings from the server.
 
 Wait for the progress indicator to finish. You may close the window while the operation continues. An operation cannot start in combat; if combat begins during setup, the partly completed operation pauses and resumes afterward. Automatic rollback and named recovery use the same bounded worker. The original backup is retained if recovery cannot finish.
 
@@ -40,7 +42,7 @@ All artwork is referenced from the installed game; there is no browser, web UI, 
 
 The Bindings page opens as a QWERTY keyboard with ability icons and mouse controls. **Follow form** previews the current native page; choosing an Action page pins the editor without shifting your character. Hold Shift, Ctrl, or both to see that layer; Alt shows self-cast aliases and the reserved camera/auto-run controls. Layer buttons also let you inspect a layer without holding a key. Press a combination to highlight its keys and display the planned action. Testing previews the staged layout; it does not cast or apply it, and ends when combat starts.
 
-Click an occupied key or icon to begin rebinding immediately. Each main-bar position uses one key across every native form page, so rebinding updates the linked position on all pages. Empty keys open a searchable action picker. The detail panel retains **Change action** and **Reset key**. Compatible swaps require confirmation; incompatible collisions are blocked. All changes stay staged until **Use preset**. The **List** view and search retain access to every action, including bindings outside the displayed keyboard/mouse controls.
+Click an occupied key or icon to begin rebinding immediately. Each main-bar position uses one key across every native form page, so rebinding updates the linked position on all pages. Empty keys open a searchable action picker. The detail panel retains **Change action** and **Reset key**. Compatible swaps require confirmation; incompatible collisions are blocked. All changes stay staged until **Apply & save**. The **List** view and search retain access to every action, including bindings outside the displayed keyboard/mouse controls.
 
 Open **Spellbook** beside the keyboard to browse spells by specialization / skill line, including reserved talent abilities. Separate sections list game commands, chat controls, emotes, and existing user or generated macros. Drag an entry onto a key, or select it and click the destination. Dragging only edits the preset and never casts the action. **Show ranks** exposes ranks identified in the current client; choosing one permits a separate downrank binding alongside the highest-rank family entry. Rankless spells do not acquire invented ranks, and future ranks absent from current-client data cannot be safely enumerated.
 

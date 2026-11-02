@@ -21,6 +21,32 @@ function N:AvailableBars()
  for index,bar in ipairs(bars) do if index<=4 or _G[bar.frame] then bar.toggle=index; list[#list+1]=bar end end
  return list
 end
+local function toggleFlag(value) return value==true or value==1 or value=="1" end
+local function tuple(...) return {...},select("#",...) end
+function N:ReadToggles()
+ -- Some older APIs return nil for disabled flags. Keep the ordinal positions
+ -- explicit: Lua's length operator cannot measure a tuple containing holes.
+ local values,count={},4
+ if GetActionBarToggles then values,count=tuple(GetActionBarToggles()) end
+ for _,bar in ipairs(self:AvailableBars()) do count=math.max(count,bar.toggle) end
+ count=math.min(#bars,math.max(4,count))
+ for index=1,count do values[index]=toggleFlag(values[index]) end
+ return values
+end
+function N:GetBarOptions(plan,settings)
+ local values=self:ReadToggles()
+ local available={}; for _,bar in ipairs(self:AvailableBars()) do available[bar.toggle]=true end
+ local used=plan and plan.nativeLayout and plan.nativeLayout.usedBars or {}
+ local requested=(settings or (plan and plan.settings) or {}).nativeBars or {}
+ local names={"bottom left","bottom right","right","left","extra","extra","extra"}
+ local options={}
+ for index,bar in ipairs(bars) do
+  local label=OPTION_SHOW_ACTION_BAR and OPTION_SHOW_ACTION_BAR:format(index+1) or ("Action bar "..(index+1))
+  options[index]={toggle=index,label=label.." ("..names[index]..")",available=available[index] or false,
+   shown=values[index] or false,required=used[index] and true or false,requested=requested[index]}
+ end
+ return options
+end
 function N:ManagedSlots()
  local result={}
  for i=1,120 do result[#result+1]=i end
@@ -174,6 +200,10 @@ function N:BindingMap(plan)
     local index=GetMacroIndexByName(a.macroName)
     local name,_,body=GetMacroInfo(index or 0)
     if not name or K.Macros:Name(body or "")~=a.macroFingerprint then error("A referenced macro changed before binding: "..tostring(a.label)) end
+   else
+    local index,name=K.Macros:FindExact(a.macroName,a.body)
+    if not index or K.db.ownedMacros[name]~=a.body then error("A generated action macro changed before binding: "..tostring(a.label)) end
+    a.macroIndex=index
    end
    map[key]="MACRO "..a.macroName
   end
@@ -229,7 +259,7 @@ local function canRestore(data)
 end
 function N:SnapshotSteps(target)
  if not GetActionInfo then error("Native action-bar inspection is unavailable.") end
- target.actions={}; target.toggles=GetActionBarToggles and {GetActionBarToggles()} or nil; target.page=getPage()
+ target.actions={}; target.toggles=GetActionBarToggles and self:ReadToggles() or nil; target.page=getPage()
  local steps={}
  local all=self:ManagedSlots()
  for first=1,#all,12 do
@@ -311,19 +341,64 @@ local function contentFor(a)
   return {kind="macro",id=index,name=name,body=body,icon=icon}
  end
  if a.body then
-  if not a.macroIndex then error("Macro not prepared: "..tostring(a.label)) end
-  local name,icon,body=GetMacroInfo(a.macroIndex)
-  if not name or body~=a.body then error("A generated action macro changed before placement.") end
-  return {kind="macro",id=a.macroIndex,name=name,body=body,icon=icon}
+  -- Creating another macro can reorder its bank. The saved numeric index is
+  -- diagnostic only; resolve and verify the prepared identity at the use point.
+  local index,name,icon=K.Macros:FindExact(a.macroName,a.body)
+  if not index or K.db.ownedMacros[name]~=a.body then error("A generated action macro changed before placement.") end
+  a.macroIndex=index
+  return {kind="macro",id=index,name=name,body=a.body,icon=icon}
  end
  if a.known and a.spellID then return {kind="spell",id=a.spellID} end
  return false
 end
+local function refreshBars()
+ if combat() then return end
+ if MultiActionBar_Update then MultiActionBar_Update() end
+ if Settings and Settings.GetSetting and Settings.NotifyUpdate then
+  for _,bar in ipairs(N:AvailableBars()) do
+   local variable="PROXY_SHOW_ACTIONBAR_"..(bar.toggle+1)
+   if Settings.GetSetting(variable) then Settings.NotifyUpdate(variable) end
+  end
+ end
+end
+function N:QueueVisibilityRefresh()
+ -- GetActionBarToggles is server-mirrored. Re-read for a bounded period,
+ -- including after Restore, instead of forcing stale desired frame states.
+ -- A new request replaces the existing observer; it never queues old writes.
+ if not self.visibilityObserver then self.visibilityObserver=CreateFrame("Frame") end
+ local elapsed,tick,last=0,0,nil
+ self.visibilityObserver:SetScript("OnUpdate",function(frame,delta)
+  if combat() then return end
+  elapsed=elapsed+delta; tick=tick+delta
+  if tick<0.2 then return end
+  tick=0
+  local parts={}; for index,value in ipairs(N:ReadToggles()) do parts[index]=value and "1" or "0" end
+  local signature=table.concat(parts)
+  if signature~=last then
+   last=signature; refreshBars()
+   if K.QueueRefresh then K:QueueRefresh() end
+  end
+  if elapsed>=10 then frame:SetScript("OnUpdate",nil) end
+ end)
+ refreshBars()
+end
 local function setToggles(values)
  if not values then return end
+ if combat() then error("Leave combat before updating action bars.") end
  if not SetActionBarToggles then error("This client cannot enable native extra action bars.") end
+ -- Era/Forever's proxy setter has a private ten-second full-mask cache.
+ -- SetValue skips equal native values, so it cannot clear stale cached bits.
+ -- Capability-check the actual proxy setter and synchronize every bit before
+ -- sending our complete mask. Older clients use the direct full-mask API.
+ local proxies={}; local complete=Settings and Settings.GetSetting and true or false
+ if complete then for index=1,#values do
+  local setting=Settings.GetSetting("PROXY_SHOW_ACTIONBAR_"..(index+1))
+  if not setting or type(setting.SetValueDerived)~="function" then complete=false; break end
+  proxies[index]=setting
+ end end
+ if complete then for index,value in ipairs(values) do proxies[index]:SetValueDerived(value) end end
  SetActionBarToggles(unpack(values,1,#values))
- if MultiActionBar_Update then MultiActionBar_Update() end
+ N:QueueVisibilityRefresh()
 end
 function N:ApplySteps(plan,layout)
  layout=layout or plan.nativeLayout
@@ -337,7 +412,13 @@ function N:ApplySteps(plan,layout)
   steps[#steps+1]=function() self:WriteSlot(at,id and contentFor(map[id]) or false) end
  end end
  steps[#steps+1]=function()
-  local values=GetActionBarToggles and {GetActionBarToggles()} or {false,false,false,false}
+  local values=self:ReadToggles()
+  local requested=plan.settings and plan.settings.nativeBars or {}
+  for _,bar in ipairs(self:AvailableBars()) do
+   if type(requested[bar.toggle])=="boolean" then values[bar.toggle]=requested[bar.toggle] end
+  end
+  -- A binding must never point to a bar the preset deliberately hides.
+  -- Optional choices affect only unused bars; occupied bars always win.
   for bank in pairs(layout.usedBars) do values[bank]=true end
   setToggles(values); setPage(1)
  end

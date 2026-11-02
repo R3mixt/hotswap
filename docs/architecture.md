@@ -32,11 +32,14 @@ Each Lua module receives the shared `K` namespace through addon varargs. The TOC
 
 `bindingOverrides` maps action IDs to keys. `actionOverrides` holds rank, targeting and replacement edits. `customActions` contains typed spell/item/system/emote/macro-reference descriptors. `itemBindings` holds a selected item ID, ordered alternatives, target mode and explicit empty state. UI calls these domain methods rather than constructing executable text.
 
+`nativeBars` contains optional boolean visibility choices keyed by native toggle index 1–7 (displayed bars 2–8). Missing entries preserve unused bar visibility; planned occupancy always forces a required bar on. Visibility snapshots preserve every tuple position, including nil/legacy flags. Current Era/Forever proxy setters maintain a short-lived full-mask cache: capability-checked derived setters synchronize all bits before the final full-mask write. A bounded observer refreshes Blizzard frames from current mirrored values after server updates, pauses in combat, and never replays stale visibility writes.
+
 ## Invariants
 
 - Back up both binding sets, unsaved active bindings, native contents, page/visibility and managed settings before replacement. Never leave the inactive binding set selected across frames.
 - Preserve a pre-existing player cursor payload. After failed owned placement, release only the payload acquired by that operation before rollback.
 - Preserve user-edited macros. Names and body fingerprints identify ownership; local macro references must still match at apply time.
+- Macro indices are transient lookup results. Creation, deletion and renaming can reorder a bank; resolve the stable name and verify exact contents again at placement, direct binding, maintenance and rollback.
 - Imports are data. Resolve spell names and exact ranks through client metadata; never compile imported display strings as macro syntax. Existing macros remain local references.
 - Alt-self wins over friendly mouseover/focus clauses. Arbitrary macro references cannot inherit another native page's self-cast alias where semantics would be unsafe.
 - Ground targeting is not unit targeting. Offer item unit modes only from verified capability data; unknown items retain default behavior.
