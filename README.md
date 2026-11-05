@@ -8,7 +8,7 @@ Hot Swap is a World of Warcraft addon with a visual keyboard editor, spellbook d
 
 [Download on CurseForge](https://www.curseforge.com/wow/addons/hot-swap) · [Player guide](KeybindOptimizer/README.md) · [Documentation](docs/README.md) · [Changelog](CHANGELOG.md) · [Report a bug](https://github.com/R3mixt/hotswap/issues)
 
-Version **1.0.2** adds a readable binding action menu and mouseover targeting for Current bindings and targets Forever 1.60.1 and Classic Era / Hardcore 1.15.9. Automated tests verify the menu, staged edits and targeting fallback; live-client protected input, casting and third-party action-bar compatibility still need verification. The CurseForge download may lag the source version while a file is awaiting publication.
+Version **1.0.3** adds **Auto mouseover all spells** in Current bindings for clients with native support, fixes healing Mouseover's final self-cast fallback, resolves the RestedXP target-marking conflict, and improves Current bindings with Bartender4, ElvUI and Dominos. It retains the readable action menu introduced in 1.0.2. The RestedXP fix was confirmed in game on Forever; native mouseover and addon-specific action-bar behavior have automated coverage and still need live acceptance. The CurseForge download may lag the source version while a file is awaiting publication.
 
 ## What it does
 
@@ -47,7 +47,7 @@ To import a downloaded `.hotswap` profile, open it in a text editor and paste it
 
 ## Compatibility and limits
 
-Forever and Classic Era / Hardcore are the release targets. Retail and other Classic expansions are not supported release targets. Bartender/Dominos integration is best-effort: Hot Swap recognizes supported live action buttons but does not rewrite another addon's paging or override configuration.
+Forever and Classic Era / Hardcore are the release targets. Retail and other Classic expansions are not supported release targets. Current reads supported live buttons and key overrides from Bartender4, ElvUI and Dominos. It preserves their profiles and paging rules. Unsupported custom button actions remain unchanged.
 
 Character macro capacity still applies. New presets leave optional utility form cancellation off to conserve slots; existing preferences are preserved. Protected setup changes wait for out-of-combat execution. The addon does not automate combat decisions or casts.
 
@@ -65,7 +65,7 @@ python tests/run_tests.py
 python package.py
 ```
 
-The 1.0.2 release includes **528 Lua 5.1 scenarios**, **7 packaging checks** and **8 publisher checks**. The Lua tests execute the addon modules against simulated WoW APIs. `package.py` reruns validation, checks the TOC and archive layout, and writes install/source ZIPs and SHA-256 files into `dist/`. GitHub Actions performs the same build on pushes and pull requests.
+The 1.0.3 release includes **583 Lua 5.1 scenarios**, **7 packaging checks** and **8 publisher checks**. The Lua tests execute the addon modules against simulated WoW APIs. `package.py` reruns validation, checks the TOC and archive layout, and writes install/source ZIPs and SHA-256 files into `dist/`. GitHub Actions performs the same build on pushes and pull requests.
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) for the module map, change workflow and useful bug-report details. [CurseForge publishing](docs/curseforge.md) explains release sync and its one-time secret setup.
 

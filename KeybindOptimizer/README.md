@@ -1,8 +1,8 @@
-# Hot Swap 1.0.2
+# Hot Swap 1.0.3
 
 A visual editor for your current World of Warcraft keybindings, native action slots, and saved presets.
 
-Version 1.0.2 adds an opaque binding action menu, searchable spell replacement, and targeting choices in Current bindings. Version 1.0 opens Current with the spellbook, supports native spellbook drops, local replacement/swap confirmation switches, safe additive imports and backed-up default keybind restoration. New generated macros are character-specific; ordinary future spells reserve native positions without macros. This build targets Forever and Classic Era / Hardcore. Automated Lua tests and geometry review do not certify live protected execution.
+Version 1.0.3 fixes the RestedXP target-marking conflict and reads supported live Bartender4, ElvUI and Dominos bindings. Version 1.0.2 added the opaque binding action menu, searchable spell replacement, and targeting choices in Current. Version 1.0 opens Current with the spellbook, supports native spellbook drops, local replacement/swap confirmation switches, safe additive imports and backed-up default keybind restoration. New generated macros are character-specific; ordinary future spells reserve native positions without macros. This build targets Forever and Classic Era / Hardcore. Automated Lua tests and geometry review do not certify live protected execution.
 
 See the packaged `docs/behavior.md` for the complete behavior contract and user acceptance sequence.
 
@@ -54,7 +54,9 @@ Hover bind uses the same linked form positions and collision checks as the keybo
 
 While editing Current or a saved preset draft, open **Spellbook** beside the keyboard to browse spells by specialization / skill line, including reserved talent abilities. Separate sections list game commands, chat controls, emotes, and existing user or generated macros. Drag an entry onto a key, or select it and click the destination. Dragging only edits the preset and never casts the action. **Show ranks** exposes ranks identified in the current client; choosing one permits a separate downrank binding alongside the highest-rank family entry. Rankless spells do not acquire invented ranks, and future ranks absent from current-client data cannot be safely enumerated.
 
-The binding action menu offers supported targeting modes in Current and preset drafts, with a small badge and tooltip. **Mouseover** tries a valid hovered unit, then a valid current target. In Current, **Default** keeps the ordinary spell/item behavior. Choices depend on the spell, item and client; unavailable choices have an explanation. Helpful spells preserve Alt-self precedence where allowed. Existing macro references preserve their text; missing or changed macros are reported for review instead of silently recreated. Targeting controls do not rewrite arbitrary user macro text.
+**Bindings → Current bindings → Auto mouseover all spells** enables WoW's native mouseover without a modifier and normal automatic self-casting when you click **Apply changes**. **Discard edits** cancels the pending setting; backups restore it. This is available on Forever and disabled with an explanation when the client lacks native support. It applies to compatible action-bar spell buttons. Existing macros keep their conditions, and some bar addons require their own mouseover setting. For a directly bound wheel spell, use the binding menu's explicit **Mouseover** mode. Native mouseover can take priority over Alt-self.
+
+The binding action menu offers supported targeting modes in Current and preset drafts, with a small badge and tooltip. **Mouseover** tries a valid hovered unit, then a valid current target. For friendly spells that can target you, it casts on you when neither is valid. Item, resurrection and no-self spell rules remain separate. In Current, **Default** keeps the ordinary spell/item behavior. Choices depend on the spell, item and client; unavailable choices have an explanation. Helpful spells preserve Alt-self precedence where allowed. Existing macro references preserve their text; missing or changed macros are reported for review instead of silently recreated. Targeting controls do not rewrite arbitrary user macro text.
 
 Unlearned spells use the current client's spell database for their real icon and native tooltip. Amber **L** marks ordinary unlearned spells; blue **T** marks a talent ability that is not learned. You can rebind them before learning them; display metadata never makes an unlearned action castable. A spell absent from this client's database retains a named placeholder rather than borrowing a different expansion's spell. Empty item slots identify the missing selection separately from unlearned spells.
 
@@ -141,9 +143,9 @@ The Mage profile preserves Frostbolt on 1, Fireball on Shift-1, Ice Barrier on F
 
 WoW reports input events but does not provide a documented physical mouse-button-count query. **Record side buttons** captures the buttons you press. Remapped firmware inputs may appear as keyboard keys; use a binding row's capture control for those inputs. Recorded extra side buttons become usable allocation capacity. The addon does not invent unavailable mouse buttons.
 
-Click a binding's key to replace it. The override remains pinned until reset. Conflicting keys are reported before Apply. Alt gameplay bindings, the primary mouse buttons, and core movement/menu keys are protected from accidental reassignment. Alt-wheel and Alt-grave are the intended exceptions.
+Click a binding to open its action menu, then choose Change key to rebind it. The override remains pinned until reset. Conflicting keys are reported before Apply. Alt gameplay bindings, the primary mouse buttons, and core movement/menu keys are protected from accidental reassignment. Alt-wheel and Alt-grave are the intended exceptions.
 
-Hot Swap creates no custom combat bars. It populates and enables Blizzard's original bars. The previous native contents and visibility are included in recovery snapshots. Clients with fewer extra bars can use direct macro shortcuts for overflow. The addon does not rewrite ElvUI, Bartender, or Dominos profiles; their binding overrides may affect the result.
+Hot Swap creates no custom combat bars. It populates and enables Blizzard's original bars. The previous native contents and visibility are included in recovery snapshots. Clients with fewer extra bars can use direct macro shortcuts for overflow. Current follows supported Bartender4, ElvUI and Dominos button/override mappings. It checks that the reviewed button still leads to the same slot before applying edits. Other addons' profiles, paging and overrides are not rewritten. Unsupported custom button actions need editing in their owning addon.
 
 Vehicle, possession and override paging use the game's native dispatcher and the same linked main-position bindings.
 
@@ -172,7 +174,7 @@ Item spell information identifies candidates, not tactical suitability. Confirm 
 
 ## Compatibility and evidence
 
-The local installed targets used for planning were Forever `1.60.1.70707` and Era `1.15.9.70576`. Version 1.0.1 targets Forever 1.60.1 and Classic Era / Hardcore 1.15.9; live-client acceptance remains pending. Retail and other Classic expansions are not supported release targets.
+The local installed targets used for planning were Forever `1.60.1.70707` and Era `1.15.9.70576`. Version 1.0.3 targets Forever 1.60.1 and Classic Era / Hardcore 1.15.9. The RestedXP target-macro fix was confirmed on Forever after reload; action-bar-specific live acceptance remains pending. Retail and other Classic expansions are not supported release targets.
 
 See `docs/research.md` for player-source evidence and version-specific decisions, `docs/requirements.md` for the implemented requirement map, and `docs/compatibility.md` for tests and required live-client checks.
 

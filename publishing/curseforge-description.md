@@ -4,17 +4,18 @@ Build a comfortable keyboard layout, keep it consistent across your class, and s
 
 Hot Swap places spells and generated macros on **Blizzard's original action bars**. Its in-game keyboard opens on your current game bindings in edit mode, including native pet controls. Build your own Current layout with the spellbook or Hover bind, including future spells and missing items. Future reservations do not consume macro slots. Saved preset drafts provide a separate editor for Shift and Ctrl layers, mouse buttons, and optional wheel bindings. The interface uses WoW's own frames and controls.
 
-**1.0.1 macro Apply fix:** Targets Forever 1.60.1 and Classic Era / Hardcore 1.15.9. Fixes macro-related Apply failures such as Hunter Auto Shot. Automated tests exercise the actual Lua modules with mocked WoW APIs and reproduce the reported failure. Live-client acceptance testing is still pending. Retail and other Classic expansions are not supported release targets.
+**1.0.3 compatibility update:** Targets Forever 1.60.1 and Classic Era / Hardcore 1.15.9. Fixes the RestedXP target-marking conflict, confirmed in Forever after reload. Current reads supported Bartender4, ElvUI and Dominos live button mappings. These action-bar adapters have automated coverage; addon-specific live acceptance remains pending. Retail and other Classic expansions are not supported release targets.
 
 ## Set up your keys
 
 - Inspect your current bindings first. On **Presets → Preview recommendations**, inspect a temporary layout for any of the nine Classic classes, then **Save as new preset** to keep a unique editable copy. Existing presets remain intact; previewing creates no saved preset or live changes. Druid uses the native Base, Cat, Bear, and Moonkin action pages; travel and aquatic forms share Base, and Prowl shares Cat.
-- Edit Current directly or select a saved preset draft, then click a key to rebind it, or drag an action from the miniature spellbook. Browse class and spec groups, individual spell ranks, items, existing personal macros, and game controls.
+- Edit Current directly or select a saved preset draft, then click a binding for Targeting, Change spell or Change key, or drag an action from the miniature spellbook. Browse class and spec groups, individual spell ranks, items, existing personal macros, and game controls.
 - Choose **Bindings → Hover bind** for a scrollable grid of spells, including future talents and custom ranks. Hover an ability and press a key, a Shift/Ctrl combination, a side mouse button or the wheel. Hover binding changes do not require individual confirmations. Linked form positions and existing control protections still apply; Alt and primary mouse clicks remain reserved.
 - See spell icons and tooltips before abilities are learned. Reserved bindings remain available as you level.
 - Test key combinations in the keyboard view without casting spells.
 - Record the mouse buttons your client receives and choose whether to use the wheel and middle click. Alt stays reserved for self-casting, with separate camera and movement shortcuts.
 - Generate mouseover, focus, self, or cursor macros where the action and client support them. Your existing personal macro text is not imported or overwritten.
+- Enable **Auto mouseover all spells** in Current bindings on supported clients, then Apply changes. Compatible spell buttons use WoW's native mouseover and automatic self-casting. Macros and some action-bar addons keep their own targeting rules.
 
 In Hover bind, **Done - keep draft** saves the edits in your preset without installing them; **Apply & save** installs them with a named backup. The wheel binds over a spell and scrolls over blank grid space. No spells cast while the mode is active. Escape closes a confirmation first, then leaves the mode; closing the window or entering combat also releases capture.
 

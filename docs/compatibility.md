@@ -2,13 +2,13 @@ Version 1.0 acceptance: use [behavior.md](behavior.md) for the current interacti
 
 # Hot Swap compatibility and verification
 
-Status: initial implementation is exercised by an automated Lua 5.1 regression suite. The runner reports the current scenario count and results. Source/API research and mocked Lua tests do not establish in-game compatibility. Installation is recorded separately from automated validation. No live-client casting test has been performed.
+Status: initial implementation is exercised by an automated Lua 5.1 regression suite. The runner reports the current scenario count and results. Source/API research and mocked Lua tests do not establish in-game compatibility. Installation is recorded separately from automated validation. The RestedXP target-marking fix described below was confirmed by the user on Forever. General casting and action-bar-addon acceptance remains separate.
 
 ## Target clients
 
 - Primary: World of Warcraft: Forever 1.60.1, observed local installation build 70707.
 - Secondary: Classic Era 1.15.9, observed local installation build 70576.
-- Retail: compatibility mode with legacy anchors and learned-spell coverage; no complete Retail specialization optimization or live-client certification.
+- Retail and other Classic expansions: not supported release targets.
 
 Use capability detection as well as client/build identification. Forever uses modern UI APIs despite its Classic-inspired gameplay. Do not assume Classic form indices, spell availability, spell ranks, bindings, or bar pages match Forever.
 
@@ -93,3 +93,29 @@ For 0.4.4, explicitly edit a saved preset draft, then open Bindings > Hover bind
 Check Current against actual native pet buttons with and without a summoned pet, after changing pets, and after toggling autocast in Blizzard's own UI. Token-based attack/follow/stance controls must have readable labels/icons; spell slots should show current metadata. Merely viewing these controls must not cast, reorder pet slots or toggle autocast. Saving and applying a preset must not imply persistence of pet-slot ordering or autocast state.
 
 On a new character with no enabled Hot Swap layout, verify ordinary login leaves account controls untouched and no keyboard tester/shield exists until the editor is opened. Inspect the selected binding scope when troubleshooting inherited controls: changing one character's bindings does not repair the account template for future characters.
+
+
+## Action-bar adapters (1.0.3)
+
+Current follows the effective binding for each saved key and resolves supported live action buttons from Bartender4, ElvUI and Dominos. Base commands remain the source for binding changes and backups. Button names identify the adapter, never an assumed slot number. Shared native slots still affect all aliases. Unknown/custom macro buttons are not treated as empty Blizzard slots.
+
+- [Bartender4 ActionBars](https://github.com/Nevcairiel/Bartender4/blob/master/ActionBars.lua) maps native binding commands through overrides to BT4 buttons.
+- [ElvUI ActionBars](https://github.com/tukui-org/ElvUI/blob/main/ElvUI/Game/Shared/Modules/ActionBars/ActionBars.lua) maps native and extra ElvUI bar commands to live buttons.
+- [Dominos action buttons](https://github.com/tullamods/Dominos/blob/main/Dominos/bars/actionBar/buttons.lua) can route hardware keys through Hotkey child buttons that inherit their parent's action.
+- [LibActionButton](https://github.com/Nevcairiel/LibActionButton-1.0/blob/master/LibActionButton-1.0.lua) exposes the active action type and action ID. Only verified native action-slot states are editable here.
+
+These adapters are checked against primary addon sources and automated fixtures. Do not interpret this as live certification for every addon version or profile. Test display, targeting, replacement, form/page changes, rebind, Apply and backup restoration in each target client with one action-bar addon enabled at a time.
+
+## RestedXP target-marking conflict (1.0.3)
+
+A Forever taint trace on 2026-11-05 identified Hot Swap's startup reassignment of the shared `SlashCmdList` global. Blizzard's macro parser read that tainted global while running RestedXP's target macro; its `/tm` line then failed at `SetRaidTarget()`. Hot Swap now registers only its own `SlashCmdList.KEYBINDOPTIMIZER` entry. It does not replace the registry, suppress errors or alter RestedXP.
+
+The user confirmed the target macro worked after installing this fix and reloading on Forever. A regression intercepts global assignments during isolated Core loading, including same-table assignments, and checks that another addon's slash handler remains intact. A reload is required to clear taint from the previous session.
+
+## Native mouseover checkbox (1.0.3)
+
+The Current checkbox requires `IsMouseoverCastSupported()` and readable native settings. Forever exposes this capability; Classic Era currently does not. An existing CVar alone does not establish support. Apply sets `enableMouseoverCast=1`, `MOUSEOVERCAST=NONE` and `autoSelfCast=1`, then persists the modified-click setting using the active binding set. Disabling only turns off the mouseover CVar. There is no login enforcement or conversion of every spell into a macro.
+
+The native unit selector handles compatible action buttons, with current-target and normal automatic self-casting behavior. It can give mouseover priority over the Alt self-cast modifier and does not duplicate Hot Swap's explicit macro conditions. Macros keep their own conditions. Direct `SPELL` bindings are not certified by this feature; choose explicit Mouseover for a direct wheel spell. Dominos uses compatible button attributes; ElvUI may need a button refresh or reload; Bartender has its own per-bar targeting options. The checkbox does not promise to override these addons' targeting configuration.
+
+Primary references: [Forever casting capability](https://github.com/Gethe/wow-ui-source/blob/forever/Interface/AddOns/Blizzard_SettingsDefinitions_Frame/Mainline/CombatOverrides.lua#L262), [Classic casting capability](https://github.com/Gethe/wow-ui-source/blob/classic_era/Interface/AddOns/Blizzard_SettingsDefinitions_Frame/Classic/CombatOverrides.lua#L158), and [secure unit selection](https://github.com/Gethe/wow-ui-source/blob/forever/Interface/AddOns/Blizzard_FrameXML/SecureTemplates.lua). Automated tests cover staging, no startup writes, capability rejection, setting conflicts, failed-setter rollback, persisted modifiers and backup restoration. Live native-mouseover acceptance is pending.

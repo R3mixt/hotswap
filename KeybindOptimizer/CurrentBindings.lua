@@ -13,11 +13,6 @@ C.Events={UPDATE_BINDINGS=true,ACTIONBAR_SLOT_CHANGED=true,ACTIONBAR_PAGE_CHANGE
  SPELLS_CHANGED=true,SPELL_UPDATE_ICON=true,UNIT_ENTERED_VEHICLE=true,UNIT_EXITED_VEHICLE=true,
  PLAYER_EQUIPMENT_CHANGED=true,BAG_UPDATE_DELAYED=true,
  GET_ITEM_INFO_RECEIVED=true,PLAYER_ENTERING_WORLD=true}
-local bars={
- {page=6,button="MultiBarBottomLeftButton"},{page=5,button="MultiBarBottomRightButton"},
- {page=3,button="MultiBarRightButton"},{page=4,button="MultiBarLeftButton"},
- {page=13,button="MultiBar5Button"},{page=14,button="MultiBar6Button"},{page=15,button="MultiBar7Button"},
-}
 local function read(fn,...)
  if type(fn)~="function" then return end
  local values=tuple(pcall(fn,...))
@@ -28,10 +23,6 @@ local function positive(value)
 end
 local function actionAPI(name)
  return C_ActionBar and C_ActionBar[name] or _G[name]
-end
-local function buttonAction(button)
- if not button then return end
- return positive(button.action) or positive(read(button.GetAttribute,button,"action"))
 end
 function C:ActionPage()
  local page=positive(read(actionAPI("GetActionBarPage"))) or 1
@@ -51,37 +42,53 @@ function C:ActionPage()
  return page,"Main"
 end
 function C:ActionSlot(command,page,pageType)
- -- Resolve supported action-bar addon buttons through their live slot, never
- -- by assuming their visible button number equals Blizzard's action slot.
- local frameName,mouse=command:match("^CLICK ([%w_]+):([%w]+)$")
- if frameName and (frameName:match("^BT4Button%d+$") or frameName:match("^DominosActionButton%d+$")) and (mouse=="LeftButton" or mouse=="HOTKEY" or mouse=="Keybind") then
-  local button=_G[frameName]
-  if button then
-   local kind=read(button.GetAttribute,button,"type")
-   if kind==nil or kind=="action" then return buttonAction(button) end
+ return K.ActionBars:Slot(command,page,pageType)
+end
+function C:ReadRoute(key)
+ local command=read(GetBindingAction,key)
+ if type(command)~="string" then return {key=key,error="This binding cannot be read. Try again outside combat."} end
+ local page,kind=self:ActionPage()
+ return K.ActionBars:Route(command,key,page,kind,true)
+end
+function C:ValidateRoutes(edits)
+ for key,expected in pairs(edits.expectedRoutes or {}) do
+  local actual=self:ReadRoute(key)
+  if actual.error or actual.command~=expected.command or actual.effectiveCommand~=expected.effectiveCommand or actual.slot~=expected.slot then
+   error("Current action-bar routing changed on "..key..". Discard pending edits and review the active bar again.")
   end
-  return nil
  end
- local index=tonumber(command:match("^ACTIONBUTTON(%d+)$"))
- if index and index>=1 and index<=12 then
-  if pageType=="Vehicle" or pageType=="Override" or pageType=="TempShapeshift" then
-   -- An inactive ActionButton can retain its old slot while the override bar
-   -- owns gameplay. Its cached action must not win over the controller page.
-   local override=_G["OverrideActionBarButton"..index]
-   if override and read(override.IsShown,override) then
-    return buttonAction(override) or (page-1)*12+index
-   end
-   return (page-1)*12+index
+end
+function C:ReviewLegacyRoutes(edits)
+ edits.expectedRoutes=edits.expectedRoutes or {}
+ local function outdated()
+  error("These pending edits predate action-bar routing checks. Discard pending edits and review the active bar again.")
+ end
+ for key in pairs(edits.expectedKeys) do
+  if not edits.expectedRoutes[key] then
+   local route=self:ReadRoute(key)
+   -- Old slot edits are usable only when a key still proves that exact slot.
+   -- An old rebind did not retain its addon button, so it needs fresh review.
+   if route.error or route.effectiveCommand~=route.command and (edits.keys[key]~=nil or not edits.slots[route.slot]) then outdated() end
+   edits.expectedRoutes[key]=route
   end
-  return buttonAction(_G["ActionButton"..index]) or (page-1)*12+index
  end
- local bar,button=command:match("^MULTIACTIONBAR(%d+)BUTTON(%d+)$")
- bar,button=tonumber(bar),tonumber(button)
- if bars[bar] and button and button>=1 and button<=12 then
-  return buttonAction(_G[bars[bar].button..button]) or (bars[bar].page-1)*12+button
+ for at in pairs(edits.slots) do
+  local found=false
+  for _,route in pairs(edits.expectedRoutes) do if route.slot==at then found=true; break end end
+  if not found then outdated() end
  end
- local extra=tonumber(command:match("^EXTRAACTIONBUTTON(%d+)$"))
- if extra then return buttonAction(_G["ExtraActionButton"..extra]) end
+end
+function C:VerifyEditedRoutes(edits)
+ for key,command in pairs(edits.keys) do
+  local route=self:ReadRoute(key)
+  local source=edits.keyRoutes and edits.keyRoutes[key]
+  local clear=not command and route.effectiveCommand~="" and route.effectiveCommand~="NONE"
+  local moved=source and source.slot and route.slot~=source.slot
+  local direct=command and not (source and source.slot) and route.effectiveCommand~=command
+  if route.error or clear or moved or direct then
+   error("The action-bar addon did not update its key routing on "..key..". Change this key in that addon's binding settings.")
+  end
+ end
 end
 local function commandLabel(command)
  local localized=_G["BINDING_NAME_"..command]
@@ -173,13 +180,22 @@ local function stanceAction(action,index)
  action.label=action.spellName or ("Form "..index); action.known=true; action.builtin="stance"
  action.active=active and true or false; action.castable=castable; action.category="Forms"
 end
-function C:Describe(command,key,page,pageType,labels)
+function C:Describe(command,key,page,pageType,labels,sourceRoute)
  -- Hex-escape separators so different physical key strings never collide.
  local identity=key:gsub("[^%w]",function(ch) return string.format("_%02x",string.byte(ch)) end)
  local a={id="live-"..identity,key=key,keys={key},command=command,liveCommand=command,
   current=true,readOnly=true,form="all",scope="all",kind="system",known=true,
   label=commandLabel(command),category="Game controls"}
- local slot=self:ActionSlot(command,page,pageType)
+ -- A staged rebind still previews the source button, even before the addon
+ -- has installed its override for the new key. The saved command stays intact.
+ local route
+ if sourceRoute then route=K.ActionBars:Route(sourceRoute.command,sourceRoute.key,page,pageType,true)
+ else route=K.ActionBars:Route(command,key,page,pageType,read(GetBindingAction,key)==command) end
+ a.actionRoute=route; a.effectiveCommand=route.effectiveCommand; a.actionBarProvider=route.provider
+ a.actionBarError=route.error
+ local slot=route.slot
+ if route.effectiveCommand~=command then a.label=commandLabel(route.effectiveCommand or command) end
+ if route.error then a.category="Addon controls"; return a end
  if slot then
   a.nativeSlot=slot; a.liveSlot=slot
   local readable,typ,id,subtype=pcall(GetActionInfo,slot)
@@ -279,17 +295,54 @@ end
 function C:Edits()
  self.edits=self.edits or {keys={},slots={},expectedKeys={},expectedSlots={},entries={}}
  self.edits.entries=self.edits.entries or {}
+ self.edits.expectedRoutes=self.edits.expectedRoutes or {}; self.edits.keyRoutes=self.edits.keyRoutes or {}
  K.db.currentEditDraft=self.edits
  return self.edits
 end
 function C:Discard()
  self.edits=nil; K.db.currentEditDraft=nil; self:Invalidate()
 end
-function C:HasEdits() local e=self.edits; return e and (next(e.keys) or next(e.slots))~=nil or false end
-function C:StageKey(key,command,entry)
+function C:HasEdits() local e=self.edits; return e and (next(e.keys) or next(e.slots) or e.nativeMouseover)~=nil or false end
+function C:GetNativeMouseoverState()
+ local state=K.API:GetNativeMouseoverState()
+ local edit=self.edits and self.edits.nativeMouseover
+ if edit then state.enabled=edit.enabled; state.pending=true end
+ return state
+end
+function C:SetNativeMouseover(enabled)
+ if type(enabled)~="boolean" then return false,"Choose whether to enable mouseover casting." end
+ if K.Engine.busy or (InCombatLockdown and InCombatLockdown()) then return false,"Leave combat and wait for the current operation." end
+ local state=K.API:GetNativeMouseoverState()
+ if not state.supported then return false,state.reason end
+ local unchanged=enabled and state.enabled and state.autoSelfCast or not enabled and state.enableMouseoverCast=="0"
+ if unchanged then
+  if self.edits then self.edits.nativeMouseover=nil end
+ else
+  self:Edits().nativeMouseover={enabled=enabled,expected=K.Copy(state)}
+ end
+ return true,"Mouseover casting staged. Apply changes installs it."
+end
+function C:ValidateNativeMouseover(edits)
+ local edit=edits.nativeMouseover; if not edit then return end
+ if type(edit)~="table" or type(edit.enabled)~="boolean" or type(edit.expected)~="table" then error("Invalid pending mouseover casting change.") end
+ local state=K.API:GetNativeMouseoverState()
+ if not state.supported then error(state.reason) end
+ local expected=edit.expected
+ if state.enableMouseoverCast~=expected.enableMouseoverCast or (edit.enabled and
+     (state.modifier~=expected.modifier or state.autoSelfCastValue~=expected.autoSelfCastValue)) then
+  error("Mouseover casting settings changed. Discard the pending edit and choose the setting again.")
+ end
+end
+function C:StageKey(key,command,entry,sourceRoute)
  local e=self:Edits()
+ local route=self:ReadRoute(key)
+ if route.error then return false,route.error end
  if e.expectedKeys[key]==nil then e.expectedKeys[key]=GetBindingAction(key) or "" end
+ if e.expectedRoutes[key]==nil then e.expectedRoutes[key]=route end
+ if sourceRoute and e.expectedRoutes[sourceRoute.key]==nil then e.expectedRoutes[sourceRoute.key]=K.Copy(sourceRoute) end
  e.keys[key]=command or false; e.entries[key]=entry and K.Copy(entry) or nil
+ e.keyRoutes[key]=sourceRoute and K.Copy(sourceRoute) or nil
+ return true
 end
 function C:Rebind(action,key)
  key=K.API:NormalizeKey(key)
@@ -297,6 +350,10 @@ function C:Rebind(action,key)
  if not action or not action.key then return false,"Choose a current binding." end
  if action.key=="ESCAPE" or action.key:match("BUTTON[12]$") then return false,"Keep Escape and primary mouse controls on their current keys." end
  if action.key==key then return true end
+ local source=self:ReadRoute(action.actionRoute and action.actionRoute.key or action.key)
+ local destination=self:ReadRoute(key)
+ local current=self:ReadRoute(action.key)
+ if action.actionBarError or source.error or current.error or destination.error then return false,action.actionBarError or source.error or current.error or destination.error end
  local command=action.command
  if action.currentEntry and action.currentEntry.pending and not action.liveSlot then
   self:StageKey(key,false,action.currentEntry); self:StageKey(action.key,false)
@@ -304,18 +361,18 @@ function C:Rebind(action,key)
  end
  if not command or command=="" then return false,"This binding changed. Review Current again." end
  local metadata; if not action.liveSlot then metadata=action.currentEntry end
- self:StageKey(key,command,metadata); self:StageKey(action.key,false)
+ self:StageKey(key,command,metadata,action.liveSlot and action.actionRoute); self:StageKey(action.key,false)
  return true,"Binding moved in your Current layout. Apply changes installs it."
 end
 function C:ClearKey(action)
  if not action or not action.key or action.key=="ESCAPE" or action.key:match("BUTTON[12]$") then return false,"Keep Escape and primary mouse controls." end
- self:StageKey(action.key,false)
+ local ok,why=self:StageKey(action.key,false); if not ok then return false,why end
  return true,"Key cleared in your Current layout. Apply changes installs it."
 end
 -- Only verified spell families and item types can be rewritten. In particular,
 -- GetMacroSpell is display metadata, never permission to replace a user macro.
 function C:TargetAction(action)
- if not action or action.builtin or action.petSpell or action.readError then return end
+ if not action or action.builtin or action.petSpell or action.readError or action.actionBarError then return end
  if action.kind=="item" and action.itemID then
   local info=K.Items:GetTargetInfo(action)
   return {kind="item",itemID=action.itemID,itemTargeting=info.kind,itemTargetInfo=info,targeting=info.kind}
@@ -412,17 +469,21 @@ function C:StageEntry(entry,key)
 end
 function C:StageResolvedEntry(data,key)
  local e=self:Edits(); self:Build(); local live=self:EditingView().byKey[key]
+ local route=self:ReadRoute(key)
+ if route.error or live and live.actionBarError then return false,route.error or live.actionBarError end
  if (data.content or data.pending or data.body) and live and live.liveSlot then
   local at=live.liveSlot
   local supported=false; for _,slot in ipairs(K.NativeBars:ManagedSlots()) do if slot==at then supported=true; break end end
   if not supported then return false,"This temporary action slot cannot be edited safely. Choose a normal action-bar key or an empty key." end
   if e.expectedSlots[at]==nil then e.expectedSlots[at]=K.NativeBars:ReadSlot(at) or false end
   if e.expectedKeys[key]==nil then e.expectedKeys[key]=GetBindingAction(key) or "" end
+  if e.expectedRoutes[key]==nil then e.expectedRoutes[key]=route end
+  if live.actionRoute and e.expectedRoutes[live.actionRoute.key]==nil then e.expectedRoutes[live.actionRoute.key]=K.Copy(live.actionRoute) end
   if data.body then data.content={kind="macro",name=K.Macros:Name(data.body),body=data.body} end
   e.slots[at]=data
  else
   if data.body then data.command="MACRO "..K.Macros:Name(data.body) end
-  self:StageKey(key,data.command,data)
+  local ok,why=self:StageKey(key,data.command,data); if not ok then return false,why end
  end
  return true
 end
@@ -548,7 +609,7 @@ function C:EditingView()
   commands[key]=command or entry and entry.pending and (entry.previewCommand or "Reserved action") or nil
  end
  for key,command in pairs(commands) do
-  local a=self:Describe(command,key,plan.actionPage,plan.actionPageType)
+  local a=self:Describe(command,key,plan.actionPage,plan.actionPageType,nil,e and e.keyRoutes and e.keyRoutes[key])
   local staged=e and a.liveSlot and e.slots[a.liveSlot]
   local prior=a.liveSlot and saved.slots[a.liveSlot]
   local entry=staged or e and e.entries and e.entries[key]
@@ -559,10 +620,12 @@ function C:EditingView()
   end
   if staged then
    local preview=self:Describe(staged.previewCommand or staged.command or "Reserved action",key,plan.actionPage,plan.actionPageType)
-   preview.liveSlot=a.liveSlot; preview.nativeSlot=a.liveSlot; preview.command=command; a=preview
+   preview.liveSlot=a.liveSlot; preview.nativeSlot=a.liveSlot; preview.command=command; preview.liveCommand=command
+   preview.actionRoute=a.actionRoute; preview.effectiveCommand=a.effectiveCommand; preview.actionBarProvider=a.actionBarProvider
+   preview.actionBarError=a.actionBarError; a=preview
   end
   self:Annotate(a,entry); if entry and entry.pending and not a.liveSlot then a.command=false end
-  a.readOnly=false; a.current=true
+  a.readOnly=a.actionBarError~=nil; a.current=true
   plan.actions[#plan.actions+1]=a; plan.byID[a.id]=a; plan.byKey[key]=a
  end
  table.sort(plan.actions,function(a,b) return a.key<b.key end)

@@ -208,7 +208,7 @@ end
 
 function Tests.current_edit_temporary_slot_outside_backup_is_not_mutated()
  local k=currentMage(); Mock.bindings.F='EXTRAACTIONBUTTON1'
- ExtraActionButton1={action=201,GetAttribute=function() return 201 end}
+ ExtraActionButton1={action=201,GetAttribute=function(_,name) if name=="type" then return "action" elseif name=="action" then return 201 end end}
  k.CurrentBindings:Invalidate()
  local ok,why=k.CurrentBindings:StageEntry({spellID=116,label='Frostbolt'},'F')
  assert(not ok and why:find('temporary') and not k.CurrentBindings:HasEdits() and #Mock.writes==0)

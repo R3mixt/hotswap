@@ -1,6 +1,6 @@
 local addonName, K = ...
 _G.KeybindOptimizer = K
-K.name, K.version = addonName or "KeybindOptimizer", "1.0.2"
+K.name, K.version = addonName or "KeybindOptimizer", "1.0.3"
 K.defaults = {
     wheel = true, middle = true, ctrl = true,
     mouseButtons = { BUTTON4 = true, BUTTON5 = true },
@@ -380,7 +380,7 @@ if CreateFrame then
     SLASH_KEYBINDOPTIMIZER1="/hotswap"
     SLASH_KEYBINDOPTIMIZER2="/kbo"
     SLASH_KEYBINDOPTIMIZER3="/keybindoptimizer"
-    SlashCmdList=SlashCmdList or {}
+    -- Blizzard owns this shared registry; reassigning its global taints other addons' slash commands.
     SlashCmdList.KEYBINDOPTIMIZER=function(command)
         command=(command or ""):lower()
         if command=="restore" or command=="disable" then local _,message=K:Restore(); K:Print(message)

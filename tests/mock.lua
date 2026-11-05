@@ -109,6 +109,9 @@ Constants={MacroConsts={MAX_ACCOUNT_MACROS=120,MAX_CHARACTER_MACROS=30}}
 local FrameMethods={}
 local FrameMeta={__index=function(t,k)
   if FrameMethods[k] then return FrameMethods[k] end
+  -- GetAction is a LibActionButton extension, not a native Frame API. Fixtures
+  -- that model that library must provide its real state-returning method.
+  if k=="GetAction" then return nil end
   if k:match("^Set") or k:match("^Get") or k:match("^Enable") or k:match("^Disable") or k:match("^Register") or k:match("^Unregister") or k:match("^Clear") or k:match("^Start") or k:match("^Stop") or k:match("^Add") or k:match("^Highlight") or k:match("^Lock") or k:match("^Unlock") then return function() end end
 end}
 function CreateFrame(kind,name,parent,template)
@@ -344,6 +347,7 @@ function GetTime() return Mock.now end
 function date() return "2026-10-31" end
 function time() return 1793462400 end
 function GetCVar(k) return Mock.cvars[k] end
+function IsMouseoverCastSupported() return true end
 function GetCVarBool(k) return Mock.cvars[k]=="1" end
 function SetCVar(k,v) Mock:Write("cvar",k,v); Mock.cvars[k]=tostring(v); return true end
 C_CVar={GetCVar=GetCVar,GetCVarBool=GetCVarBool,SetCVar=SetCVar,GetCVarInfo=function(k) return Mock.cvars[k],"0",false,false,false,false,false end}

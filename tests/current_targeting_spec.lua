@@ -20,12 +20,12 @@ function Tests.current_targeting_direct_wheel_is_staged_and_preserves_other_cont
  assert(k.CurrentBindings:SetTargetMode(action,'mouseover'))
  local staged=k.CurrentBindings:EditingView().byKey.MOUSEWHEELUP
  assert(staged.targetMode=='mouseover' and staged.targeting=='help' and staged.kind=='spell')
- assert(staged.currentEntry.body:find('[mod:alt,@player][@mouseover,help,nodead][help,nodead]',1,true))
+ assert(staged.currentEntry.body:find('[mod:alt,@player][@mouseover,help,nodead][help,nodead][@player]',1,true))
  assert(#Mock.writes==0 and k:Export()==preset and GetBindingAction('MOUSEWHEELUP')=='SPELL Rejuvenation')
  applyCurrent(k)
  local command=GetBindingAction('MOUSEWHEELUP'); assert(command:match('^MACRO KBO_'))
  local _,_,body=GetMacroInfo(GetMacroIndexByName(command:sub(7)))
- assert(body:find('/cast [mod:alt,@player][@mouseover,help,nodead][help,nodead] Rejuvenation',1,true))
+ assert(body:find('/cast [mod:alt,@player][@mouseover,help,nodead][help,nodead][@player] Rejuvenation',1,true))
  assert(GetBindingAction('MOUSEWHEELDOWN')=='ACTIONBUTTON1' and GetBindingAction('F')=='OPENCHAT')
  assert(Mock.actions[40][2]==768 and not k.db.enabled and k:Export()==preset)
  for name,value in pairs(original) do assert(Mock.modified[name]==value) end
@@ -141,4 +141,30 @@ function Tests.current_targeting_failure_restores_native_slot_and_keeps_draft()
  assert(k.Engine:ApplyCurrentEdits()=='pending'); assert(not Mock:Drain())
  assert(Mock.actions[1][1]=='spell' and Mock.actions[1][2]==339 and GetBindingAction('F')=='OPENCHAT')
  assert(k.CurrentBindings:HasEdits() and k.CurrentBindings:EditingView().byKey.MOUSEWHEELDOWN.targetMode=='mouseover')
+end
+function Tests.current_targeting_saved_mouseover_refresh_adds_final_self_fallback()
+ local k=targetingSetup()
+ local body='#showtooltip Rejuvenation\n/cast [mod:alt,@player][@mouseover,help,nodead][help,nodead] Rejuvenation'
+ local name=k.Macros:Name(body); CreateMacro(name,1,body,true); k.db.ownedMacros[name]=body
+ Mock.bindings.MOUSEWHEELUP='MACRO '..name
+ k.db.currentLayout={keys={MOUSEWHEELUP={spellID=774,name='Rejuvenation',label='Rejuvenation',targetMode='mouseover',targeting='help',
+  body=body,macroName=name,command='MACRO '..name,content={kind='macro',name=name,body=body}}},slots={}}
+ k.CurrentBindings:Invalidate(); k.CurrentBindings:QueueRefresh(); Mock:Advance(0.1); assert(Mock:Drain())
+ local updated=GetBindingAction('MOUSEWHEELUP'):match('^MACRO (.+)$'); assert(updated and updated~=name)
+ local _,_,replacement=GetMacroInfo(GetMacroIndexByName(updated))
+ assert(replacement:find('[mod:alt,@player][@mouseover,help,nodead][help,nodead][@player] Rejuvenation',1,true))
+ assert(GetBindingAction('MOUSEWHEELDOWN')=='ACTIONBUTTON1' and GetBindingAction('F')=='OPENCHAT')
+end
+function Tests.current_targeting_fallback_refresh_preserves_manually_changed_macro()
+ local k=targetingSetup()
+ local body='#showtooltip Rejuvenation\n/cast [mod:alt,@player][@mouseover,help,nodead][help,nodead] Rejuvenation'
+ local name=k.Macros:Name(body); CreateMacro(name,1,body,true); k.db.ownedMacros[name]=body
+ Mock.bindings.MOUSEWHEELUP='MACRO '..name
+ k.db.currentLayout={keys={MOUSEWHEELUP={spellID=774,name='Rejuvenation',label='Rejuvenation',targetMode='mouseover',
+  body=body,macroName=name,command='MACRO '..name,content={kind='macro',name=name,body=body}}},slots={}}
+ EditMacro(GetMacroIndexByName(name),name,1,'/say keep my changes'); Mock:ResetWrites()
+ k.CurrentBindings:Invalidate(); k.CurrentBindings:QueueRefresh(); Mock:Advance(0.1)
+ assert(not k.Engine.busy and #Mock.writes==0 and k.db.currentLayout.keys.MOUSEWHEELUP.detached)
+ local _,_,personal=GetMacroInfo(GetMacroIndexByName(name))
+ assert(personal=='/say keep my changes' and GetBindingAction('MOUSEWHEELUP')=='MACRO '..name)
 end

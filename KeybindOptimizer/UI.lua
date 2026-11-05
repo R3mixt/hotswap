@@ -348,7 +348,7 @@ function UI:UpdateBusyState()
         for _,name in ipairs({"Setup","Presets","Bindings","Items","Safety","Share","Settings"}) do
             local page=pages[name]
             if page then
-                for _,control in ipairs({"recommendations","source","nativeBars","new","duplicate","rename","delete","usePreset","hotkey","gearCapture","gearEquip","restoreSelected","original","import","opacity","scale","resetAppearance","diagnostics","viewLog","clearLog","hoverBind"}) do disable(page[control]) end
+                for _,control in ipairs({"recommendations","source","nativeBars","new","duplicate","rename","delete","usePreset","hotkey","gearCapture","gearEquip","restoreSelected","original","import","opacity","scale","resetAppearance","diagnostics","viewLog","clearLog","hoverBind","autoMouseover"}) do disable(page[control]) end
                 if page.detail then for _,control in ipairs({"rebind","change","reset","clearKey","talents"}) do disable(page.detail[control]) end end
                 for _,row in ipairs(page.checks or {}) do disable(row); disable(row.checkbox) end
                 for _,row in ipairs(page.list and page.list.rows or {}) do disable(row); disable(row.key) end
@@ -745,6 +745,7 @@ function UI:CaptureInput(key)
 end
 function UI:BeginActionCapture(action)
     if not action then return end
+    if action.actionBarError then self:Notice(action.actionBarError,true); return end
     if self.bindingSource=="recommendation" then self:Notice("Save this recommendation before editing."); return end
     if action.preserved then self:Notice("This control is protected in Settings. Its current game binding is kept."); return end
     if action.presetID and K.Presets and K.Presets.FindID then
@@ -767,7 +768,7 @@ function UI:ValidateBindingSelection(action,snapshot)
     K.CurrentBindings:Build()
     local current=K.CurrentBindings:EditingView().byKey[action.key]
     local same=self.bindingSource=="current" and current~=nil
-    for _,field in ipairs({"command","liveSlot","spellID","itemID","targetMode","macroFingerprint"}) do
+    for _,field in ipairs({"command","effectiveCommand","actionBarError","liveSlot","spellID","itemID","targetMode","macroFingerprint"}) do
         if not current or current[field]~=action[field] then same=false end
     end
     if snapshot and ((GetBindingAction(action.key) or "")~=snapshot.command or (current and current.liveSlot)~=snapshot.slot
@@ -819,11 +820,13 @@ function UI:OpenBindingMenu(action)
     local f=self.bindingMenu
     f.selection=self:BindingSelectionSnapshot(action)
     f.action=action; f.title:SetText(action.label or action.spellName or action.id)
-    f.icon:SetTexture(action.displayIcon or action.icon or "Interface\\Icons\\INV_Misc_QuestionMark"); f.key:SetText(keyName(action.key).."  /  "..(self.bindingSource=="current" and "Current bindings" or "Preset draft"))
+    f.icon:SetTexture(action.displayIcon or action.icon or "Interface\\Icons\\INV_Misc_QuestionMark")
+    local provider=action.actionBarProvider and action.actionBarProvider~="Blizzard" and action.actionBarProvider
+    f.key:SetText(keyName(action.key).."  /  "..(self.bindingSource=="current" and "Current bindings" or "Preset draft")..(provider and "  /  "..provider or ""))
     f.change.text:SetText((action.spellID or action.spellName) and "Change spell..." or "Change action...")
     f.changeHint:SetText("Keep "..keyName(action.key).."; choose a different spell or action.")
-    f.note:SetText(self.bindingSource=="current" and "Edits are staged until you choose Apply changes." or "Edits are staged until you choose Apply & save.")
-    local editable=not action.preserved
+    f.note:SetText(action.actionBarError and "Inspect only. This binding must be edited in its action-bar addon." or self.bindingSource=="current" and "Edits are staged until you choose Apply changes." or "Edits are staged until you choose Apply & save.")
+    local editable=not action.preserved and not action.actionBarError
     f.change:SetEnabled(editable and not action.presetName and action.key~=nil)
     f.rebind:SetEnabled(editable); f.clear:SetEnabled(editable)
     f.clear.text:SetText(self.bindingSource=="current" and "Clear key" or "Reset key")
@@ -831,6 +834,7 @@ function UI:OpenBindingMenu(action)
     self:BeginModal(f,"KeybindOptimizerBindingMenu"); f:Show()
 end
 function UI:BeginCapture(mode, action)
+    if mode=="key" and action and action.actionBarError then self:Notice(action.actionBarError,true); return end
     if mode~="mouse" and mode~="preset" and self.bindingSource=="recommendation" then
         self:Notice("Choose an editable preset draft before rebinding."); return
     end
@@ -1419,6 +1423,8 @@ function UI:RenderKeyboard()
         elseif #detail == 0 then detail[1]=self.bindingSource=="draft" and "Unassigned. Click to choose an action." or "Unassigned in this view." end
         if self.bindingSource=="recommendation" then detail[#detail+1]="Read-only. Choose Preset draft to edit, or save a recommendation as a new preset." end
         if target and not hidden then detail[#detail+1]="Targeting: "..target end
+        if a and a.actionBarProvider and a.actionBarProvider~="Blizzard" then detail[#detail+1]="Action bar: "..a.actionBarProvider end
+        if a and a.actionBarError then detail[#detail+1]=a.actionBarError end
         if a and a.preserved then detail[#detail+1]="Protected in Settings. Current game binding is kept." end
         tooltip(cap, keyName(full), table.concat(detail,"\n"), not hidden and a and (a.displaySpellID or a.spellID), cap.locked and status or nil,a and a.itemID)
     end
@@ -1633,6 +1639,15 @@ function UI:BuildBindings(page)
     local followLabel=label(page.follow,"Follow form",10,C.text); followLabel:SetPoint("LEFT",26,0); followLabel:SetWidth(80)
     page.follow:SetScript("OnClick",function(self) UI:SetFollowForm(self:GetChecked()) end)
     tooltip(page.follow,"Follow your form","Keep the preview on your current action page. Turn this off, or choose a page, to inspect another form without shifting.")
+    page.autoMouseover=CreateFrame("CheckButton",nil,page,"UICheckButtonTemplate")
+    page.autoMouseover:SetSize(24,24); page.autoMouseover:SetPoint("TOPLEFT",-3,-38)
+    if page.autoMouseover.text and page.autoMouseover.text.Hide then page.autoMouseover.text:Hide() end
+    page.autoMouseoverLabel=label(page.autoMouseover,"Auto mouseover all spells",12,C.text)
+    page.autoMouseoverLabel:SetPoint("LEFT",29,0); page.autoMouseoverLabel:SetWidth(250)
+    page.autoMouseover:SetScript("OnClick",function(self)
+        UI:Call(K.CurrentBindings,"SetNativeMouseover",self:GetChecked() and true or false)
+        UI.currentBindingPlan=nil; UI:Refresh()
+    end)
     page.layers = {}
     local x = 292
     for _, layer in ipairs({{"","No mod",60},{"SHIFT-","Shift",46},{"CTRL-","Ctrl",42},{"CTRL-SHIFT-","Ctrl+Shift",77},{"ALT-","Alt",43}}) do
@@ -1677,6 +1692,7 @@ function UI:BuildBindings(page)
     detail.change:SetEnabled(false)
     detail.reset = button(detail, "Reset key", 94, function()
         if not UI.selectedAction then return end
+        if UI.selectedAction.actionBarError then UI:Notice(UI.selectedAction.actionBarError,true); return end
         if UI.bindingSource=="current" then
             UI:Confirm("Clear this key?","Remove this key assignment from your Current layout. Other keys and the action-bar slot stay unchanged until you apply your edits.",function()
                 UI:Call(K.CurrentBindings,"ClearKey",UI.selectedAction); UI.currentBindingPlan=nil; UI:Refresh()
@@ -1703,6 +1719,14 @@ function UI:RenderBindings(reusePageCache)
     if not reusePageCache or not self.availableActionPages then self:CacheActionPages() end
     local current=self.bindingSource=="current"
     local editable=self.bindingSource~="recommendation"
+    page.form:SetShown(not current); page.follow:SetShown(not current); page.autoMouseover:SetShown(current)
+    if current then
+        local casting=K.CurrentBindings:GetNativeMouseoverState()
+        page.autoMouseover:SetChecked(casting.enabled)
+        page.autoMouseover:SetEnabled(casting.supported and not (InCombatLockdown and InCombatLockdown()))
+        tooltip(page.autoMouseover,"Auto mouseover all spells",casting.supported and
+            "Use WoW's native mouseover casting for compatible action-bar spell buttons, with current-target and automatic self-cast fallback. Apply changes saves this setting; Discard edits cancels it.\n\nMacros keep their own targeting. Some bar addons have a separate mouseover option. WoW's native mouseover can take priority over Alt-self." or casting.reason)
+    end
     page.source.text:SetText(current and "Current bindings" or editable and "Preset draft" or "Recommendations")
     local readErrors={}; for _,entry in ipairs((self.bindingPlan or {}).errors or {}) do readErrors[#readErrors+1]=message(entry) end
     tooltip(page.source,current and "Current character bindings" or "Binding view",current and #readErrors>0 and table.concat(readErrors,"\n") or "Current bindings reads the live character. Preset draft is editable. Recommendations are an unsaved preview until you choose Save as new preset.")
@@ -1812,23 +1836,28 @@ function UI:BindingDetail(a)
     d.title:SetText((a.label or a.id) .. "  /  " .. keyName(a.key or "Unbound"))
     local _,target=self:TargetDescription(a)
     local parts = {a.category or "Action",target or "Default behavior"}
+    if a.actionBarProvider and a.actionBarProvider~="Blizzard" then table.insert(parts,1,a.actionBarProvider) end
     local state,status=self:SpellAvailability(a)
     if state and state~="ready" then parts[#parts+1]=status.."; key reserved"
     elseif a.known==false then parts[#parts+1]=a.itemAvailability or "Unavailable" end
     if a.preserved then parts[#parts+1]="Protected in Settings" end
     if a.previousBinding and a.previousBinding ~= "" then parts[#parts+1] = "replaces " .. bindingLabel(a.previousBinding) end
-    d.desc:SetText(table.concat(parts, "  |  "))
+    d.desc:SetText(a.actionBarError or table.concat(parts, "  |  "))
     local linked=self:LinkedBindings(a)
     local pinned=false
     for _,action in ipairs(linked) do if (settings().bindingOverrides or {})[action.id]~=nil then pinned=true; break end end
-    local editable=self.bindingSource~="recommendation"
+    local editable=self.bindingSource~="recommendation" and not a.actionBarError
     d.reset:SetEnabled(editable and not a.preserved and (a.current or a.presetName~=nil or pinned))
     d.note:SetText(a.current and "Apply changes installs only your edits. Drag from the spellbook to replace an action." or not editable and (self.bindingSource=="current" and "Current character bindings are read-only. Choose Preset draft to edit." or "Recommendation preview only. Save a preset to edit this layout.") or #linked>1 and "This action-bar position changes in every form." or "Apply & save installs your changes.")
+    if a.actionBarError then d.note:SetText("Inspect only. Use your action-bar addon's settings to edit this binding.") end
     d.reset.text:SetText((a.current or a.presetName) and "Clear key" or "Reset key")
     d.rebind:SetEnabled(editable and not a.preserved)
     d.change:SetEnabled(editable and not a.preserved and a.key~=nil and (a.current or a.kind~="system" and not a.presetName))
     d.talents:SetEnabled(not a.current and editable and self.CanEditTalentChoices and self:CanEditTalentChoices(a) or false)
-    tooltip(d, a.label or a.id, self:MacroDetail(a),a.displaySpellID or a.spellID,state and state~="ready" and status,a.itemID)
+    local detailText=self:MacroDetail(a)
+    if a.actionBarProvider and a.actionBarProvider~="Blizzard" then detailText="Action bar: "..a.actionBarProvider.."\n"..detailText end
+    if a.actionBarError then detailText=a.actionBarError.."\n"..detailText end
+    tooltip(d, a.label or a.id, detailText,a.displaySpellID or a.spellID,state and state~="ready" and status,a.itemID)
     d:EnableMouse(true)
 end
 

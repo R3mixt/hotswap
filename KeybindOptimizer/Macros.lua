@@ -98,7 +98,11 @@ function K.Macros:Build(action,settings)
                 elseif mode=="focus" then cond="["..guard.."@focus,"..validity.."]"
                 elseif mode=="self" then cond="[@player]"
                 elseif mode=="target" then cond="["..guard..validity.."]" end
-                if target=="help" and not action.noSelf then cond="[mod:alt,@player]"..cond end
+                if target=="help" and not action.noSelf then
+                    -- Explicit Mouseover heals keep a friendly target fallback,
+                    -- then heal the player when neither unit is available.
+                    cond="[mod:alt,@player]"..cond..(mode=="mouseover" and "[@player]" or "")
+                end
             end
         end
         if cancel and settings.cancelForUtility and not action.requiresForm and K.API:GetFlavor(settings)=="era" then

@@ -9,6 +9,27 @@ function A:GetFlavor(settings)
     if WOW_PROJECT_ID and WOW_PROJECT_MAINLINE and WOW_PROJECT_ID==WOW_PROJECT_MAINLINE then return "retail" end
     return "era"
 end
+function A:GetNativeMouseoverState()
+    local state={supported=false,enabled=false,autoSelfCast=false}
+    local getter=C_CVar and C_CVar.GetCVar or GetCVar
+    local setter=C_CVar and C_CVar.SetCVar or SetCVar
+    local available,supported=false,false
+    if type(IsMouseoverCastSupported)=="function" then available,supported=pcall(IsMouseoverCastSupported) end
+    if not available or not supported or type(getter)~="function" or type(setter)~="function"
+        or type(GetModifiedClick)~="function" or type(SetModifiedClick)~="function" then
+        state.reason="This client does not expose supported built-in mouseover casting."; return state
+    end
+    local ok,enabled,modifier,selfCast=pcall(function()
+        return getter("enableMouseoverCast"),GetModifiedClick("MOUSEOVERCAST"),getter("autoSelfCast")
+    end)
+    if not ok or (enabled~="0" and enabled~="1") or type(modifier)~="string" or modifier==""
+        or (selfCast~="0" and selfCast~="1") then
+        state.reason="The client's mouseover casting settings are not readable yet."; return state
+    end
+    state.supported=true; state.enableMouseoverCast=enabled; state.modifier=modifier; state.autoSelfCastValue=selfCast
+    state.enabled=enabled=="1" and modifier=="NONE"; state.autoSelfCast=selfCast=="1"
+    return state
+end
 function A:SpellInfo(id)
     if id==nil then return end
     if C_Spell and C_Spell.GetSpellInfo then

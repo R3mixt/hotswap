@@ -1,5 +1,14 @@
 # Changelog
 
+## 1.0.3 - 2026-11-05
+
+- Add **Auto mouseover all spells** to Current bindings on clients with native mouseover support. Apply saves mouseover without a modifier and enables automatic self-casting; Discard and backups cover the setting. Compatible spell buttons use native targeting, while macros and addon-specific targeting keep their own rules.
+- Explicit Mouseover for self-eligible friendly spells now falls back from a valid mouseover to a friendly current target, then to yourself when neither is valid. Hostile, resurrection, no-self spells and item targeting retain their existing behavior.
+- Fix RestedXP target macros failing at target marking: register only Hot Swap's own slash command instead of reassigning Blizzard's shared SlashCmdList registry. Confirmed by a local taint trace and the user after reload on Forever.
+- Follow supported Bartender4, ElvUI and Dominos live button/override mappings in Current, preserving original binding commands and addon profiles.
+- Reject changed or unsupported action-bar destinations before editing native slots. Retain backed-up Current edits, targeting and ordinary spell replacement.
+- Add adapter and slash-registry regressions. Action-bar-addon live acceptance remains pending.
+
 ## 1.0.2 - 2026-11-05
 
 - Open a readable, opaque action menu when clicking a keyboard, wheel, mouse or list binding. Choose targeting, change the spell, or explicitly record a new key.

@@ -104,12 +104,15 @@ cases.append(('Bindings','hover-bind','caster',''))
 cases.append(('Bindings','save-preset','caster',''))
 cases.extend([('Bindings','bindings-current',None,''),('Bindings','current-hover',None,''),('Bindings','bindings-recommendation','caster','')])
 cases.extend([('Bindings','binding-menu',None,''),('Bindings','binding-targeting',None,''),('Bindings','binding-rebind',None,''),('Bindings','binding-replace',None,'')])
+cases.append(('Bindings','bindings-native-mouseover',None,''))
 for page,filename,form,layer in cases:
     lua.execute('K.UI:CloseMenu(); K.UI:EndCapture(); for _,name in ipairs({"nativeBarsDialog","diagnosticLogDialog","operationErrorDialog","talentDialog","saveDialog","bindingMenu","replacementPicker"}) do local f=K.UI[name]; if f then f:Hide() end end')
     if filename.startswith('settings-') or filename.startswith('talent-'):
         lua.execute('K.UI:ClearOperationError()')
     lua.globals().K.UI.libraryOpen=filename.startswith('library-') or filename=='bindings-current'
-    if filename.startswith('binding-'):
+    if filename == 'bindings-native-mouseover':
+        lua.execute('Mock.build="1.60.1"; K:GetSettings().flavor="forever"; IsMouseoverCastSupported=function() return true end; Mock.cvars.enableMouseoverCast="1"; Mock.cvars.autoSelfCast="1"; Mock.modified.MOUSEOVERCAST="NONE"; K.CurrentBindings:Discard(); K.CurrentBindings:Invalidate(); K.UI:ClearOperationError(); K.UI:Open(); K.UI.libraryOpen=false')
+    elif filename.startswith('binding-'):
         lua.execute('Mock.bindings["MOUSEWHEELUP"]="ACTIONBUTTON1"; Mock.actions[1]={"spell",774}; Mock.bindings["MOUSEWHEELDOWN"]="ACTIONBUTTON2"; Mock.actions[2]={"spell",8936}; K.CurrentBindings:Discard(); K.CurrentBindings:Invalidate(); K.UI:ClearOperationError(); K.UI:Open()')
     elif filename in ('bindings-current','current-hover'):
         lua.execute('Mock.bindings["1"]="ACTIONBUTTON1"; Mock.actions[1]={"spell",5176}; K.UI:ClearOperationError(); K.UI:Open()')

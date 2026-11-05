@@ -1,0 +1,13 @@
+Hot Swap 1.0.3
+
+Add Auto mouseover all spells in Current bindings on clients with native support. Apply changes enables mouseover without a modifier and automatic self-casting. Discard and backups include this setting. Compatible spell buttons use native targeting; macros and addons with separate targeting options keep their own rules.
+
+Fix RestedXP target-macro errors caused by Hot Swap tainting Blizzard's shared slash-command registry. The target-marking fix was confirmed by a local taint trace and the user in Forever after reload.
+
+Improve Current bindings with Bartender4, ElvUI and Dominos: read supported live button and override mappings, preserve original key commands, and reject destinations that change before Apply. Other addons' profiles, paging and overrides remain their own.
+
+Retains 1.0.2's readable action menu and searchable spell replacement. Explicit Mouseover for friendly spells now uses a valid mouseover, then friendly current target, then yourself when the spell permits self-casting. Other targeting modes and item rules are preserved.
+
+Targets Forever 1.60.1 and Classic Era / Hardcore 1.15.9. Action-bar adapters have source review and automated regressions; live addon-specific casting and paging acceptance remains pending. Reload after updating to clear existing taint.
+
+Validation: 583 Lua 5.1 scenarios, 7 packaging checks and 8 publisher checks.

@@ -174,6 +174,9 @@ function UI:TargetDescription(action)
         return nil
     end
     local detail=mode=="mouseover" and "Mouseover, then current target" or targetNames[mode] or mode
+    if mode=="mouseover" and target=="help" and action.kind~="item" and not action.noSelf then
+        detail="Mouseover, then friendly target, then yourself"
+    end
     return ({target="T",mouseover="M",focus="F",self="S",cursor="@"})[mode],detail..(mode~="self" and selfCast or "")
 end
 function UI:RenderCaptureTarget()
@@ -188,21 +191,23 @@ function UI:RenderBindingMenuTarget()
     local f=self.bindingMenu; if not f or not f.action then return end
     local action=f.action
     local modes=self:ActionTargetModes(action)
-    local supported=#modes>1 and not action.preserved
+    local supported=#modes>1 and not action.preserved and not action.actionBarError
     f.targetMode:SetEnabled(supported)
     f.targetMode.text:SetText(targetNames[action.targetMode or "default"] or "Default")
     local _,description=self:TargetDescription(action)
-    if action.preserved then description="This control is protected in Settings."
+    if action.actionBarError then description=action.actionBarError
+    elseif action.preserved then description="This control is protected in Settings."
     elseif not supported then
         description=action.kind=="macroref" and "This macro controls its own targeting. Edit it in WoW's Macros window."
             or "This action has no supported targeting choices. You can still change its spell or key."
     end
     f.targetHint:SetText(description or "Choose who this action affects.")
-    color(f.targetHint,C.muted)
+    color(f.targetHint,action.actionBarError and C.warning or C.muted)
 end
 function UI:OpenTargetMenu(anchor)
     local action=self.bindingMenu and self.bindingMenu:IsShown() and self.bindingMenu.action or self.captureAction
     if not action then return end
+    if action.actionBarError then self:Notice(action.actionBarError,true); return end
     local options={}
     for _,mode in ipairs(self:ActionTargetModes(action)) do options[#options+1]={value=mode,label=targetNames[mode] or mode} end
     self:Menu(anchor,options,action.targetMode or "default",function(mode) UI:SetActionTarget(mode) end)
@@ -239,6 +244,7 @@ end
 local replacementKinds={{value="spells",label="Spells"},{value="items",label="Items"},{value="macros",label="Macros"},{value="game",label="Game controls"},{value="chat",label="Chat controls"},{value="emotes",label="Emotes"}}
 function UI:OpenReplacementPicker(action)
     if not action or not action.key or self.bindingSource=="recommendation" then return end
+    if action.actionBarError then self:Notice(action.actionBarError,true); return end
     if K.Engine and K.Engine.busy then self:UpdateBusyState(); return end
     if InCombatLockdown and InCombatLockdown() then self:Notice("Editing is paused during combat.",true); return end
     if action.preserved then self:Notice("This control is protected in Settings.",true); return end

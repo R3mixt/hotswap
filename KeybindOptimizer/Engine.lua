@@ -220,6 +220,10 @@ local function snapshotSteps(job)
     job.before=snapshot
     for _,key in ipairs({"SELFCAST","FOCUSCAST"}) do snapshot.modified[key]=GetModifiedClick and GetModifiedClick(key) or "NONE" end
     snapshot.cvars.autoSelfCast=getCVar("autoSelfCast")
+    local mouseover=K.API:GetNativeMouseoverState()
+    if mouseover.supported then
+        snapshot.modified.MOUSEOVERCAST=mouseover.modifier; snapshot.cvars.enableMouseoverCast=mouseover.enableMouseoverCast
+    end
     local probes=K.Copy(job.probeKeys or {})
     for key in pairs(job.plan and job.plan.nativeLayout and job.plan.nativeLayout.keys or {}) do probes[key]=true end
     for key in pairs(job.previous and job.previous.appliedPlan and job.previous.appliedPlan.nativeLayout and job.previous.appliedPlan.nativeLayout.keys or {}) do probes[key]=true end
@@ -244,6 +248,15 @@ local function snapshotSteps(job)
             local restored,restoreError=pcall(function()
                 loadBindings(snapshot.bindingSet)
                 loaded=captureBindings(probes)
+                -- Loading a binding set also replaces modified-click settings.
+                -- Restore unsaved live values before any later preflight checks;
+                -- this is a temporary read, so do not save them here.
+                for name,setting in pairs(snapshot.modified) do
+                    if GetModifiedClick and GetModifiedClick(name)~=setting then
+                        if SetModifiedClick then SetModifiedClick(name,setting) end
+                        if GetModifiedClick(name)~=setting then error("Could not restore unsaved modifier "..name.." after backup.") end
+                    end
+                end
             end)
             if not restored then
                 -- Loading the inactive set was itself a state change. If the
@@ -353,6 +366,9 @@ local function restoreSteps(job,snapshot)
     end
     addStep(steps,function() loadBindings(snapshot.bindingSet) end,"Selecting restored binding set",true,true)
     for _,step in ipairs(settingsSteps(snapshot)) do steps[#steps+1]=step end
+    if next(snapshot.modified or {}) then
+        addStep(steps,function() saveBindings(snapshot.bindingSet) end,"Saving restored modifier settings",true,true)
+    end
     addStep(steps,function()
         local expected=activeExpected or snapshot.bindings
         local read={}; local verify=readSteps(read,expected)
@@ -586,9 +602,10 @@ function E:Apply(plan)
     addStep(job.steps,function()
         if plan.settings.preserveGameSettings then return end
         if SetModifiedClick then SetModifiedClick("SELFCAST","ALT"); SetModifiedClick("FOCUSCAST","NONE") end
-        if job.before.cvars.autoSelfCast~=nil then setCVar("autoSelfCast","0") end
+        local preserveAutoSelf=tostring(getCVar("enableMouseoverCast"))=="1"
+        if job.before.cvars.autoSelfCast~=nil and not preserveAutoSelf then setCVar("autoSelfCast","0") end
         if GetModifiedClick and (GetModifiedClick("SELFCAST")~="ALT" or GetModifiedClick("FOCUSCAST")~="NONE") then error("The client rejected self-cast settings.") end
-        if job.before.cvars.autoSelfCast~=nil and tostring(getCVar("autoSelfCast"))~="0" then error("The client rejected automatic self-cast settings.") end
+        if job.before.cvars.autoSelfCast~=nil and not preserveAutoSelf and tostring(getCVar("autoSelfCast"))~="0" then error("The client rejected automatic self-cast settings.") end
     end,"Setting Alt self-cast",true,true)
     addStep(job.steps,function() saveBindings(2); loadBindings(2) end,"Saving character bindings",true,true)
     addStep(job.steps,function()
@@ -618,6 +635,9 @@ function E:ApplyCurrentEdits(refreshEdits)
     local prepared,edits=pcall(K.CurrentBindings.PrepareEdits,K.CurrentBindings,K.Copy(refreshEdits or K.CurrentBindings:Edits()))
     if not prepared then return self:Reject(tostring(edits),"current-edit") end
     local function validate()
+        K.CurrentBindings:ValidateNativeMouseover(edits)
+        if not refreshEdits then K.CurrentBindings:ReviewLegacyRoutes(edits) end
+        K.CurrentBindings:ValidateRoutes(edits)
         for key,expected in pairs(edits.expectedKeys) do if (GetBindingAction(key) or "")~=expected then error("Current binding changed on "..key..". Discard pending edits and try again.") end end
         for at,expected in pairs(edits.expectedSlots) do if not K.NativeBars:SameContent(K.NativeBars:ReadSlot(at),expected or nil) then error("Current action slot changed: "..at..". Discard pending edits and try again.") end end
     end
@@ -670,18 +690,41 @@ function E:ApplyCurrentEdits(refreshEdits)
     end,"Preparing current actions",true,false)
     for at,entry in pairs(edits.slots) do
         local index,change=at,entry
-        addStep(job.steps,function() K.NativeBars:WriteSlot(index,change.content) end,"Editing current action slots",false,true)
+        addStep(job.steps,function()
+            K.CurrentBindings:ValidateRoutes(edits)
+            K.NativeBars:WriteSlot(index,change.content)
+        end,"Editing current action slots",false,true)
     end
+    if next(edits.keys) or next(edits.slots) then
     addStep(job.steps,function()
+        K.CurrentBindings:ValidateRoutes(edits)
         local expected=captureBindings(edits.expectedKeys)
         job.currentBindings=K.Copy(expected)
         for key,command in pairs(edits.keys) do expected[key]=command or nil end
         job.expected=expected; insertSteps(job,bindingSteps(job,expected))
     end,"Editing current keys",true,false)
     addStep(job.steps,function() saveBindings(2); loadBindings(2) end,"Saving current character bindings",true,true)
+    end
+    if edits.nativeMouseover then
+        addStep(job.steps,function()
+            K.CurrentBindings:ValidateNativeMouseover(edits)
+            if edits.nativeMouseover.enabled then
+                SetModifiedClick("MOUSEOVERCAST","NONE"); setCVar("autoSelfCast","1"); setCVar("enableMouseoverCast","1")
+            else setCVar("enableMouseoverCast","0") end
+            local state=K.API:GetNativeMouseoverState()
+            if not state.supported or state.enableMouseoverCast~=(edits.nativeMouseover.enabled and "1" or "0")
+                or (edits.nativeMouseover.enabled and (state.modifier~="NONE" or not state.autoSelfCast)) then
+                error("The client rejected mouseover casting settings.")
+            end
+            -- Modified-click settings share the active binding-set save path.
+            -- A settings-only change must not switch account/character scope.
+            if edits.nativeMouseover.enabled then saveBindings(GetCurrentBindingSet and GetCurrentBindingSet() or job.before.bindingSet) end
+        end,"Setting mouseover casting",true,true)
+    end
     addStep(job.steps,function()
         for key,command in pairs(edits.keys) do if GetBindingAction(key)~=(command or "") then error("Current binding verification failed: "..key) end end
         for at,entry in pairs(edits.slots) do if not K.NativeBars:SameContent(K.NativeBars:ReadSlot(at),entry.content) then error("Current action verification failed: "..at) end end
+        K.CurrentBindings:VerifyEditedRoutes(edits)
     end,"Verifying current changes",true,false)
     job.commit=function()
         -- Existing installed-plan ownership checks treat these as personal edits.
