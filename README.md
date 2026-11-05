@@ -8,7 +8,7 @@ Hot Swap is a World of Warcraft addon with a visual keyboard editor, spellbook d
 
 [Download on CurseForge](https://www.curseforge.com/wow/addons/hot-swap) · [Player guide](KeybindOptimizer/README.md) · [Documentation](docs/README.md) · [Changelog](CHANGELOG.md) · [Report a bug](https://github.com/R3mixt/hotswap/issues)
 
-Version **1.0.0** is prepared for Classic Era / Hardcore user testing. Forever is a development target. Automated tests pass; live-client protected input, casting and third-party action-bar compatibility still need verification. The CurseForge download may lag the source version while a file is awaiting publication.
+Version **1.0.1** fixes macro-related Apply failures on Forever and targets Forever 1.60.1 and Classic Era / Hardcore 1.15.9. Automated tests reproduce the reported failure and verify the fix; live-client protected input, casting and third-party action-bar compatibility still need verification. The CurseForge download may lag the source version while a file is awaiting publication.
 
 ## What it does
 
@@ -47,7 +47,7 @@ To import a downloaded `.hotswap` profile, open it in a text editor and paste it
 
 ## Compatibility and limits
 
-Classic Era / Hardcore is the current testing focus. Retail and other Classic expansions are not supported release targets. Bartender/Dominos integration is best-effort: Hot Swap recognizes supported live action buttons but does not rewrite another addon's paging or override configuration.
+Forever and Classic Era / Hardcore are the release targets. Retail and other Classic expansions are not supported release targets. Bartender/Dominos integration is best-effort: Hot Swap recognizes supported live action buttons but does not rewrite another addon's paging or override configuration.
 
 Character macro capacity still applies. New presets leave optional utility form cancellation off to conserve slots; existing preferences are preserved. Protected setup changes wait for out-of-combat execution. The addon does not automate combat decisions or casts.
 
@@ -65,7 +65,7 @@ python tests/run_tests.py
 python package.py
 ```
 
-The 1.0 release passed **494 Lua 5.1 scenarios** and **7 packaging checks**. The Lua tests execute the addon modules against simulated WoW APIs. `package.py` reruns validation, checks the TOC and archive layout, and writes install/source ZIPs and SHA-256 files into `dist/`. GitHub Actions performs the same build on pushes and pull requests.
+The 1.0.1 release includes **505 Lua 5.1 scenarios**, **7 packaging checks** and **8 publisher checks**. The Lua tests execute the addon modules against simulated WoW APIs. `package.py` reruns validation, checks the TOC and archive layout, and writes install/source ZIPs and SHA-256 files into `dist/`. GitHub Actions performs the same build on pushes and pull requests.
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) for the module map, change workflow and useful bug-report details. [CurseForge publishing](docs/curseforge.md) explains release sync and its one-time secret setup.
 

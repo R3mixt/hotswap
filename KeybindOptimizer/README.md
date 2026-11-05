@@ -1,15 +1,15 @@
-# Hot Swap 1.0.0
+# Hot Swap 1.0.1
 
 A visual editor for your current World of Warcraft keybindings, native action slots, and saved presets.
 
-Version 1.0 opens Current with the spellbook, supports native spellbook drops, local replacement/swap confirmation switches, safe additive imports and backed-up default keybind restoration. New generated macros are character-specific; ordinary future spells reserve native positions without macros. This build is prepared for Classic Era user testing. Automated Lua tests and geometry review do not certify live protected execution.
+Version 1.0.1 fixes macro-related Apply failures on Forever, including Hunter Auto Shot. Version 1.0 opens Current with the spellbook, supports native spellbook drops, local replacement/swap confirmation switches, safe additive imports and backed-up default keybind restoration. New generated macros are character-specific; ordinary future spells reserve native positions without macros. This build targets Forever and Classic Era / Hardcore. Automated Lua tests and geometry review do not certify live protected execution.
 
 See the packaged `docs/behavior.md` for the complete behavior contract and user acceptance sequence.
 
 ## Install and open
 
 1. Extract the `KeybindOptimizer` folder into the game's `Interface/AddOns` folder. The `.toc` file must be directly inside `Interface/AddOns/KeybindOptimizer/`.
-2. Use the client folder you intend to test: `_classic_era_` for Era / Hardcore or the Forever client folder when available. Do not install into a different client's AddOns folder.
+2. Use the client folder you intend to test: `_classic_era_` for Era / Hardcore or `_forever_` for Forever. Do not install into a different client's AddOns folder.
 3. Restart WoW if it was running while a new addon folder was installed. Enable Hot Swap at character selection.
 4. Open **Hot Swap** from the Escape menu or **Options → AddOns → Hot Swap → Open Hot Swap**. `/hotswap` also works. Select the client automatically or explicitly, record your side buttons, and choose whether to use the wheel and middle click.
 5. Open **Bindings** to inspect your actual controls. On **Presets**, choose **Preview recommendations** to inspect a proposed layout without saving or applying it. Choose **Save preset...**, then **Overwrite selected** or **Save as new**. Edit that saved draft in **Bindings**, **Setup**, and **Items**, then choose **Apply & save** outside combat.
@@ -172,7 +172,7 @@ Item spell information identifies candidates, not tactical suitability. Confirm 
 
 ## Compatibility and evidence
 
-The local installed targets used for planning were Forever `1.60.1.70707` and Era `1.15.9.70576`. The final release targets Forever; Era / Hardcore is the current test client. Retail and other Classic expansions are not supported release targets.
+The local installed targets used for planning were Forever `1.60.1.70707` and Era `1.15.9.70576`. Version 1.0.1 targets Forever 1.60.1 and Classic Era / Hardcore 1.15.9; live-client acceptance remains pending. Retail and other Classic expansions are not supported release targets.
 
 See `docs/research.md` for player-source evidence and version-specific decisions, `docs/requirements.md` for the implemented requirement map, and `docs/compatibility.md` for tests and required live-client checks.
 

@@ -40,7 +40,7 @@ class PublisherTests(unittest.TestCase):
         project, archive, metadata = publisher.prepare(self.root, "beta", "v" + self.version)
         self.assertEqual(project, 1779519)
         self.assertEqual(archive, self.archive)
-        self.assertEqual(metadata["gameVersionNames"], ["1.15.9"])
+        self.assertEqual(metadata["gameVersionNames"], ["1.60.1", "1.15.9"])
         self.assertEqual(metadata["releaseType"], "beta")
         self.assertEqual(metadata["changelog"], "Release notes")
 

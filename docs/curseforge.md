@@ -19,7 +19,7 @@ This integration uploads files. It does not synchronize the CurseForge project d
 
 1. Create a publisher token in [CurseForge API tokens](https://authors.curseforge.com/account/api-tokens).
 2. In [GitHub Actions secrets](https://github.com/R3mixt/hotswap/settings/secrets/actions), create **CURSEFORGE_API_TOKEN** and paste the token into its Secret field. Never put it in an issue, commit, workflow text or chat.
-3. Check [publishing/curseforge.json](../publishing/curseforge.json). It targets project 1779519 and Classic Era **1.15.9**. Add other game version names only after checking the client and CurseForge support. Forever is not automatically advertised by this publisher.
+3. Check [publishing/curseforge.json](../publishing/curseforge.json). Version 1.0.1 targets project 1779519, Forever **1.60.1** and Classic Era / Hardcore **1.15.9**. These version names match the TOC and are offered by CurseForge. Add other game version names only after checking the client and CurseForge support. Live-client acceptance remains a separate check.
 4. Enable GitHub Actions for the repository if GitHub prompts you. The workflow needs only read access to repository contents; CurseForge upload authorization comes from the dedicated secret.
 
 The repository owner reported completing step 2 on 2026-11-02. A successful first publishing run is still needed to establish token validity and project upload permission.

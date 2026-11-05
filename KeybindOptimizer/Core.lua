@@ -1,6 +1,6 @@
 local addonName, K = ...
 _G.KeybindOptimizer = K
-K.name, K.version = addonName or "KeybindOptimizer", "1.0.0"
+K.name, K.version = addonName or "KeybindOptimizer", "1.0.1"
 K.defaults = {
     wheel = true, middle = true, ctrl = true,
     mouseButtons = { BUTTON4 = true, BUTTON5 = true },

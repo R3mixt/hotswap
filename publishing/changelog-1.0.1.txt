@@ -1,0 +1,9 @@
+Hot Swap 1.0.1 - Forever macro Apply fix
+
+- Fix Apply changes and preset application failing at action slot 1 for Hunter Auto Shot and other macros on Forever. Modern clients can report a macro's spell or item ID instead of its macro index; Hot Swap now resolves the actual macro by its native action name.
+- Use the same macro lookup for backups, recovery, Current bindings, friendly labels and unused-macro cleanup.
+- Stop before changing bars when an existing macro cannot be identified safely, including duplicate macro names.
+- Include expected and actual action identities in verification errors.
+- Add 11 regression scenarios for modern macro behavior, recovery and legacy API compatibility.
+
+Targets Forever 1.60.1 and Classic Era / Hardcore 1.15.9. Existing saved presets and backups are retained. Automated tests reproduce the reported failure and verify the fix; live-client acceptance is still pending.
