@@ -240,7 +240,11 @@ local function readSlot(index)
  local kind,id,subtype=GetActionInfo(index)
  if not kind then return false end
  local data={kind=kind,id=id,subtype=subtype}
- if kind=="macro" then data.name,data.icon,data.body=GetMacroInfo(id); if not data.name then return false end end
+ if kind=="macro" then
+  local resolved,name,icon,body=K.API:MacroForAction(index,id,subtype)
+  if resolved then data.id,data.name,data.icon,data.body=resolved,name,icon,body
+  else data.readError=name end -- Occupied but unreadable must never become empty.
+ end
  return data
 end
 local function flyoutLocation(id)
@@ -267,7 +271,7 @@ end
 local function canRestore(data)
  if not data then return true end
  if data.kind=="spell" then return (C_Spell and C_Spell.PickupSpell or PickupSpell)~=nil end
- if data.kind=="macro" then return PickupMacro~=nil end
+ if data.kind=="macro" then return not data.readError and data.name and type(data.body)=="string" and PickupMacro~=nil end
  if data.kind=="item" then return (C_Item and C_Item.PickupItem or PickupItem)~=nil end
  if data.kind=="flyout" then
   local index,_,modern=flyoutLocation(data.id)
@@ -289,7 +293,7 @@ function N:SnapshotSteps(target)
    if GetCursorInfo and GetCursorInfo() then error("Put down the item or action on your cursor before using a preset.") end
    for j=start,math.min(start+11,#all) do
     local at=all[j]; local data=readSlot(at)
-    if not canRestore(data) then error("Cannot safely back up action slot "..at.." ("..tostring(data.kind).."). Move that action off the bar before using a preset.") end
+    if not canRestore(data) then error("Cannot safely back up action slot "..at.." ("..tostring(data.kind).."). "..(data.readError or "Move that action off the bar before using a preset.")) end
     target.actions[at]=data
    end
   end
@@ -302,7 +306,7 @@ end
 local function sameContent(a,b)
  if not a or not b then return not a and not b end
  if a.kind~=b.kind then return false end
- if a.kind=="macro" then return a.name==b.name and a.body==b.body end
+ if a.kind=="macro" then return not a.readError and not b.readError and a.name~=nil and a.body~=nil and a.name==b.name and a.body==b.body end
  return a.id==b.id and (a.kind~="companion" or a.subtype==b.subtype)
 end
 local function macroIndex(data)
@@ -351,7 +355,14 @@ function N:WriteSlot(index,data)
   ClearCursor()
   if not ok then error(why) end
  end
- if not sameContent(readSlot(index),data) then error("Action-bar verification failed at slot "..index) end
+ local actual=readSlot(index)
+ if not sameContent(actual,data) then
+  local function describe(value)
+   if not value then return "empty" end
+   return value.kind.." "..tostring(value.name or value.id)..(value.subtype and " ("..tostring(value.subtype)..")" or "")
+  end
+  error("Action-bar verification failed at slot "..index..": expected "..describe(data)..", found "..describe(actual)..(actual and actual.readError and ". "..actual.readError or ""))
+ end
 end
 local function contentFor(a)
  if not a or a.nativeHidden then return false end
@@ -401,9 +412,10 @@ local function macroLabelAction(button)
  local at=button and button.action
  if type(at)~="number" and button and button.GetAttribute then at=button:GetAttribute("action") end
  if type(at)~="number" or not GetActionInfo or not GetMacroInfo then return end
- local kind,index=GetActionInfo(at)
+ local kind,index,subtype=GetActionInfo(at)
  if kind~="macro" then return nil,"" end
- local name,_,body=GetMacroInfo(index)
+ local resolved,name,_,body=K.API:MacroForAction(at,index,subtype)
+ if not resolved then return nil,"" end
  if not K.db or not K.db.enabled or not name or not body or (K.db.ownedMacros or {})[name]~=body then return nil,name end
  local a=N.macroLabelsBySlot and N.macroLabelsBySlot[at]
  if not a or a.macroName~=name or a.body~=body then a=N.macroLabelsByName and N.macroLabelsByName[name] end

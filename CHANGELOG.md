@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Fix Forever Apply failures on macros such as Hunter Auto Shot: resolve native macro names instead of treating reported spell/item IDs as macro indices. Use the same lookup for backups, Current, labels and cleanup, and refuse unreadable or ambiguous macro backups before changing bars.
+- Include expected and actual action identities in action-bar verification failures.
 - Split the spellbook's game controls into dedicated Movement and Camera sections, including strafe/turn and native mouse camera commands.
 - Allow explicit Current edits to leave movement/camera controls unbound, including primary mouse camera controls, with a Clear key action in the rebind dialog and recovery backups on Apply.
 - Keep explicit mouse clears through legacy recovery and reject changed source bindings, reservations or replacement destinations while an edit confirmation is open.

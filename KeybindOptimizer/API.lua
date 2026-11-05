@@ -30,6 +30,41 @@ function A:SpellRank(id)
         if ok and type(rank)=="string" and rank~="" then return rank end
     end
 end
+function A:MacroForAction(slot,id,subtype)
+    -- Modern clients report the macro's spell/item identity in GetActionInfo,
+    -- not its macro-bank index. Read the native action text (never button text,
+    -- which addons can relabel), then require an unambiguous bank entry.
+    local text=C_ActionBar and C_ActionBar.GetActionText or GetActionText
+    local name
+    if text then
+        local ok,value=pcall(text,slot)
+        if not ok then return nil,"Cannot read the macro in action slot "..slot.."." end
+        name=value
+    end
+    if type(name)=="string" and name~="" then
+        local account,character=GetNumMacros()
+        local constants=Constants and Constants.MacroConsts
+        local maxAccount=(constants and constants.MAX_ACCOUNT_MACROS) or MAX_ACCOUNT_MACROS or 120
+        local found,icon,body
+        for bank=1,2 do
+            local count=bank==1 and account or character
+            local offset=bank==1 and 0 or maxAccount
+            for index=offset+1,offset+count do
+                local candidate,texture,content=GetMacroInfo(index)
+                if candidate==name then
+                    if found then return nil,"More than one macro is named '"..name.."'. Give them unique names before applying changes." end
+                    found,icon,body=index,texture,content
+                end
+            end
+        end
+        if found and type(body)=="string" then return found,name,icon,body end
+    elseif subtype==nil or subtype=="" then
+        -- Older clients return the actual macro index and may lack action text.
+        local legacy,icon,body=GetMacroInfo(id)
+        if legacy and type(body)=="string" then return id,legacy,icon,body end
+    end
+    return nil,"Cannot identify the macro in action slot "..slot.."."
+end
 function A:IsKnown(id,pet)
     if IsPlayerSpell and not pet then local ok,v=pcall(IsPlayerSpell,id); if ok and v then return true end end
     if IsSpellKnown then local ok,v=pcall(IsSpellKnown,id,pet or false); if ok and v then return true end end
