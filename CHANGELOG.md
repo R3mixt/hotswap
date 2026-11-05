@@ -1,5 +1,10 @@
 # Changelog
 
+## Unreleased
+
+- Fix Forever Apply failures on macros such as Hunter Auto Shot: resolve native macro names instead of treating reported spell/item IDs as macro indices. Use the same lookup for backups, Current, labels and cleanup, and refuse unreadable or ambiguous macro backups before changing bars.
+- Include expected and actual action identities in action-bar verification failures.
+
 ## 1.0.0 - 2026-11-02
 
 - Always opens the Current layout with the miniature spellbook and preserves staged edits.

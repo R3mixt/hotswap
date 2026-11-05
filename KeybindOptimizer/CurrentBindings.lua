@@ -193,7 +193,13 @@ function C:Describe(command,key,page,pageType,labels)
   if not typ then empty(a)
   elseif typ=="spell" then spell(a,id,texture)
   elseif typ=="item" then item(a,id,texture)
-  elseif typ=="macro" then macro(a,id,texture,labels)
+  elseif typ=="macro" then
+   local resolved,index,why=pcall(K.API.MacroForAction,K.API,slot,id,subtype)
+   if resolved and index then macro(a,index,texture,labels)
+   else
+    a.kind="macroref"; a.known=false; a.label="Macro details unavailable"; a.category="Unreadable actions"
+    a.readError=resolved and why or ("Could not read the macro in action slot "..slot..".")
+   end
   elseif typ=="petaction" then
    -- GetActionInfo's petaction ID is not a pet-bar position.
    a.kind="spell"; a.builtin="petaction"; a.icon=texture; a.category="Pet actions"

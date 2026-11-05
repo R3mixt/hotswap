@@ -140,8 +140,12 @@ local function macroReferenced(name)
  -- Inspect every slot in the native page range, including currently hidden
  -- bars and possession pages that normal preset placement deliberately skips.
  for slot=1,180 do
-  local kind,id=GetActionInfo(slot)
-  if kind=="macro" and id==index then return true end
+  local kind,id,subtype=GetActionInfo(slot)
+  if kind=="macro" then
+   local resolved=K.API:MacroForAction(slot,id,subtype)
+   -- An unreadable reference cannot prove that a macro is unused.
+   if not resolved or resolved==index then return true end
+  end
  end
  return false
 end
