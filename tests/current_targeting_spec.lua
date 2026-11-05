@@ -168,3 +168,38 @@ function Tests.current_targeting_fallback_refresh_preserves_manually_changed_mac
  local _,_,personal=GetMacroInfo(GetMacroIndexByName(name))
  assert(personal=='/say keep my changes' and GetBindingAction('MOUSEWHEELUP')=='MACRO '..name)
 end
+local function oldMouseoverSlot()
+ local k=targetingSetup()
+ local body='#showtooltip Rejuvenation\n/cast [mod:alt,@player][@mouseover,help,nodead][help,nodead] Rejuvenation'
+ local name=k.Macros:Name(body); local index=CreateMacro(name,1,body,true); k.db.ownedMacros[name]=body
+ Mock.actions[1]={'macro',index}
+ k.db.currentLayout={keys={},slots={[1]={spellID=774,name='Rejuvenation',label='Rejuvenation',targetMode='mouseover',targeting='help',
+  body=body,macroName=name,command='MACRO '..name,content={kind='macro',name=name,body=body}}}}
+ k.CurrentBindings:Invalidate(); Mock:ResetWrites()
+ return k,name
+end
+function Tests.current_targeting_unreadable_macro_defers_then_upgrades_when_metadata_returns()
+ local k,name=oldMouseoverSlot(); local original=GetMacroInfo
+ GetMacroInfo=function() return nil end
+ assert(k.NativeBars:ReadSlot(1).readError,'Fixture must represent occupied but unreadable macro metadata')
+ k.CurrentBindings:QueueRefresh(); Mock:Advance(0.1)
+ assert(not k.Engine.busy and not k.db.currentLayout.slots[1].detached and #Mock.writes==0,'Unreadable macro was permanently detached or rewritten')
+ GetMacroInfo=original
+ assert(k.NativeBars:SameContent(k.NativeBars:ReadSlot(1),k.db.currentLayout.slots[1].content),'Original macro did not become readable again')
+ k.CurrentBindings:QueueRefresh(); Mock:Advance(0.1); local ok,why=Mock:Drain(); assert(ok,why)
+ local current=k.NativeBars:ReadSlot(1)
+ assert(current.name~=name and current.body:find('[help,nodead][@player] Rejuvenation',1,true),'Readable owned macro did not receive the fallback upgrade')
+ assert(not k.db.currentLayout.slots[1].detached and Mock.bindings.MOUSEWHEELDOWN=='ACTIONBUTTON1')
+end
+function Tests.current_targeting_readable_personal_slot_change_still_detaches_permanently()
+ local k,name=oldMouseoverSlot()
+ EditMacro(GetMacroIndexByName(name),name,1,'/say keep this edit'); Mock:ResetWrites()
+ k.CurrentBindings:QueueRefresh(); Mock:Advance(0.1)
+ assert(not k.Engine.busy and k.db.currentLayout.slots[1].detached and #Mock.writes==0)
+ local current=k.NativeBars:ReadSlot(1); assert(current.body=='/say keep this edit')
+ -- Even restoring the old text does not silently re-adopt an already detached slot.
+ EditMacro(GetMacroIndexByName(name),name,1,k.db.currentLayout.slots[1].body); Mock:ResetWrites()
+ k.CurrentBindings:QueueRefresh(); Mock:Advance(0.1)
+ assert(not k.Engine.busy and k.db.currentLayout.slots[1].detached and #Mock.writes==0)
+ assert(k.NativeBars:ReadSlot(1).name==name)
+end

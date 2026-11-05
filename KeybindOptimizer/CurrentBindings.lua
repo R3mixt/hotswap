@@ -306,7 +306,11 @@ function C:HasEdits() local e=self.edits; return e and (next(e.keys) or next(e.s
 function C:GetNativeMouseoverState()
  local state=K.API:GetNativeMouseoverState()
  local edit=self.edits and self.edits.nativeMouseover
- if edit then state.enabled=edit.enabled; state.pending=true end
+ if edit then
+  state.enabled=edit.enabled; state.pending=true
+  local merged=self:MergeMouseoverRepairs(self.edits)
+  state.repairCount=merged.nativeMouseover.repairCount or 0
+ end
  return state
 end
 function C:SetNativeMouseover(enabled)
@@ -314,13 +318,98 @@ function C:SetNativeMouseover(enabled)
  if K.Engine.busy or (InCombatLockdown and InCombatLockdown()) then return false,"Leave combat and wait for the current operation." end
  local state=K.API:GetNativeMouseoverState()
  if not state.supported then return false,state.reason end
+ local repairs=enabled and self:CollectMouseoverRepairs() or nil
+ local hasRepairs=repairs and (next(repairs.slots) or next(repairs.keys))
  local unchanged=enabled and state.enabled and state.autoSelfCast or not enabled and state.enableMouseoverCast=="0"
- if unchanged then
+ if unchanged and not hasRepairs then
   if self.edits then self.edits.nativeMouseover=nil end
  else
-  self:Edits().nativeMouseover={enabled=enabled,expected=K.Copy(state)}
+  self:Edits().nativeMouseover={enabled=enabled,expected=K.Copy(state),repairs=repairs}
  end
- return true,"Mouseover casting staged. Apply changes installs it."
+ local count=self:GetNativeMouseoverState().repairCount or 0
+ return true,"Mouseover casting staged."..(count>0 and (" "..count.." older healing binding(s) will also be updated.") or "").." Apply changes installs it."
+end
+-- Only an explicit checkbox enable may re-adopt a detached, unchanged macro.
+-- Capture exact ownership and a live bound route, never infer from macro text.
+function C:CollectMouseoverRepairs()
+ local repairs={slots={},keys={}}; local saved=K.db.currentLayout or {}; local draft=self.edits or {}
+ local raw=self:Build(); local managed={}
+ for _,at in ipairs(K.NativeBars:ManagedSlots()) do managed[at]=true end
+ local function candidate(entry)
+  local content=entry.content
+  if not entry.spellID or entry.targetMode~="mouseover" or type(content)~="table" or content.kind~="macro"
+      or not content.name or type(content.body)~="string" or entry.body~=content.body
+      or (K.db.ownedMacros or {})[content.name]~=content.body or not K.Macros:FindExact(content.name,content.body) then return end
+  local target=self:TargetAction({kind="spell",spellID=entry.spellID,name=entry.name})
+  if not target or target.targeting~="help" or target.noSelf then return end
+  local ok,resolved=pcall(self.ResolveEntry,self,entry)
+  if not ok or resolved.pending or not resolved.body or resolved.body==content.body then return end
+  -- Reconstruct the previous generated helper, rather than interpreting an
+  -- arbitrary owned macro as a spell merely because its saved label matches.
+  local legacy=resolved.body:gsub("%[help,nodead%]%[@player%]","[help,nodead]",1)
+  if content.body~=legacy then return end
+  resolved.detached=nil
+  return resolved
+ end
+ for at,entry in pairs(saved.slots or {}) do
+  if managed[at] and not (draft.slots and draft.slots[at]) then
+   local resolved=candidate(entry); local live=resolved and K.NativeBars:ReadSlot(at)
+   if resolved and K.NativeBars:SameContent(live,entry.content) then
+    for _,action in ipairs(raw.actions) do
+     if action.liveSlot==at and not action.actionBarError and not (draft.keys and draft.keys[action.key]~=nil) then
+      local route=self:ReadRoute(action.key)
+      if not route.error and route.slot==at then
+       repairs.slots[at]={entry=resolved,original=K.Copy(entry.content),key=action.key,route=route}; break
+      end
+     end
+    end
+   end
+  end
+ end
+ for key,entry in pairs(saved.keys or {}) do
+  if not (draft.keys and draft.keys[key]~=nil) then
+   local resolved=candidate(entry); local route=resolved and self:ReadRoute(key)
+   if resolved and not route.error and not route.slot and route.command==entry.command and route.effectiveCommand==entry.command then
+    repairs.keys[key]={entry=resolved,original=K.Copy(entry.content),key=key,route=route}
+   end
+  end
+ end
+ return repairs
+end
+function C:MergeMouseoverRepairs(edits)
+ local edit=edits and edits.nativeMouseover
+ if not edit or not edit.repairs then return edits end
+ local merged=K.Copy(edits); local active={slots={},keys={}}
+ merged.expectedRoutes=merged.expectedRoutes or {}; merged.nativeMouseover.activeRepairs=active; merged.nativeMouseover.repairCount=0
+ for kind,records in pairs(edit.repairs) do
+  for id,record in pairs(records) do
+   local free=merged.keys[record.key]==nil and (kind~="slots" or not merged.slots[id])
+   if free then
+    active[kind][id]=K.Copy(record); merged.nativeMouseover.repairCount=merged.nativeMouseover.repairCount+1
+    if kind=="slots" then merged.slots[id]=K.Copy(record.entry); merged.expectedSlots[id]=K.Copy(record.original)
+    else merged.keys[id]=record.entry.command; merged.entries[id]=K.Copy(record.entry) end
+    if merged.expectedKeys[record.key]==nil then merged.expectedKeys[record.key]=record.route.command end
+    if merged.expectedRoutes[record.key]==nil then merged.expectedRoutes[record.key]=K.Copy(record.route) end
+   end
+  end
+ end
+ return merged
+end
+function C:ValidateMouseoverRepair(edits,kind,id)
+ local active=edits.nativeMouseover and edits.nativeMouseover.activeRepairs
+ local record=active and active[kind] and active[kind][id]; if not record then return end
+ local original=record.original
+ local route=self:ReadRoute(record.key)
+ if (K.db.ownedMacros or {})[original.name]~=original.body or not K.Macros:FindExact(original.name,original.body)
+     or route.error or route.command~=record.route.command or route.effectiveCommand~=record.route.effectiveCommand or route.slot~=record.route.slot
+     or (kind=="slots" and not K.NativeBars:SameContent(K.NativeBars:ReadSlot(id),original))
+     or (kind=="keys" and GetBindingAction(id)~=record.route.command) then
+  error("A mouseover spell selected for repair changed. Discard pending edits and review it again.")
+ end
+end
+function C:ValidateMouseoverRepairs(edits)
+ local active=edits.nativeMouseover and edits.nativeMouseover.activeRepairs
+ for kind,records in pairs(active or {}) do for id in pairs(records) do self:ValidateMouseoverRepair(edits,kind,id) end end
 end
 function C:ValidateNativeMouseover(edits)
  local edit=edits.nativeMouseover; if not edit then return end
@@ -535,6 +624,7 @@ function C:ResolveEntry(entry)
  return data
 end
 function C:PrepareEdits(edits)
+ edits=self:MergeMouseoverRepairs(edits)
  for at,entry in pairs(edits.slots) do edits.slots[at]=self:ResolveEntry(entry) end
  for key,entry in pairs(edits.entries or {}) do
   edits.entries[key]=self:ResolveEntry(entry); edits.keys[key]=edits.entries[key].command
@@ -547,13 +637,18 @@ end
 function C:RefreshEdits()
  local saved=K.db.currentLayout; if not saved then return end
  local edits={keys={},entries={},slots={},expectedKeys={},expectedSlots={}}
- local pending=self.edits
+ local pending=self:MergeMouseoverRepairs(self.edits)
  for at,entry in pairs(saved.slots or {}) do
   if not (pending and pending.slots[at]) and not entry.detached then
-   if K.NativeBars:SameContent(K.NativeBars:ReadSlot(at),entry.content) then
-    local resolved=self:ResolveEntry(entry)
-    if not sameEntry(entry,resolved) then edits.slots[at]=resolved; edits.expectedSlots[at]=entry.content or false end
-   else entry.detached=true end
+   local current=K.NativeBars:ReadSlot(at)
+   -- Macro metadata can be temporarily unavailable while the client loads it.
+   -- An unreadable occupied slot is not proof that the user replaced our action.
+   if not (current and current.readError) then
+    if K.NativeBars:SameContent(current,entry.content) then
+     local resolved=self:ResolveEntry(entry)
+     if not sameEntry(entry,resolved) then edits.slots[at]=resolved; edits.expectedSlots[at]=entry.content or false end
+    else entry.detached=true end
+   end
   end
  end
  for key,entry in pairs(saved.keys or {}) do
@@ -596,7 +691,7 @@ function C:Annotate(action,entry)
  return action
 end
 function C:EditingView()
- local raw=self:Get(); local plan=K.Copy(raw); local e=self.edits
+ local raw=self:Get(); local plan=K.Copy(raw); local e=self:MergeMouseoverRepairs(self.edits)
  local saved=K.db and K.db.currentLayout or {keys={},slots={}}
  plan.readOnly=false; plan.byID={}; plan.byKey={}; plan.actions={}
  local commands={}

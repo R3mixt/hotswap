@@ -1725,7 +1725,7 @@ function UI:RenderBindings(reusePageCache)
         page.autoMouseover:SetChecked(casting.enabled)
         page.autoMouseover:SetEnabled(casting.supported and not (InCombatLockdown and InCombatLockdown()))
         tooltip(page.autoMouseover,"Auto mouseover all spells",casting.supported and
-            "Use WoW's native mouseover casting for compatible action-bar spell buttons, with current-target and automatic self-cast fallback. Apply changes saves this setting; Discard edits cancels it.\n\nMacros keep their own targeting. Some bar addons have a separate mouseover option. WoW's native mouseover can take priority over Alt-self." or casting.reason)
+            "Use WoW's native mouseover casting for compatible action-bar spell buttons, with current-target and automatic self-cast fallback. Apply changes saves this setting; Discard edits cancels it.\n\nApply also refreshes unchanged Hot Swap Mouseover healing macros to include self-cast fallback. Personal macros keep their own targeting. Some bar addons have a separate mouseover option. WoW's native mouseover can take priority over Alt-self." or casting.reason)
     end
     page.source.text:SetText(current and "Current bindings" or editable and "Preset draft" or "Recommendations")
     local readErrors={}; for _,entry in ipairs((self.bindingPlan or {}).errors or {}) do readErrors[#readErrors+1]=message(entry) end

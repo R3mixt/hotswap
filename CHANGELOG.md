@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.0.4 - 2026-11-05
+
+- Enabling Auto mouseover all spells explicitly stages a refresh of unchanged, previously generated Hot Swap Mouseover heals that lack the final self-cast fallback, including entries detached by an earlier read failure. Apply validates the live macro and binding before replacing it; personal edits remain untouched.
+- Keep these repairs separate from ordinary binding drafts so unchecking or discarding the checkbox cancels its repairs without losing other edits. Fail before changing a working heal if there is no room for its replacement macro.
+- Wait for temporarily unreadable action-slot macro details instead of permanently detaching the slot. Genuine personal changes still stop automatic updates.
+- Existing native mouseover scope remains unchanged: compatible action buttons use WoW's setting, while arbitrary macros and addon-specific targeting retain their own rules. Live acceptance of this repair is pending.
+
 ## 1.0.3 - 2026-11-05
 
 - Add **Auto mouseover all spells** to Current bindings on clients with native mouseover support. Apply saves mouseover without a modifier and enables automatic self-casting; Discard and backups cover the setting. Compatible spell buttons use native targeting, while macros and addon-specific targeting keep their own rules.

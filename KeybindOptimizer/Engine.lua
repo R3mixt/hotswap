@@ -292,6 +292,7 @@ bindingSteps=function(job,target)
         local binding,command=key,target[key]
         if job.currentBindings[binding]~=command then
             addStep(steps,function()
+                if job.beforeBindingWrite and not job.rollingBack then job.beforeBindingWrite(binding) end
                 if not SetBinding(binding,command) then
                     local label=actionLabel(job.plan,binding,command)
                     if not job.rollingBack then job.failureKey=binding; job.failureCommand=command; job.failureAction=label end
@@ -636,6 +637,7 @@ function E:ApplyCurrentEdits(refreshEdits)
     if not prepared then return self:Reject(tostring(edits),"current-edit") end
     local function validate()
         K.CurrentBindings:ValidateNativeMouseover(edits)
+        K.CurrentBindings:ValidateMouseoverRepairs(edits)
         if not refreshEdits then K.CurrentBindings:ReviewLegacyRoutes(edits) end
         K.CurrentBindings:ValidateRoutes(edits)
         for key,expected in pairs(edits.expectedKeys) do if (GetBindingAction(key) or "")~=expected then error("Current binding changed on "..key..". Discard pending edits and try again.") end end
@@ -643,6 +645,10 @@ function E:ApplyCurrentEdits(refreshEdits)
     end
     local ok,why=pcall(validate); if not ok then return self:Reject(why,"current-edit") end
     local macroPlan={actions={},settings={allowAccountMacros=false}}
+    local repairEntries={}
+    local repairs=edits.nativeMouseover and edits.nativeMouseover.activeRepairs
+    for at in pairs(repairs and repairs.slots or {}) do repairEntries[edits.slots[at]]=true end
+    for key in pairs(repairs and repairs.keys or {}) do repairEntries[edits.entries[key]]=true end
     for _,map in ipairs({edits.slots,edits.entries or {}}) do
         for _,entry in pairs(map) do
             if entry.body then entry.nativeMacro=true; macroPlan.actions[#macroPlan.actions+1]=entry end
@@ -658,6 +664,9 @@ function E:ApplyCurrentEdits(refreshEdits)
             if not owned and not allocated[body] then available=available-1; allocated[body]=true end
             ready[#ready+1]=entry
         else
+            if repairEntries[entry] then
+                return self:Reject("There is not enough character macro space to update these mouseover spells. Free a macro slot and apply again; the existing spells have been kept.","current-edit")
+            end
             -- Keep macro-only actions reserved instead of blocking unrelated
             -- spells/items or borrowing account-wide macro space.
             entry.desiredBody=body; entry.previewCommand=entry.command
@@ -692,15 +701,18 @@ function E:ApplyCurrentEdits(refreshEdits)
         local index,change=at,entry
         addStep(job.steps,function()
             K.CurrentBindings:ValidateRoutes(edits)
+            K.CurrentBindings:ValidateMouseoverRepair(edits,"slots",index)
             K.NativeBars:WriteSlot(index,change.content)
         end,"Editing current action slots",false,true)
     end
     if next(edits.keys) or next(edits.slots) then
     addStep(job.steps,function()
         K.CurrentBindings:ValidateRoutes(edits)
+        for key in pairs(repairs and repairs.keys or {}) do K.CurrentBindings:ValidateMouseoverRepair(edits,"keys",key) end
         local expected=captureBindings(edits.expectedKeys)
         job.currentBindings=K.Copy(expected)
         for key,command in pairs(edits.keys) do expected[key]=command or nil end
+        job.beforeBindingWrite=function(key) K.CurrentBindings:ValidateMouseoverRepair(edits,"keys",key) end
         job.expected=expected; insertSteps(job,bindingSteps(job,expected))
     end,"Editing current keys",true,false)
     addStep(job.steps,function() saveBindings(2); loadBindings(2) end,"Saving current character bindings",true,true)

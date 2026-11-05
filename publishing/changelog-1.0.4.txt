@@ -1,0 +1,11 @@
+Hot Swap 1.0.4
+
+Fix older Hot Swap Mouseover heals missing automatic self-casting when no friendly mouseover or current target exists. Enable Auto mouseover all spells, then Apply changes, to explicitly refresh unchanged generated healing macros. If the checkbox is already checked, uncheck and recheck it before Apply.
+
+Repairs validate the exact existing owned macro and active binding, preserve personal edits, and can be cancelled with the checkbox or Discard edits. Insufficient character macro space stops Apply without clearing the working heal.
+
+Temporary unreadable macro details no longer permanently stop automatic updates to that slot. Genuine personal replacements still do.
+
+Retains the RestedXP fix and action-bar adapters from 1.0.3. Targets Forever 1.60.1 and Classic Era / Hardcore 1.15.9. Native checkbox availability still depends on client support. Live acceptance of this repair is pending.
+
+Validation: 596 Lua 5.1 scenarios, 7 packaging checks and 8 publisher checks.

@@ -4,7 +4,9 @@ Build a comfortable keyboard layout, keep it consistent across your class, and s
 
 Hot Swap places spells and generated macros on **Blizzard's original action bars**. Its in-game keyboard opens on your current game bindings in edit mode, including native pet controls. Build your own Current layout with the spellbook or Hover bind, including future spells and missing items. Future reservations do not consume macro slots. Saved preset drafts provide a separate editor for Shift and Ctrl layers, mouse buttons, and optional wheel bindings. The interface uses WoW's own frames and controls.
 
-**1.0.3 compatibility update:** Targets Forever 1.60.1 and Classic Era / Hardcore 1.15.9. Fixes the RestedXP target-marking conflict, confirmed in Forever after reload. Current reads supported Bartender4, ElvUI and Dominos live button mappings. These action-bar adapters have automated coverage; addon-specific live acceptance remains pending. Retail and other Classic expansions are not supported release targets.
+**1.0.4 mouseover repair:** Enabling Auto mouseover all spells also refreshes unchanged older Hot Swap healing macros so they can self-cast when neither a friendly mouseover nor target exists. Personal macro edits remain untouched. The repair has regression coverage; live acceptance is pending.
+
+**Compatibility:** Targets Forever 1.60.1 and Classic Era / Hardcore 1.15.9. Fixes the RestedXP target-marking conflict, confirmed in Forever after reload. Current reads supported Bartender4, ElvUI and Dominos live button mappings. These action-bar adapters have automated coverage; addon-specific live acceptance remains pending. Retail and other Classic expansions are not supported release targets.
 
 ## Set up your keys
 

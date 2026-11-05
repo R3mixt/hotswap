@@ -8,7 +8,7 @@ Hot Swap is a World of Warcraft addon with a visual keyboard editor, spellbook d
 
 [Download on CurseForge](https://www.curseforge.com/wow/addons/hot-swap) · [Player guide](KeybindOptimizer/README.md) · [Documentation](docs/README.md) · [Changelog](CHANGELOG.md) · [Report a bug](https://github.com/R3mixt/hotswap/issues)
 
-Version **1.0.3** adds **Auto mouseover all spells** in Current bindings for clients with native support, fixes healing Mouseover's final self-cast fallback, resolves the RestedXP target-marking conflict, and improves Current bindings with Bartender4, ElvUI and Dominos. It retains the readable action menu introduced in 1.0.2. The RestedXP fix was confirmed in game on Forever; native mouseover and addon-specific action-bar behavior have automated coverage and still need live acceptance. The CurseForge download may lag the source version while a file is awaiting publication.
+Version **1.0.4** repairs older Hot Swap healing macros when you enable **Auto mouseover all spells** and Apply changes. It also prevents a temporary failure to read macro details from permanently disabling future updates. The 1.0.3 RestedXP fix and action-bar adapters are retained. The RestedXP fix was confirmed in game on Forever; this mouseover repair and addon-specific behavior still need live acceptance. The CurseForge download may lag the source version while a file is awaiting publication.
 
 ## What it does
 
@@ -65,7 +65,7 @@ python tests/run_tests.py
 python package.py
 ```
 
-The 1.0.3 release includes **583 Lua 5.1 scenarios**, **7 packaging checks** and **8 publisher checks**. The Lua tests execute the addon modules against simulated WoW APIs. `package.py` reruns validation, checks the TOC and archive layout, and writes install/source ZIPs and SHA-256 files into `dist/`. GitHub Actions performs the same build on pushes and pull requests.
+The 1.0.4 release includes **596 Lua 5.1 scenarios**, **7 packaging checks** and **8 publisher checks**. The Lua tests execute the addon modules against simulated WoW APIs. `package.py` reruns validation, checks the TOC and archive layout, and writes install/source ZIPs and SHA-256 files into `dist/`. GitHub Actions performs the same build on pushes and pull requests.
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) for the module map, change workflow and useful bug-report details. [CurseForge publishing](docs/curseforge.md) explains release sync and its one-time secret setup.
 

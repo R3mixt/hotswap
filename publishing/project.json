@@ -5,12 +5,12 @@
   "name": "Hot Swap",
   "summary": "Build and switch class keybind presets on Blizzard's original action bars, with a visual keyboard editor, generated macros, item choices, and named backups.",
   "release": {
-    "version": "1.0.3",
-    "displayName": "Hot Swap 1.0.3",
+    "version": "1.0.4",
+    "displayName": "Hot Swap 1.0.4",
     "releaseType": "release",
-    "automatedTests": 583,
+    "automatedTests": 596,
     "testMethod": "Actual Lua modules executed under Lua 5.1 with mocked WoW APIs",
-    "liveClientAcceptance": "RestedXP target-marking fix confirmed by the user on Forever after reload on 2026-11-05; native mouseover and action-bar adapters validated by source review and mocked regressions, live casting and addon-specific acceptance pending"
+    "liveClientAcceptance": "RestedXP target-marking fix confirmed by user on Forever in 1.0.3; 1.0.4 old Mouseover heal repair covered by mocked regression tests, live acceptance pending"
   },
   "game": "World of Warcraft",
   "projectClass": "Addons",
@@ -40,9 +40,9 @@
     "logo": "logo.png",
     "logoVectorSource": "logo.svg",
     "logoBuildScript": "build-logo.ps1",
-    "curseforgeUpload": "HotSwap-1.0.3-CurseForge.zip",
-    "developerArchive": "HotSwap-1.0.3-developer-source-NOT-FOR-UPLOAD.zip",
-    "changelog": "changelog-1.0.3.txt"
+    "curseforgeUpload": "HotSwap-1.0.4-CurseForge.zip",
+    "developerArchive": "HotSwap-1.0.4-developer-source-NOT-FOR-UPLOAD.zip",
+    "changelog": "changelog-1.0.4.txt"
   },
   "logo": {
     "width": 400,
