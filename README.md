@@ -8,7 +8,7 @@ Hot Swap is a World of Warcraft addon with a visual keyboard editor, spellbook d
 
 [Download on CurseForge](https://www.curseforge.com/wow/addons/hot-swap) · [Player guide](KeybindOptimizer/README.md) · [Documentation](docs/README.md) · [Changelog](CHANGELOG.md) · [Report a bug](https://github.com/R3mixt/hotswap/issues)
 
-Version **1.0.1** fixes macro-related Apply failures on Forever and targets Forever 1.60.1 and Classic Era / Hardcore 1.15.9. Automated tests reproduce the reported failure and verify the fix; live-client protected input, casting and third-party action-bar compatibility still need verification. The CurseForge download may lag the source version while a file is awaiting publication.
+Version **1.0.2** adds a readable binding action menu and mouseover targeting for Current bindings and targets Forever 1.60.1 and Classic Era / Hardcore 1.15.9. Automated tests verify the menu, staged edits and targeting fallback; live-client protected input, casting and third-party action-bar compatibility still need verification. The CurseForge download may lag the source version while a file is awaiting publication.
 
 ## What it does
 
@@ -38,7 +38,7 @@ The folder and SavedVariables name remain `KeybindOptimizer` for upgrade compati
 ## First use
 
 1. Inspect **Bindings → Current**. Opening the window changes no game bindings.
-2. Drag a spell onto a key, or use **Hover bind**. Review replacements and modifier layers.
+2. Click a binding to choose **Targeting**, **Change spell**, or **Change key**. You can also drag a spell onto a key or use **Hover bind**.
 3. Choose **Apply changes** outside combat. Use **Discard edits** to abandon a draft.
 4. For a complete preset, preview it in **Presets**, save a draft, then explicitly **Apply & save**.
 5. Use **Backups** to restore a saved layout, the original setup, or Blizzard's default character keys.
@@ -65,7 +65,7 @@ python tests/run_tests.py
 python package.py
 ```
 
-The 1.0.1 release includes **505 Lua 5.1 scenarios**, **7 packaging checks** and **8 publisher checks**. The Lua tests execute the addon modules against simulated WoW APIs. `package.py` reruns validation, checks the TOC and archive layout, and writes install/source ZIPs and SHA-256 files into `dist/`. GitHub Actions performs the same build on pushes and pull requests.
+The 1.0.2 release includes **528 Lua 5.1 scenarios**, **7 packaging checks** and **8 publisher checks**. The Lua tests execute the addon modules against simulated WoW APIs. `package.py` reruns validation, checks the TOC and archive layout, and writes install/source ZIPs and SHA-256 files into `dist/`. GitHub Actions performs the same build on pushes and pull requests.
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) for the module map, change workflow and useful bug-report details. [CurseForge publishing](docs/curseforge.md) explains release sync and its one-time secret setup.
 

@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.0.2 - 2026-11-05
+
+- Open a readable, opaque action menu when clicking a keyboard, wheel, mouse or list binding. Choose targeting, change the spell, or explicitly record a new key.
+- Add searchable action replacement while preserving the selected key. Keep existing replacement/swap confirmation preferences.
+- Add supported mouseover, target, focus and self targeting to Current bindings, including existing wheel assignments. Mouseover falls back to a valid current target; helpful spells preserve Alt-self where allowed.
+- Keep targeting edits staged, preserve native slots and unrelated bindings, protect personal macros, and retain backup/rollback and future-ability reservation behavior.
+- Add regression coverage and mock layout previews. Live-client casting and taint acceptance remains pending; broader action-bar and RestedXP compatibility work follows separately.
+
 ## 1.0.1 - 2026-11-04
 
 - Fix Forever Apply failures on macros such as Hunter Auto Shot: resolve native macro names instead of treating reported spell/item IDs as macro indices. Use the same lookup for backups, Current, labels and cleanup, and refuse unreadable or ambiguous macro backups before changing bars.

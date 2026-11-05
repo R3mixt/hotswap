@@ -1,0 +1,11 @@
+Hot Swap 1.0.2
+
+Click a binding to open a clear action menu: Targeting, Change spell, or Change key. The menu and key recorder use opaque cards for readability.
+
+Current bindings now support mouseover, target, focus and self for eligible spells/items. Mouseover falls back to a valid current target. Wheel assignments remain on their existing keys; edits take effect with Apply changes.
+
+Search for a replacement spell or action without rebinding its key. Existing confirmation preferences, personal macros, backups and future-spell reservations are preserved.
+
+528 Lua 5.1 regression scenarios, 7 packaging checks and 8 publisher checks. Mock UI previews reviewed; live-client casting/taint acceptance remains pending.
+
+Targets Forever 1.60.1 and Classic Era / Hardcore 1.15.9. Broader action-bar/RestedXP compatibility is separate follow-up work.

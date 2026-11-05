@@ -147,9 +147,17 @@ function UI:OpenTalentChoices(action)
 end
 
 local targetNames={default="Default",target="Current target",mouseover="Mouseover",focus="Focus",self="Self",cursor="At cursor"}
+function UI:ActionTargetModes(action)
+    if action and action.current and K.CurrentBindings.TargetModes then return K.CurrentBindings:TargetModes(action) end
+    return action and K.Library:TargetModes(action) or {"default"}
+end
 function UI:TargetDescription(action)
     if not action or action.kind=="system" or action.presetName then return nil end
     local mode=action.targetMode or "default"
+    if action.current and mode=="default" then
+        if action.kind=="macroref" then return nil,"Uses the macro's own targeting" end
+        return nil,"Uses the spell or item's normal targeting"
+    end
     local target=action.itemTargetInfo and action.itemTargetInfo.kind or action.targeting
     local selfCast=target=="help" and not action.noSelf and "; Alt casts on you" or ""
     if mode=="default" then
@@ -171,29 +179,125 @@ end
 function UI:RenderCaptureTarget()
     if not self.capture or not self.capture.targetMode then return end
     local action=self.captureAction
-    local modes=K.Library and K.Library.TargetModes and action and K.Library:TargetModes(action) or {}
+    local modes=self:ActionTargetModes(action)
     local shown=self.captureMode=="key" and #modes>1
     self.capture.targetMode:SetShown(shown); self.capture.targetLabel:SetShown(shown)
     if shown then self.capture.targetMode.text:SetText(targetNames[action.targetMode or "default"] or "Default") end
 end
+function UI:RenderBindingMenuTarget()
+    local f=self.bindingMenu; if not f or not f.action then return end
+    local action=f.action
+    local modes=self:ActionTargetModes(action)
+    local supported=#modes>1 and not action.preserved
+    f.targetMode:SetEnabled(supported)
+    f.targetMode.text:SetText(targetNames[action.targetMode or "default"] or "Default")
+    local _,description=self:TargetDescription(action)
+    if action.preserved then description="This control is protected in Settings."
+    elseif not supported then
+        description=action.kind=="macroref" and "This macro controls its own targeting. Edit it in WoW's Macros window."
+            or "This action has no supported targeting choices. You can still change its spell or key."
+    end
+    f.targetHint:SetText(description or "Choose who this action affects.")
+    color(f.targetHint,C.muted)
+end
 function UI:OpenTargetMenu(anchor)
-    local action=self.captureAction
+    local action=self.bindingMenu and self.bindingMenu:IsShown() and self.bindingMenu.action or self.captureAction
     if not action then return end
     local options={}
-    for _,mode in ipairs(K.Library:TargetModes(action)) do options[#options+1]={value=mode,label=targetNames[mode] or mode} end
+    for _,mode in ipairs(self:ActionTargetModes(action)) do options[#options+1]={value=mode,label=targetNames[mode] or mode} end
     self:Menu(anchor,options,action.targetMode or "default",function(mode) UI:SetActionTarget(mode) end)
 end
 function UI:SetActionTarget(mode)
-    local action=self.captureAction or self.selectedAction
+    local menu=self.bindingMenu and self.bindingMenu:IsShown() and self.bindingMenu
+    local action=menu and menu.action or self.captureAction or self.selectedAction
     if not action then return end
-    local ok,why=self:Call(K.Library,"SetTargetMode",action.id,mode)
-    if not ok then if why then self.captureHint:SetText(why) end; return end
-    self:Refresh()
-    for _,candidate in ipairs((self.plan or {}).actions or {}) do
-        if candidate.id==action.id then self.captureAction=candidate; self.selectedAction=candidate; self:BindingDetail(candidate); break end
+    local ok,why
+    if action.current then ok,why=self:Call(K.CurrentBindings,"SetTargetMode",action,mode)
+    else ok,why=self:Call(K.Library,"SetTargetMode",action.id,mode) end
+    if not ok then
+        if why then
+            if menu then menu.targetHint:SetText(why); color(menu.targetHint,C.error)
+            elseif self.captureHint then self.captureHint:SetText(why) end
+        end
+        return false
     end
-    self:RenderCaptureTarget()
-    self.captureHint:SetText("Targeting saved to the draft. Press a new key to rebind, or Escape to finish.")
+    if action.current then self.currentBindingPlan=nil end
+    self:Refresh()
+    for _,candidate in ipairs(self:DisplayActions()) do
+        if candidate.id==action.id or (action.current and candidate.key==action.key) then
+            if menu then menu.action=candidate else self.captureAction=candidate end
+            self.selectedAction=candidate; self:BindingDetail(candidate); break
+        end
+    end
+    if menu then self:RenderBindingMenuTarget()
+    else
+        self:RenderCaptureTarget()
+        self.captureHint:SetText("Targeting saved. Press a new key to rebind, or choose Done to keep this key.")
+    end
+    return true
+end
+local replacementKinds={{value="spells",label="Spells"},{value="items",label="Items"},{value="macros",label="Macros"},{value="game",label="Game controls"},{value="chat",label="Chat controls"},{value="emotes",label="Emotes"}}
+function UI:OpenReplacementPicker(action)
+    if not action or not action.key or self.bindingSource=="recommendation" then return end
+    if K.Engine and K.Engine.busy then self:UpdateBusyState(); return end
+    if InCombatLockdown and InCombatLockdown() then self:Notice("Editing is paused during combat.",true); return end
+    if action.preserved then self:Notice("This control is protected in Settings.",true); return end
+    if not self:ValidateBindingSelection(action) then return end
+    self:CloseBindingEditor(); self:EndCapture(); self:CloseMenu(); self:ClearInputFocus(); self:CancelLibraryDrag()
+    if not self.replacementPicker then
+        local f,panel=W.bindingDialog(self.frame,"KeybindOptimizerReplacementPicker",590,480)
+        f.title=label(panel,"",20); f.title:SetPoint("TOPLEFT",24,-22); f.title:SetWidth(542); f.title:SetHeight(30)
+        f.note=label(panel,"",12,C.text); f.note:SetPoint("TOPLEFT",24,-60); f.note:SetWidth(542); f.note:SetHeight(28)
+        label(panel,"Search spells or actions",11,C.muted):SetPoint("TOPLEFT",24,-91)
+        local shell,search=edit(panel,360,30); shell:SetPoint("TOPLEFT",24,-107); f.search=search
+        search:SetScript("OnTextChanged",function(_,user) if user then UI:RenderReplacementPicker() end end)
+        search:SetScript("OnEscapePressed",function() f:Hide() end)
+        tooltip(shell,"Find a replacement","Search by spell or action name. The selected key stays the same.")
+        f.kind=button(panel,"Spells",170,function(self)
+            UI:Menu(self,replacementKinds,f.tab,function(tab) f.tab=tab; UI:RenderReplacementPicker() end)
+        end); f.kind:SetPoint("TOPRIGHT",-24,-108)
+        f.list=scroll(panel); f.list:SetPoint("TOPLEFT",24,-151); f.list:SetPoint("BOTTOMRIGHT",-24,76)
+        f.cancel=button(panel,"Cancel",112,function() f:Hide() end); f.cancel:SetPoint("BOTTOMRIGHT",-24,22)
+        label(panel,"Choose an action to stage the replacement.",11,C.muted):SetPoint("BOTTOMLEFT",24,31)
+        f:SetScript("OnHide",function() search:ClearFocus(); UI:CloseMenu(); UI:EndModal(f) end)
+        self.replacementPicker=f
+    end
+    local f=self.replacementPicker
+    f.selection=self:BindingSelectionSnapshot(action)
+    f.action=action; f.key=action.key; f.tab=action.kind=="item" and "items" or action.kind=="macroref" and "macros" or "spells"
+    f.title:SetText("Change action on "..keyName(action.key))
+    f.note:SetText("Replacing "..(action.label or action.spellName or action.id)..". The key stays "..keyName(action.key)..".")
+    f.search:SetText("")
+    self:BeginModal(f,"KeybindOptimizerReplacementPicker"); f:Show(); self:RenderReplacementPicker(); f.search:SetFocus()
+end
+function UI:RenderReplacementPicker()
+    local f=self.replacementPicker; if not f then return end
+    for _,option in ipairs(replacementKinds) do if option.value==f.tab then f.kind.text:SetText(option.label) end end
+    local entries=K.Library:List({tab=f.tab,query=f.search:GetText(),current=self.bindingSource=="current"})
+    local list=f.list
+    for _,row in ipairs(list.rows) do row:Hide() end
+    for i,entry in ipairs(entries) do
+        local row=list.rows[i]
+        if not row then
+            row=listRow(list.child); row:SetHeight(46)
+            row.icon=row:CreateTexture(nil,"ARTWORK"); row.icon:SetSize(32,32); row.icon:SetPoint("LEFT",5,0)
+            row.name=label(row,"",13,C.text); row.name:SetPoint("TOPLEFT",48,-5); truncate(row.name,447)
+            row.description=label(row,"",11,C.muted); row.description:SetPoint("TOPLEFT",48,-25); truncate(row.description,447)
+            row:SetScript("OnClick",function(self)
+                if not UI:ValidateBindingSelection(f.action,f.selection) then return end
+                local entry,key=self.entry,f.key
+                f:Hide(); UI.libraryEntry=entry; UI:DropLibraryEntry(key)
+            end)
+            list.rows[i]=row
+        end
+        row.entry=entry; row:SetPoint("TOPLEFT",0,-(i-1)*48); row:SetWidth(math.max(480,list.child:GetWidth()))
+        row.icon:SetTexture(entry.icon or "Interface\\Icons\\INV_Misc_QuestionMark")
+        row.name:SetText(entry.label or entry.name); row.description:SetText((entry.category or "")..(entry.known==false and " · Not learned yet" or ""))
+        tooltip(row,entry.label,"Use this action on "..keyName(f.key)..".",entry.spellID,nil,entry.itemID)
+        row:Show()
+    end
+    if not list.empty then list.empty=label(list.child,"No matching actions. Try another name or category.",12,C.muted); list.empty:SetPoint("TOPLEFT",8,-12); list.empty:SetWidth(490) end
+    list.empty:SetShown(#entries==0); list:UpdateHeight(math.max(50,#entries*48))
 end
 function UI:FitWindows()
     if not self.frame then return end

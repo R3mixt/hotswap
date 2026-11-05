@@ -615,7 +615,8 @@ end
 function E:ApplyCurrentEdits(refreshEdits)
     if self.busy or inCombat() then return false,"Leave combat and wait for the current operation." end
     if not refreshEdits and not K.CurrentBindings:HasEdits() then return true,"No current binding changes to apply." end
-    local edits=K.CurrentBindings:PrepareEdits(K.Copy(refreshEdits or K.CurrentBindings:Edits()))
+    local prepared,edits=pcall(K.CurrentBindings.PrepareEdits,K.CurrentBindings,K.Copy(refreshEdits or K.CurrentBindings:Edits()))
+    if not prepared then return self:Reject(tostring(edits),"current-edit") end
     local function validate()
         for key,expected in pairs(edits.expectedKeys) do if (GetBindingAction(key) or "")~=expected then error("Current binding changed on "..key..". Discard pending edits and try again.") end end
         for at,expected in pairs(edits.expectedSlots) do if not K.NativeBars:SameContent(K.NativeBars:ReadSlot(at),expected or nil) then error("Current action slot changed: "..at..". Discard pending edits and try again.") end end

@@ -1199,6 +1199,7 @@ end
 function Tests.combat_start_ends_active_rebind_capture_without_protected_input_mutation()
   local k,board=hunterKeyboard()
   board.keys["1"]:Click()
+  k.UI.bindingMenu.rebind:Click()
   assert(k.UI.capture:IsVisible(),"Rebind fixture did not start capture")
   Mock.strictInputRestrictions=true; Mock.combat=true
   Mock:Fire("PLAYER_REGEN_DISABLED")
@@ -1207,7 +1208,7 @@ function Tests.combat_start_ends_active_rebind_capture_without_protected_input_m
   equal(Mock.propagatedKeys[#Mock.propagatedKeys],"1","Combat rebind capture swallowed gameplay input")
 end
 
-function Tests.keyboard_click_immediately_captures_rebind_and_locked_spell_has_native_tooltip()
+function Tests.keyboard_click_opens_action_menu_and_locked_spell_has_native_tooltip()
   local k,board=hunterKeyboard()
   local aimed=board.keys["2"]
   equal(aimed.icon:GetTexture(),135130,"Locked action still uses a question mark")
@@ -1218,12 +1219,13 @@ function Tests.keyboard_click_immediately_captures_rebind_and_locked_spell_has_n
   local status=table.concat(GameTooltip.lines or {}," ")
   assert(contains(status,"learn") or contains(status,"unlock"),"Tooltip omits locked availability")
   aimed:Click()
-  assert(k.UI.capture and k.UI.capture:IsShown(),"One icon click did not enter rebind mode")
-  equal(k.UI.captureAction.id,"hunter.aimed_shot","Rebind capture selected the wrong spell")
+  assert(k.UI.bindingMenu and k.UI.bindingMenu:IsShown(),"One icon click did not open its action menu")
+  assert(not k.UI.capture or not k.UI.capture:IsShown(),"Opening an action menu began recording a replacement key")
+  equal(k.UI.bindingMenu.action.id,"hunter.aimed_shot","Menu selected the wrong spell")
   Mock:KeyDown("ESCAPE"); Mock:Advance(0.02)
-  assert(k.UI.frame:IsShown(),"Escape from direct-icon rebinding closed the addon")
-  assert(not k.UI.capture:IsShown(),"Escape did not end direct-icon rebinding")
-  equal(k:GetSettings().bindingOverrides["hunter.aimed_shot"],nil,"Cancelled rebinding changed an unlearned action")
+  assert(k.UI.frame:IsShown(),"Escape from the action menu closed the addon")
+  assert(not k.UI.bindingMenu:IsShown(),"Escape did not dismiss the action menu")
+  equal(k:GetSettings().bindingOverrides["hunter.aimed_shot"],nil,"Inspecting the menu changed an unlearned action")
 end
 
 function Tests.keyboard_keycap_icons_and_captions_use_separate_aligned_regions()
@@ -1275,6 +1277,7 @@ end
 function Tests.finishing_direct_rebind_consumes_the_same_key_event_instead_of_casting()
   local k,board=hunterKeyboard()
   board.keys["2"]:Click()
+  k.UI.bindingMenu.rebind:Click()
   Mock.propagatedKeys={}
   Mock:KeyDown("NUMPAD9")
   equal(k:GetSettings().bindingOverrides["hunter.aimed_shot"],"NUMPAD9","Captured key was not staged")
@@ -1287,6 +1290,7 @@ end
 function Tests.rebind_confirmation_keeps_keyboard_input_consumed_until_overlay_is_dismissed()
   local k,board=hunterKeyboard()
   board.keys["2"]:Click()
+  k.UI.bindingMenu.rebind:Click()
   Mock.propagatedKeys={}
   Mock:KeyDown("3")
   assert(k.UI.confirm and k.UI.confirm:IsVisible(),"Swapping two planned actions skipped review")
@@ -1359,8 +1363,8 @@ function Tests.keyboard_click_and_picker_reassign_only_selected_action_and_self_
   page.keyboard.keys.Q:Click()
   equal(k.UI.selectedAction.id,"druid.rejuvenation","clicking occupied key selects its action")
   assert(page.detail.rebind:IsEnabled(),"Selected key cannot be rebound")
-  assert(k.UI.capture:IsShown(),"Clicking an occupied key did not immediately begin rebinding")
-  k.UI:EndCapture(); Mock:Advance(0.02)
+  assert(k.UI.bindingMenu:IsShown(),"Clicking an occupied key did not open the action menu")
+  k.UI.bindingMenu.done:Click(); Mock:Advance(0.02)
   assert(not page.keyboard.keys.U.action,"U fixture must be unassigned")
   Mock:ResetWrites()
   page.keyboard.keys.U:Click()
@@ -1424,28 +1428,30 @@ function Tests.occupied_keyboard_key_can_change_action_using_mouse_controls_only
   Mock:ResetWrites()
   page.keyboard.keys.Q:Click()
   assert(page.detail.change and page.detail.change:IsEnabled(),"Occupied key has no Change action control")
-  assert(k.UI.capture:IsShown(),"Occupied key did not enter direct rebind mode")
-  k.UI:EndCapture(); Mock:Advance(0.02)
-  page.detail.change:Click()
-  assert(k.UI.picker:IsShown(),"Change action did not open the picker")
-  equal(k.UI.picker.key,"Q","Change action picker targets the wrong physical key")
+  assert(k.UI.bindingMenu:IsShown(),"Occupied key did not open the action menu")
+  k.UI.bindingMenu.change:Click()
+  assert(k.UI.replacementPicker:IsShown(),"Change action did not open the replacement picker")
+  equal(k.UI.replacementPicker.key,"Q","Change action picker targets the wrong physical key")
+  local picker=k.UI.replacementPicker
+  picker.search:SetText("Regrowth"); picker.search:GetScript("OnTextChanged")(picker.search,true)
   local candidate
-  for _,row in ipairs(k.UI.picker.list.rows) do
-    if row:IsShown() and row.action.id=="druid.regrowth" then candidate=row end
+  for _,row in ipairs(picker.list.rows) do
+    if row:IsShown() and row.entry.actionID=="druid.regrowth" then candidate=row end
   end
-  assert(candidate,"Mouse picker omitted the action to swap")
+  assert(candidate,"Mouse picker omitted the replacement action")
   candidate:Click()
-  equal(k:GetSettings().bindingOverrides["druid.regrowth"],nil,"Picking a collision committed before confirmation")
+  equal(actionByID(k.UI.plan,"druid.rejuvenation").name,"Rejuvenation","Picking a replacement committed before confirmation")
   local confirmButton
   for _,frame in ipairs(Mock.frames) do
     if frame:GetParent()==k.UI.confirm and frame.kind=="Button" and frame:GetText()=="Continue" then confirmButton=frame end
   end
-  assert(confirmButton,"Swap review has no usable confirmation button")
+  assert(confirmButton,"Replacement review has no usable confirmation button")
   confirmButton:Click()
-  equal(actionByID(k.UI.plan,"druid.regrowth").key,"Q","Mouse-only swap did not assign the chosen spell")
-  equal(actionByID(k.UI.plan,"druid.rejuvenation").key,"E","Mouse-only swap discarded the previous spell")
-  equal(#k.UI.plan.errors,0,"Mouse-only swap produced invalid bindings")
-  equal(#Mock.writes,0,"Mouse-only swap applied live bindings without Apply")
+  equal(actionByID(k.UI.plan,"druid.rejuvenation").name,"Regrowth","Mouse-only replacement did not install the chosen spell")
+  equal(actionByID(k.UI.plan,"druid.rejuvenation").key,"Q","Mouse-only replacement moved the destination key")
+  equal(actionByID(k.UI.plan,"druid.regrowth").key,"E","Mouse-only replacement moved the spell's other binding")
+  equal(#k.UI.plan.errors,0,"Mouse-only replacement produced invalid bindings")
+  equal(#Mock.writes,0,"Mouse-only replacement applied live bindings without Apply")
 end
 
 function Tests.settings_launcher_registers_once_and_open_is_idempotent()

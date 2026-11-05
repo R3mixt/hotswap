@@ -42,10 +42,16 @@ Preflight errors stop before installation. Transaction failures attempt rollback
 
 Hot Swap uses the native action slots and binding commands where possible. Supported Bartender/Dominos button bindings can be displayed through their live action-slot attributes. Hot Swap does not rewrite another addon's profiles, paging rules or override bindings. Consequently custom overrides can still take precedence over saved bindings. Verify the actual button action, form paging and combat behavior with each addon enabled separately before relying on the combination.
 
+## Binding action menu
+
+Click an occupied keyboard, wheel, mouse or list binding to open targeting, spell replacement and key-change choices. The menu never starts key recording by itself. The opaque menu and recorder remain readable with translucent window settings. Search replacement actions while retaining the selected key.
+
+Current supports targeting for verified spell families and item types. Mouseover falls back to the current valid target; Default preserves normal native behavior. Arbitrary macros retain their own targeting and are never rewritten by this control. Current target edits stay separate from preset drafts and apply through the existing backup/rollback transaction. Any other keys bound to the same native slot share its action/targeting.
+
 ## User acceptance sequence
 
 1. Open `/hotswap`, inspect Current against the game, close from another tab, and reopen. Confirm Current is selected and no bindings changed.
-2. Drag a learned spell from each spellbook onto an empty key and an occupied key. Test both confirmation switches, cancel, apply, and discard. Try Shift/Ctrl and a form-specific action.
+2. Click each wheel direction, select Mouseover, close with Done, reopen, and apply. Test a valid mouseover, no mouseover with a valid current target, and Alt-self for eligible heals. Replace a spell using the menu search, then explicitly Change key; opening the menu alone must never record input. Drag a learned spell from each spellbook onto an empty key and an occupied key. Test both confirmation switches, cancel, apply, and discard. Try Shift/Ctrl and a form-specific action.
 3. Reserve an unlearned spell, apply, learn it, and verify it activates without a placeholder macro. Repeat with combat deferral, a higher rank and an explicit lower rank.
 4. Import a downloaded `.hotswap` code while a local draft exists. Confirm the draft and preferences remain, duplicate names survive, and imported bindings install only after explicit apply.
 5. Bind movement and camera commands through Game controls. Check mouse buttons/wheel, chat, Escape, search typing and Hover bind; closing and entering combat must release editor capture.

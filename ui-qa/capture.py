@@ -24,7 +24,7 @@ end
 local oldCreate=CreateFrame
 function CreateFrame(kind,name,parent,template)
  local f=oldCreate(kind,name,parent,template)
- f.qid=#QA+1; QA[f.qid]=f; f.shown=true; f.points={}
+ f.qid=#QA+1; QA[f.qid]=f; f.qaKind=kind; f.shown=true; f.points={}
  function f:SetPoint(point,a,b,c,d)
    local rel,rp,x,y
    if type(a)=='table' then rel=a; rp=b or point; x=c or 0; y=d or 0
@@ -103,12 +103,15 @@ cases.extend([('Settings','settings-controls',None,None),('Settings','settings-b
 cases.append(('Bindings','hover-bind','caster',''))
 cases.append(('Bindings','save-preset','caster',''))
 cases.extend([('Bindings','bindings-current',None,''),('Bindings','current-hover',None,''),('Bindings','bindings-recommendation','caster','')])
+cases.extend([('Bindings','binding-menu',None,''),('Bindings','binding-targeting',None,''),('Bindings','binding-rebind',None,''),('Bindings','binding-replace',None,'')])
 for page,filename,form,layer in cases:
-    lua.execute('for _,name in ipairs({"nativeBarsDialog","diagnosticLogDialog","operationErrorDialog","talentDialog","saveDialog"}) do local f=K.UI[name]; if f then f:Hide() end end')
+    lua.execute('K.UI:CloseMenu(); K.UI:EndCapture(); for _,name in ipairs({"nativeBarsDialog","diagnosticLogDialog","operationErrorDialog","talentDialog","saveDialog","bindingMenu","replacementPicker"}) do local f=K.UI[name]; if f then f:Hide() end end')
     if filename.startswith('settings-') or filename.startswith('talent-'):
         lua.execute('K.UI:ClearOperationError()')
     lua.globals().K.UI.libraryOpen=filename.startswith('library-') or filename=='bindings-current'
-    if filename in ('bindings-current','current-hover'):
+    if filename.startswith('binding-'):
+        lua.execute('Mock.bindings["MOUSEWHEELUP"]="ACTIONBUTTON1"; Mock.actions[1]={"spell",774}; Mock.bindings["MOUSEWHEELDOWN"]="ACTIONBUTTON2"; Mock.actions[2]={"spell",8936}; K.CurrentBindings:Discard(); K.CurrentBindings:Invalidate(); K.UI:ClearOperationError(); K.UI:Open()')
+    elif filename in ('bindings-current','current-hover'):
         lua.execute('Mock.bindings["1"]="ACTIONBUTTON1"; Mock.actions[1]={"spell",5176}; K.UI:ClearOperationError(); K.UI:Open()')
     elif filename == 'bindings-recommendation':
         lua.execute('K.UI:ClearOperationError(); K.UI:PreviewRecommendations()')
@@ -128,6 +131,14 @@ for page,filename,form,layer in cases:
         lua.execute('K.UI:ClearOperationError(); K.UI:PromptSavePreset(nil,true)')
     if filename == 'current-hover':
         lua.execute('K.UI:OpenHoverBindings()')
+    if filename.startswith('binding-'):
+        lua.execute('K.UI.pages.Bindings.keyboard.keys.MOUSEWHEELUP:Click()')
+        if filename == 'binding-targeting':
+            lua.execute('K.UI.bindingMenu.targetMode:Click()')
+        elif filename == 'binding-rebind':
+            lua.execute('K.UI.bindingMenu.rebind:Click()')
+        elif filename == 'binding-replace':
+            lua.execute('K.UI.bindingMenu.change:Click()')
     if filename == 'hover-bind':
         lua.execute('K.UI:ClearOperationError(); K.UI:OpenHoverBindings()')
     if filename == 'action-bars':
@@ -149,7 +160,7 @@ for page,filename,form,layer in cases:
         def ident(value):
             if value is None:return None
             return int(value['qid']) if value['qid'] else 0
-        n={'id':int(f.qid),'kind':f.kind,'strata':f.strata,'parent':ident(f.parent),'all':ident(f.all),'scrollHost':ident(f.scrollHost),'shown':bool(f.shown),'w':f.width,'h':f.height,'text':str(f.GetText(f) or ''),'font':f.fontsize or 12,'wrap':f.wrap is not False,'justify':f.justify or 'LEFT','points':[], 'template':f.template, 'texture':f.texture if isinstance(f.texture,str) else None,'selected':bool(f.selected),'checked':bool(f.checked),'enabled':f.enabled is not False,'keycap':bool(f.base)}
+        n={'id':int(f.qid),'kind':f.qaKind,'strata':f.strata,'level':f.frameLevel,'parent':ident(f.parent),'all':ident(f.all),'scrollHost':ident(f.scrollHost),'shown':bool(f.shown),'w':f.width,'h':f.height,'text':str(f.GetText(f) or ''),'font':f.fontsize or 12,'wrap':f.wrap is not False,'justify':f.justify or 'LEFT','points':[], 'template':f.template, 'texture':f.texture if isinstance(f.texture,str) else None,'selected':bool(f.selected),'checked':bool(f.checked),'enabled':f.enabled is not False,'keycap':bool(f.base)}
         if f.backdrop:n['backdrop']={k:v for k,v in f.backdrop.items() if k in ('bgFile','edgeFile','edgeSize')}
         parent=f.parent
         # Native button state textures are displayed conditionally by the client.
@@ -199,7 +210,12 @@ for page,filename,form,layer in cases:
     def strata(i):
         n=nodes[i]
         return strata_order.get(n['strata'],2) if n['strata'] else (strata(n['parent']) if n['parent'] else 2)
-    ordered=sorted(nodes.items(),key=lambda row:(strata(row[0]),depth(row[0]),row[0]))
+    def level(i):
+        n=nodes[i]
+        if n['level'] is not None:return n['level']
+        parent_level=level(n['parent']) if n['parent'] else 0
+        return parent_level+(0 if n['kind'] in ('Texture','FontString') else 1)
+    ordered=sorted(nodes.items(),key=lambda row:(strata(row[0]),level(row[0]),depth(row[0]),row[0]))
     for i,n in ordered:
         if not visible(i):continue
         x,y,w,h=bounds(i)

@@ -312,6 +312,70 @@ function C:ClearKey(action)
  self:StageKey(action.key,false)
  return true,"Key cleared in your Current layout. Apply changes installs it."
 end
+-- Only verified spell families and item types can be rewritten. In particular,
+-- GetMacroSpell is display metadata, never permission to replace a user macro.
+function C:TargetAction(action)
+ if not action or action.builtin or action.petSpell or action.readError then return end
+ if action.kind=="item" and action.itemID then
+  local info=K.Items:GetTargetInfo(action)
+  return {kind="item",itemID=action.itemID,itemTargeting=info.kind,itemTargetInfo=info,targeting=info.kind}
+ end
+ if action.kind~="spell" or not action.spellID then return end
+ local _,class=UnitClass("player")
+ local flavor=K.API:GetFlavor({flavor="auto"}); local book=K.API:GetCachedSpellbook()
+ local catalog=self.targetCatalog
+ if not catalog or catalog.class~=class or catalog.flavor~=flavor or catalog.book~=book then
+  catalog={class=class,flavor=flavor,book=book,byID={},byName={}}
+  local function addName(name,target) if name and not catalog.byName[name] then catalog.byName[name]=target end end
+  for _,def in ipairs(K.Profiles:Get(class,flavor)) do
+   if not def.kind and not def.builtin and not def.combo and not def.focusOf then
+    local target={targeting=def.targeting,noSelf=def.noSelf}
+    addName(def.name,target)
+    for _,alias in ipairs(def.spellNames or {}) do addName(alias,target) end
+    for _,id in ipairs(def.spellIDs or {}) do
+     if not catalog.byID[id] then catalog.byID[id]=target end
+     addName(K.API:SpellInfo(id),target)
+    end
+   end
+  end
+  self.targetCatalog=catalog
+ end
+ local name=K.API:SpellInfo(action.spellID) or action.spellName or action.name
+ local target=catalog.byID[action.spellID] or name and catalog.byName[name]
+ if target then local result=K.Copy(target); result.spellID=action.spellID; return result end
+end
+function C:TargetModes(action)
+ local target=self:TargetAction(action)
+ return target and K.Library:TargetModes(target) or {"default"}
+end
+function C:SetTargetMode(action,mode)
+ if K.Engine.busy or (InCombatLockdown and InCombatLockdown()) then return false,"Leave combat and wait for the current operation." end
+ if not action or not action.current or not action.key then return false,"Choose a current spell or item binding." end
+ if action.key=="ESCAPE" or action.key:match("BUTTON[12]$") then return false,"Keep Escape and primary mouse controls on their current keys." end
+ local modes=self:TargetModes(action)
+ local allowed=false; for _,candidate in ipairs(modes) do if candidate==mode then allowed=true end end
+ if not allowed then return false,"That target mode is not supported by this action on this client." end
+ if #modes<2 then return false,"This action has no editable targeting behavior." end
+ self:Build()
+ local current=self:EditingView().byKey[action.key]
+ if not current or current.command~=action.command or current.liveSlot~=action.liveSlot or current.spellID~=action.spellID or current.itemID~=action.itemID then
+  return false,"This binding changed. Review Current again."
+ end
+ local data=K.Copy(current.currentEntry or {})
+ data.label=current.label; data.icon=current.icon
+ if current.kind=="spell" then
+  local exact=K.API:ResolveExact(current.spellID,K.API:GetCachedSpellbook())
+  if not exact then return false,"Spell details are not available yet. Refresh the spellbook and try again." end
+  data.spellID=current.spellID; data.name=data.name or exact.name
+  if not current.currentEntry then data.rank=exact.rank~="" and exact.rank or nil end
+ else data.itemID=current.itemID end
+ data.targetMode=mode~="default" and mode or nil
+ local ok,resolved=pcall(self.ResolveEntry,self,data)
+ if not ok then return false,tostring(resolved) end
+ local staged,why=self:StageResolvedEntry(resolved,current.key)
+ if not staged then return false,why end
+ return true,"Targeting saved to your Current layout. Apply changes installs it."
+end
 function C:StageEntry(entry,key)
  key=K.API:NormalizeKey(key)
  if not key or key=="ESCAPE" or key:match("BUTTON[12]$") then return false,"Choose a valid destination key." end
@@ -342,6 +406,11 @@ function C:StageEntry(entry,key)
   data.body=K.Library:Emotes()[d.emote]; data.command="MACRO "..K.Macros:Name(data.body)
  else return false,"Choose a spell, item, local macro or supported game command." end
  data=self:ResolveEntry(data)
+ local ok,why=self:StageResolvedEntry(data,key)
+ if not ok then return false,why end
+ return true,"Action added to your Current layout. Apply changes installs it, including future ability reservations."
+end
+function C:StageResolvedEntry(data,key)
  local e=self:Edits(); self:Build(); local live=self:EditingView().byKey[key]
  if (data.content or data.pending or data.body) and live and live.liveSlot then
   local at=live.liveSlot
@@ -355,7 +424,7 @@ function C:StageEntry(entry,key)
   if data.body then data.command="MACRO "..K.Macros:Name(data.body) end
   self:StageKey(key,data.command,data)
  end
- return true,"Action added to your Current layout. Apply changes installs it, including future ability reservations."
+ return true
 end
 -- Normalize both new entries and drafts saved by earlier macro-heavy versions.
 -- Only primitive spell/item entries are converted; local/custom macro bodies
@@ -373,7 +442,7 @@ function C:ResolveEntry(entry)
   data.command=learned and data.previewCommand or false
   data.content=learned and {kind="spell",id=learned.id} or false
   data.pending=not learned or nil
-  data.body=nil; data.futureBody=nil; data.macroName=nil; data.macroIndex=nil; data.nativeMacro=nil
+  data.body=nil; data.futureBody=nil; data.macroName=nil; data.macroIndex=nil; data.nativeMacro=nil; data.desiredBody=nil
  elseif data.itemID then
   K.Items:GetCached()
   local item=K.Items:Resolve(data.itemID)
@@ -382,11 +451,26 @@ function C:ResolveEntry(entry)
   data.command=available and data.previewCommand or false
   data.content=available and {kind="item",id=data.itemID} or false
   data.pending=not available or nil
-  data.body=nil; data.futureBody=nil; data.macroName=nil; data.macroIndex=nil; data.nativeMacro=nil
+  data.body=nil; data.futureBody=nil; data.macroName=nil; data.macroIndex=nil; data.nativeMacro=nil; data.desiredBody=nil
  elseif data.desiredBody then
   data.body=data.desiredBody; data.command="MACRO "..K.Macros:Name(data.body)
   data.content={kind="macro",name=K.Macros:Name(data.body),body=data.body}; data.pending=nil
  end
+ if (data.spellID or data.itemID) and data.targetMode and data.targetMode~="default" then
+  local action={kind=data.spellID and "spell" or "item",spellID=data.spellID,itemID=data.itemID,name=data.name}
+  local target=self:TargetAction(action)
+  local allowed=false; for _,mode in ipairs(target and K.Library:TargetModes(target) or {}) do if mode==data.targetMode then allowed=true end end
+  if not target or not allowed then error("Saved targeting is unavailable for "..tostring(data.label or data.name).." on this client. Choose a supported target mode.") end
+  data.targeting=target.targeting; data.noSelf=target.noSelf
+  if not data.pending then
+   target.known=true; target.spellName=data.name; target.label=data.label; target.targetMode=data.targetMode
+   target.explicitRank=data.rank and data.rank~="" or false; target.selectedRank=data.rank
+   local body,why=K.Macros:Build(target,{flavor=K.API:GetFlavor({flavor="auto"}),cancelForUtility=false,selfFallback=false})
+   if not body then error(why or "Could not build this targeting behavior.") end
+   data.body=body; data.command="MACRO "..K.Macros:Name(body)
+   data.content={kind="macro",name=K.Macros:Name(body),body=body}
+  end
+ else data.targeting=nil; data.noSelf=nil end
  return data
 end
 function C:PrepareEdits(edits)
@@ -435,6 +519,7 @@ function C:Annotate(action,entry)
  if not entry then return action end
  action.currentEntry=K.Copy(entry); action.label=entry.label or action.label
  action.icon=entry.icon or action.icon; action.displayIcon=action.icon
+ action.targetMode=entry.targetMode; action.targeting=entry.targeting; action.noSelf=entry.noSelf
  if entry.spellID then
   action.kind="spell"; action.spellID=entry.spellID; action.displaySpellID=entry.spellID; action.spellName=entry.name
   local book=K.API:GetCachedSpellbook()

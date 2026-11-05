@@ -30,6 +30,22 @@ local function box(kind, parent, fill, name)
     end
     return f
 end
+-- Binding dialogs have an opaque card of their own. Blizzard's textured
+-- backdrop (and the user's window opacity) must not bleed keyboard labels
+-- through the choices or the key-capture instructions.
+local function bindingDialog(parent, name, width, height)
+    local f=CreateFrame("Frame",name,parent)
+    f:SetAllPoints(parent); f:SetFrameStrata("DIALOG"); f:SetFrameLevel(parent:GetFrameLevel()+60)
+    f:EnableMouse(true); f:EnableMouseWheel(true); f:SetAlpha(1)
+    if f.SetIgnoreParentAlpha then f:SetIgnoreParentAlpha(true) end
+    f.shade=f:CreateTexture(nil,"BACKGROUND"); f.shade:SetAllPoints(f); f.shade:SetColorTexture(0,0,0,0.65)
+    local panel=box("Frame",f,C.bg)
+    panel:SetSize(width,height); panel:SetPoint("CENTER"); panel:EnableMouse(true)
+    panel.opaqueBackground=panel:CreateTexture(nil,"BACKGROUND",nil,-8)
+    panel.opaqueBackground:SetAllPoints(panel); panel.opaqueBackground:SetColorTexture(C.bg[1],C.bg[2],C.bg[3],1)
+    f.panel=panel
+    return f,panel
+end
 local function label(parent, value, size, tone)
     local fs = parent:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
     fs:SetFont(STANDARD_TEXT_FONT or "Fonts\\FRIZQT__.TTF", size or 12, "")
@@ -342,7 +358,7 @@ function UI:UpdateBusyState()
         self:ClearInputFocus(); self:EndCapture(); self:CloseMenu()
         if self.CancelLibraryDrag then self:CancelLibraryDrag() end
         if self.library then self.library:Hide() end
-        for _,name in ipairs({"confirm","picker","review","nameDialog","saveDialog","nativeBarsDialog","operationErrorDialog","diagnosticLogDialog","talentDialog"}) do
+        for _,name in ipairs({"confirm","picker","bindingMenu","replacementPicker","review","nameDialog","saveDialog","nativeBarsDialog","operationErrorDialog","diagnosticLogDialog","talentDialog"}) do
             local modal=self[name]; if modal then modal:Hide() end
         end
         self:ResetKeyTest()
@@ -547,6 +563,7 @@ function UI:EndCapture()
         self.capture:Hide()
     end
     self.captureAction = nil
+    self.captureSelection = nil
     self.endingCapture = nil
 end
 function UI:ClearInputFocus()
@@ -598,7 +615,9 @@ function UI:AssignBinding(action, key)
             self.libraryEntry=action.libraryEntry; return self:DropLibraryEntry(key)
         end
         action=action.currentBinding or action
+        local selection=self.captureAction==action and self.captureSelection or nil
         local function stage()
+            if not self:ValidateBindingSelection(action,selection) then return false end
             local ok,why=self:Call(K.CurrentBindings,"Rebind",action,key)
             if ok then self:EndCapture(); self.currentBindingPlan=nil; self:Refresh() end
             self:Notice(why,not ok); return ok
@@ -734,40 +753,110 @@ function UI:BeginActionCapture(action)
     end
     self:BeginCapture(action.presetName and "preset" or "key",action)
 end
+function UI:CloseBindingEditor()
+    if self.bindingMenu then self.bindingMenu:Hide() end
+    if self.replacementPicker then self.replacementPicker:Hide() end
+end
+function UI:BindingSelectionSnapshot(action)
+    if not action or not action.current then return end
+    return {command=GetBindingAction(action.key) or "",slot=action.liveSlot,
+        content=action.liveSlot and K.NativeBars:ReadSlot(action.liveSlot) or false}
+end
+function UI:ValidateBindingSelection(action,snapshot)
+    if not action or not action.current then return true end
+    K.CurrentBindings:Build()
+    local current=K.CurrentBindings:EditingView().byKey[action.key]
+    local same=self.bindingSource=="current" and current~=nil
+    for _,field in ipairs({"command","liveSlot","spellID","itemID","targetMode","macroFingerprint"}) do
+        if not current or current[field]~=action[field] then same=false end
+    end
+    if snapshot and ((GetBindingAction(action.key) or "")~=snapshot.command or (current and current.liveSlot)~=snapshot.slot
+        or (snapshot.slot and not K.NativeBars:SameContent(K.NativeBars:ReadSlot(snapshot.slot),snapshot.content))) then same=false end
+    if same then return true end
+    self:CloseBindingEditor(); self:EndCapture(); self:CloseMenu()
+    self.currentBindingPlan=nil; self:Refresh()
+    self:Notice("This key or action slot changed while you were editing it. Select the binding again.",true)
+    return false
+end
+function UI:OpenBindingMenu(action)
+    if not action or self.bindingSource=="recommendation" then return end
+    if K.Engine and K.Engine.busy then self:UpdateBusyState(); return end
+    if InCombatLockdown and InCombatLockdown() then self:Notice("Editing is paused during combat.",true); return end
+    if not self:ValidateBindingSelection(action) then return end
+    self:EndCapture(); self:CloseMenu(); self:ClearInputFocus()
+    self.selectedAction=action; self:BindingDetail(action)
+    if not self.bindingMenu then
+        local f,panel=bindingDialog(self.frame,"KeybindOptimizerBindingMenu",540,400)
+        f.icon=panel:CreateTexture(nil,"ARTWORK"); f.icon:SetSize(40,40); f.icon:SetPoint("TOPLEFT",24,-24)
+        f.title=label(panel,"",20); f.title:SetPoint("TOPLEFT",78,-23); f.title:SetWidth(438); f.title:SetHeight(48)
+        f.key=label(panel,"",12,C.text); f.key:SetPoint("TOPLEFT",24,-82); f.key:SetWidth(492)
+        label(panel,"Targeting",13,C.text):SetPoint("TOPLEFT",24,-128)
+        f.targetMode=button(panel,"Default",300,function(self) UI:OpenTargetMenu(self) end)
+        f.targetMode:SetPoint("TOPRIGHT",-24,-120); f.targetMode:SetHeight(30)
+        f.targetHint=label(panel,"",12,C.muted); f.targetHint:SetPoint("TOPLEFT",24,-160); f.targetHint:SetWidth(492); f.targetHint:SetHeight(38)
+        f.change=button(panel,"Change spell...",200,function()
+            if not UI:ValidateBindingSelection(f.action,f.selection) then return end
+            local selected=f.action; f:Hide(); UI:OpenReplacementPicker(selected)
+        end)
+        f.change:SetPoint("TOPLEFT",24,-211); f.change:SetHeight(32)
+        f.changeHint=label(panel,"",12,C.text); f.changeHint:SetPoint("TOPLEFT",242,-214); f.changeHint:SetWidth(274); f.changeHint:SetHeight(36)
+        f.rebind=button(panel,"Change key...",200,function()
+            if not UI:ValidateBindingSelection(f.action,f.selection) then return end
+            local selected=f.action; f:Hide(); UI:BeginActionCapture(selected)
+        end)
+        f.rebind:SetPoint("TOPLEFT",24,-262); f.rebind:SetHeight(32)
+        f.rebindHint=label(panel,"Keep this action; choose another key or mouse button.",12,C.text)
+        f.rebindHint:SetPoint("TOPLEFT",242,-265); f.rebindHint:SetWidth(274); f.rebindHint:SetHeight(36)
+        f.note=label(panel,"",11,C.muted); f.note:SetPoint("BOTTOMLEFT",24,65); f.note:SetWidth(492)
+        f.clear=button(panel,"Clear key",112,function()
+            if not UI:ValidateBindingSelection(f.action,f.selection) then return end
+            f:Hide(); UI.selectedAction=f.action; UI.pages.Bindings.detail.reset:Click()
+        end); f.clear:SetPoint("BOTTOMLEFT",24,22)
+        f.done=button(panel,"Done",112,function() f:Hide() end,true); f.done:SetPoint("BOTTOMRIGHT",-24,22)
+        f:SetScript("OnHide",function() UI:CloseMenu(); UI:EndModal(f) end)
+        self.bindingMenu=f
+    end
+    local f=self.bindingMenu
+    f.selection=self:BindingSelectionSnapshot(action)
+    f.action=action; f.title:SetText(action.label or action.spellName or action.id)
+    f.icon:SetTexture(action.displayIcon or action.icon or "Interface\\Icons\\INV_Misc_QuestionMark"); f.key:SetText(keyName(action.key).."  /  "..(self.bindingSource=="current" and "Current bindings" or "Preset draft"))
+    f.change.text:SetText((action.spellID or action.spellName) and "Change spell..." or "Change action...")
+    f.changeHint:SetText("Keep "..keyName(action.key).."; choose a different spell or action.")
+    f.note:SetText(self.bindingSource=="current" and "Edits are staged until you choose Apply changes." or "Edits are staged until you choose Apply & save.")
+    local editable=not action.preserved
+    f.change:SetEnabled(editable and not action.presetName and action.key~=nil)
+    f.rebind:SetEnabled(editable); f.clear:SetEnabled(editable)
+    f.clear.text:SetText(self.bindingSource=="current" and "Clear key" or "Reset key")
+    self:RenderBindingMenuTarget()
+    self:BeginModal(f,"KeybindOptimizerBindingMenu"); f:Show()
+end
 function UI:BeginCapture(mode, action)
     if mode~="mouse" and mode~="preset" and self.bindingSource=="recommendation" then
         self:Notice("Choose an editable preset draft before rebinding."); return
     end
     if K.Engine and K.Engine.busy then self:UpdateBusyState(); return end
     if InCombatLockdown and InCombatLockdown() then self:Notice("Rebinding is paused during combat.", true); return end
+    if mode=="key" and not self:ValidateBindingSelection(action) then return end
     self:CloseMenu()
     self:ClearInputFocus()
     if not self.capture then
-        local f = box("Frame", self.frame, C.bg, "KeybindOptimizerCapture")
-        f:SetAllPoints(self.frame)
-        f:SetFrameStrata("DIALOG")
-        f:SetFrameLevel(self.frame:GetFrameLevel() + 60)
-        f:EnableMouse(true)
-        f:EnableMouseWheel(true)
-        local title = label(f, "", 22, C.accent)
-        title:SetPoint("TOPLEFT", 64, -168)
-        title:SetWidth(730)
-        local hint = label(f, "", 14, C.text)
-        hint:SetPoint("TOPLEFT", title, "BOTTOMLEFT", 0, -18)
-        hint:SetWidth(730)
-        local note = label(f, "", 12, C.muted)
-        note:SetPoint("TOPLEFT", hint, "BOTTOMLEFT", 0, -22)
-        note:SetWidth(730)
-        local cancel = button(f, "Cancel", 120, function() UI:EndCapture(); UI:Refresh() end)
-        cancel:SetPoint("BOTTOMRIGHT", -40, 40)
-        f.targetLabel=label(f,"Targeting",12,C.text); f.targetLabel:SetPoint("TOPLEFT",64,-329)
-        f.targetMode=button(f,"Default",190,function(self) UI:OpenTargetMenu(self) end)
-        f.targetMode:SetPoint("TOPLEFT",155,-320)
-        f.talents=button(f,"Talent keys",150,function()
+        local f,panel = bindingDialog(self.frame,"KeybindOptimizerCapture",540,350)
+        local title = label(panel, "", 20, C.accent)
+        title:SetPoint("TOPLEFT", 24, -24); title:SetWidth(492); title:SetHeight(50)
+        local hint = label(panel, "", 14, C.text)
+        hint:SetPoint("TOPLEFT", 24, -87); hint:SetWidth(492); hint:SetHeight(60)
+        local note = label(panel, "", 12, C.muted)
+        note:SetPoint("TOPLEFT", 24, -158); note:SetWidth(492); note:SetHeight(46)
+        local cancel = button(panel, "Cancel", 120, function() UI:EndCapture(); UI:Refresh() end)
+        cancel:SetPoint("BOTTOMRIGHT", -24, 22)
+        f.targetLabel=label(panel,"Targeting",12,C.text); f.targetLabel:SetPoint("TOPLEFT",24,-219)
+        f.targetMode=button(panel,"Default",230,function(self) UI:OpenTargetMenu(self) end)
+        f.targetMode:SetPoint("TOPLEFT",126,-211)
+        f.talents=button(panel,"Talent keys",150,function()
             local selected=UI.captureAction; UI:EndCapture()
             if selected then UI:OpenTalentChoices(selected) end
         end)
-        f.talents:SetPoint("TOPLEFT",64,-368)
+        f.talents:SetPoint("BOTTOMLEFT",24,22)
         local function dispatch(key)
             UI.captureDispatch=true
             local ok, why=pcall(UI.CaptureInput,UI,key)
@@ -783,16 +872,20 @@ function UI:BeginCapture(mode, action)
         end)
         f:SetScript("OnMouseDown", function(_, key) dispatch(mouseKey(key)) end)
         f:SetScript("OnMouseWheel", function(_, delta) dispatch(delta > 0 and "MOUSEWHEELUP" or "MOUSEWHEELDOWN") end)
+        panel:SetScript("OnMouseDown",function(_,key) dispatch(mouseKey(key)) end)
+        panel:EnableMouseWheel(true); panel:SetScript("OnMouseWheel",function(_,delta) dispatch(delta>0 and "MOUSEWHEELUP" or "MOUSEWHEELDOWN") end)
         f:SetScript("OnHide", function() UI:EndCapture() end)
         self.capture, self.captureTitle, self.captureHint = f, title, hint
         self.captureNote, self.captureDone = note, cancel
     end
     self.captureMode, self.captureAction = mode, action
+    self.captureSelection=mode=="key" and self:BindingSelectionSnapshot(action) or nil
     self:BeginModal(self.capture, "KeybindOptimizerCapture")
-    self.captureTitle:SetText(mode == "mouse" and "Record your mouse buttons" or (mode == "preset" and "Hot Swap key for " or "Edit ") .. tostring(action.label or action.id))
+    self.captureTitle:SetText(mode == "mouse" and "Record your mouse buttons" or (mode == "preset" and "Hot Swap key for " or "Change key: ") .. tostring(action.label or action.id))
     self.captureHint:SetText(mode == "mouse" and "Press each side button once." or "Press the new key, mouse button, or wheel direction. Hold Shift or Ctrl if needed.")
     local linked=mode=="key" and #self:LinkedBindings(action)>1
-    self.captureNote:SetText(mode == "mouse" and "Recorded buttons are kept. Escape or Done finishes. Apply & save installs your changes." or (linked and "Escape cancels. This action-bar position changes in every form. Apply & save installs it." or "Escape cancels this key change. Apply & save installs your changes."))
+    local apply=self.bindingSource=="current" and "Apply changes" or "Apply & save"
+    self.captureNote:SetText(mode == "mouse" and "Recorded buttons are kept. Escape or Done finishes. Apply & save installs your changes." or (linked and "This position shares a key across forms. " or "").."Escape keeps the existing key. "..apply.." installs your edits.")
     self.captureDone.text:SetText(mode == "mouse" and "Done" or (mode=="key" and "Done" or "Cancel"))
     self.capture.talents:SetShown(mode=="key" and self.CanEditTalentChoices and self:CanEditTalentChoices(action) or false)
     self:RenderCaptureTarget()
@@ -1111,7 +1204,7 @@ function UI:UpdateBindingTester()
     self.tester:Show()
     if available then
         local view=self.bindingSource=="current" and "Current bindings" or self.bindingSource=="recommendation" and "Recommendation preview" or "Preset draft"
-        self.pages.Bindings.keyboard.note:SetText(self.lastTest and (view.." — no casting  |  "..self.lastTest) or (self.bindingSource~="recommendation" and "Test keys here — no casting. Click to rebind. L = unlearned; T = talent." or view.." - read-only. Press keys to inspect; no casting. Use List for other keys."))
+        self.pages.Bindings.keyboard.note:SetText(self.lastTest and (view.." — no casting  |  "..self.lastTest) or (self.bindingSource~="recommendation" and "Click a binding for targeting, spell or key options. Test keys here without casting." or view.." - read-only. Press keys to inspect; no casting. Use List for other keys."))
         if self:IsNativeSpellbookShown() then self.pages.Bindings.keyboard.note:SetText("Drag from the game spellbook. Mouse clicks outside Hot Swap use normal game controls.") end
     else
         self:ResetKeyTest()
@@ -1341,7 +1434,7 @@ function UI:KeyboardKeyClick(base)
     local cap = self.pages.Bindings.keyboard.keys[base]
     if not cap then return end
     if self.bindingSource=="current" then
-        if cap.action then self.selectedAction=cap.action; self:BindingDetail(cap.action); self:BeginActionCapture(cap.action)
+        if cap.action then self:OpenBindingMenu(cap.action)
         else self:OpenActionPicker(cap.fullKey) end
         return
     end
@@ -1355,7 +1448,7 @@ function UI:KeyboardKeyClick(base)
         UI.selectedAction = action
         UI:BindingDetail(action)
         if cap.alias then UI:Notice("Self-cast follows " .. keyName(action.key) .. ". Rebind the normal action to move both.") end
-        UI:BeginActionCapture(action)
+        UI:OpenBindingMenu(action)
     end
     if #cap.actions > 1 then
         local options = {}
@@ -1437,7 +1530,7 @@ function UI:SetBindingSource(source)
     if source~="current" and source~="draft" and source~="recommendation" then return end
     if source=="recommendation" and not self.recommendationPlan then return self:PreviewRecommendations() end
     if self.CloseHoverBindings then self:CloseHoverBindings() end
-    self:EndCapture(); self:CloseMenu(); self:ClearInputFocus(); self:CancelLibraryDrag()
+    self:EndCapture(); self:CloseBindingEditor(); self:CloseMenu(); self:ClearInputFocus(); self:CancelLibraryDrag()
     self.bindingSource=source; self.selectedAction=nil; self.notice=nil; self.search=nil
     if self.pages and self.pages.Bindings then self.pages.Bindings.search:SetText("") end
     self.currentBindingPlan=nil; self.keyIcons=nil; self.availableActionPages=nil; self.lastTest=nil
@@ -1569,7 +1662,7 @@ function UI:BuildBindings(page)
     detail.title = label(detail, "Select a binding", 12)
     detail.title:SetPoint("TOPLEFT", 12, -10)
     truncate(detail.title, 440)
-    detail.desc = label(detail, "Press a key to test its planned action. Click an icon to rebind.", 11, C.muted)
+    detail.desc = label(detail, "Click a binding to change its spell, targeting or key.", 11, C.muted)
     detail.desc:SetPoint("TOPLEFT", 12, -31)
     detail.desc:SetWidth(440)
     detail.rebind = button(detail, "Rebind", 100, function()
@@ -1578,7 +1671,7 @@ function UI:BuildBindings(page)
     detail.rebind:SetPoint("TOPRIGHT", -230, -12)
     detail.rebind:SetEnabled(false)
     detail.change = button(detail, "Change action", 112, function()
-        if UI.selectedAction and UI.selectedAction.key then UI:OpenActionPicker(UI.selectedAction.key) end
+        if UI.selectedAction and UI.selectedAction.key then UI:OpenReplacementPicker(UI.selectedAction) end
     end)
     detail.change:SetPoint("TOPRIGHT", -112, -12)
     detail.change:SetEnabled(false)
@@ -1671,7 +1764,7 @@ function UI:RenderBindings(reusePageCache)
         if not row then
             row = listRow(list.child)
             row:SetHeight(37)
-            row.key = button(row, "", 116, function(self) UI:BeginActionCapture(self:GetParent().action) end)
+            row.key = button(row, "", 116, function(self) UI:OpenBindingMenu(self:GetParent().action) end)
             row.key:SetHeight(27)
             row.key:SetPoint("LEFT", 5, 0)
             row.name = label(row, "", 11)
@@ -1686,6 +1779,7 @@ function UI:RenderBindings(reusePageCache)
             row:SetScript("OnClick", function(self)
                 UI.selectedAction = self.action
                 UI:RenderBindings()
+                UI:OpenBindingMenu(self.action)
             end)
             list.rows[i] = row
         end
@@ -1702,7 +1796,7 @@ function UI:RenderBindings(reusePageCache)
         row.state:SetText(a.preserved and "Protected" or state and state~="ready" and status or a.known==false and "Unavailable" or (pinned and "Pinned" or "Ready"))
         color(row.name, a.known == false and tone or C.text)
         color(row.state, a.known==false and tone or (pinned and C.accent or C.muted))
-        tooltip(row.key, a.label or a.id, not editable and "Read-only binding. Choose an editable preset draft to make changes." or a.preserved and "Protected in Settings. Current game binding is kept." or "Click to capture a replacement key. A pinned key is retained when the profile updates.",a.displaySpellID or a.spellID,state and state~="ready" and status)
+        tooltip(row.key, a.label or a.id, not editable and "Read-only binding. Choose an editable preset draft to make changes." or a.preserved and "Protected in Settings. Current game binding is kept." or "Choose targeting, replace this action, or change its key.",a.displaySpellID or a.spellID,state and state~="ready" and status)
         row:Show()
     end
     if not list.empty then list.empty = label(list.child, "", 13, C.muted); list.empty:SetPoint("TOPLEFT", 10, -18); list.empty:SetWidth(550) end
@@ -1909,7 +2003,7 @@ function UI:RenderPresets()
     d.use.text:SetText(APPLY_LABEL)
 end
 
-UI.widgets={button=button,label=label,box=box,scroll=scroll,edit=edit,tooltip=tooltip,truncate=truncate,color=color,colors=C,keyName=keyName,listRow=listRow,actionPageNames=actionPageNames}
+UI.widgets={button=button,label=label,box=box,bindingDialog=bindingDialog,scroll=scroll,edit=edit,tooltip=tooltip,truncate=truncate,color=color,colors=C,keyName=keyName,listRow=listRow,actionPageNames=actionPageNames}
 function UI:BuildItems(page)
     return K.ItemsUI:Build(page,self,self.widgets)
 end
@@ -2086,6 +2180,7 @@ end
 function UI:ShowPage(name)
     if K.Engine and K.Engine.busy then self:UpdateBusyState(); return end
     if self.CloseHoverBindings then self:CloseHoverBindings() end
+    self:CloseBindingEditor(); self:EndCapture()
     self:CloseMenu()
     self:ClearInputFocus()
     self.activePage = name
@@ -2114,7 +2209,7 @@ function UI:Create()
         if UI.tester then UI.tester:Hide() end
         if UI.testMouseShield then UI.testMouseShield:Hide() end
         UI:ResetKeyTest()
-        UI:EndCapture(); UI:CloseMenu(); UI:ClearInputFocus()
+        UI:EndCapture(); UI:CloseBindingEditor(); UI:CloseMenu(); UI:ClearInputFocus()
         if UI.confirm then UI.confirm:Hide() end
         if UI.picker then UI.picker:Hide() end
         if UI.review then UI.review:Hide() end
@@ -2219,14 +2314,19 @@ function UI:Create()
     self.events:RegisterEvent("MODIFIER_STATE_CHANGED")
     self.events:RegisterEvent("UPDATE_SHAPESHIFT_FORM")
     self.events:RegisterEvent("UPDATE_STEALTH")
+    local routeEvents={UPDATE_BINDINGS=true,ACTIONBAR_SLOT_CHANGED=true,ACTIONBAR_PAGE_CHANGED=true,UPDATE_MACROS=true,
+        UPDATE_BONUS_ACTIONBAR=true,UPDATE_OVERRIDE_ACTIONBAR=true,UPDATE_VEHICLE_ACTIONBAR=true,UPDATE_SHAPESHIFT_FORM=true,
+        UPDATE_SHAPESHIFT_FORMS=true,UPDATE_POSSESS_BAR=true,PLAYER_ENTERING_WORLD=true,UNIT_ENTERED_VEHICLE=true,UNIT_EXITED_VEHICLE=true}
     for event in pairs(K.CurrentBindings and K.CurrentBindings.Events or {UPDATE_BINDINGS=true,ACTIONBAR_SLOT_CHANGED=true,ACTIONBAR_PAGE_CHANGED=true}) do pcall(self.events.RegisterEvent,self.events,event) end
     self.events:SetScript("OnEvent", function(_, event)
         if not f:IsShown() then return end
         if K.Engine and K.Engine.busy then UI:UpdateBusyState(); return end
         if K.CurrentBindings and K.CurrentBindings.Events[event] then K.CurrentBindings:Invalidate(); UI.currentBindingPlan=nil end
+        if UI.bindingSource=="current" and routeEvents[event] then UI:CloseBindingEditor(); UI:EndCapture(); UI:CloseMenu() end
         if event=="PLAYER_REGEN_DISABLED" then
             if UI.CloseHoverBindings then UI:CloseHoverBindings() end
             if UI.capture and UI.capture:IsShown() then UI:EndCapture() end
+            UI:CloseBindingEditor(); UI:CloseMenu()
             UI:UpdateBindingTester()
         elseif event=="PLAYER_REGEN_ENABLED" then UI:UpdateBindingTester() end
         if event == "MODIFIER_STATE_CHANGED" then

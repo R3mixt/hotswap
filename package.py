@@ -36,7 +36,7 @@ SOURCE_FILES = (
     ".gitattributes", "build_library_data.py", "catalog-classification-input.json",
     "classification-source.json", "talent-classification-source.json",
     "forever-talent-classification-source.json", "ui-qa/capture.py", "ui-qa/render.ps1",
-    "publishing/project.json", "publishing/curseforge-description.md", "publishing/changelog-1.0.1.txt",
+    "publishing/project.json", "publishing/curseforge-description.md", "publishing/changelog-1.0.2.txt",
     "publishing/logo.svg", "publishing/logo.png", "publishing/build-logo.ps1",
 )
 
