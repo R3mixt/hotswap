@@ -19,17 +19,19 @@ This integration uploads files. It does not synchronize the CurseForge project d
 
 1. Create a publisher token in [CurseForge API tokens](https://authors.curseforge.com/account/api-tokens).
 2. In [GitHub Actions secrets](https://github.com/R3mixt/hotswap/settings/secrets/actions), create **CURSEFORGE_API_TOKEN** and paste the token into its Secret field. Never put it in an issue, commit, workflow text or chat.
-3. Check [publishing/curseforge.json](../publishing/curseforge.json). Version 1.0.4 targets project 1779519, Forever **1.60.1** and Classic Era / Hardcore **1.15.9**. These version names match the TOC and are offered by CurseForge. Add other game version names only after checking the client and CurseForge support. Live-client acceptance remains a separate check.
+3. Check [publishing/curseforge.json](../publishing/curseforge.json). Version 1.0.5 targets project 1779519, Forever **1.60.1** and Classic Era / Hardcore **1.15.9**. These version names match the TOC and are offered by CurseForge. Add other game version names only after checking the client and CurseForge support. Live-client acceptance remains a separate check.
 4. Enable GitHub Actions for the repository if GitHub prompts you. The workflow needs only read access to repository contents; CurseForge upload authorization comes from the dedicated secret.
 
 Publishing authorization is verified: the 1.0.2 release workflow successfully uploaded CurseForge file 9453950 on 2026-11-05.
+
+Version 1.0.5 has 681 Lua scenarios, 7 packaging checks and 8 publisher checks. Live verification of the latest Forever combat visibility and recovery fixes, full Era / Hardcore behavior, and third-party action bars remains pending. Automated coverage does not establish live-client acceptance.
 
 ## Publish an update
 
 1. Update the version in `KeybindOptimizer/Core.lua` and `KeybindOptimizer/KeybindOptimizer.toc` together.
 2. Add `publishing/changelog-<version>.txt`, update `CHANGELOG.md` and `publishing/project.json`, and update the changelog entry in `package.py`'s source allowlist.
 3. Push the commit and wait for **Validate Hot Swap** to pass. Complete the required live-client acceptance checks before claiming compatibility.
-4. Open [GitHub Releases](https://github.com/R3mixt/hotswap/releases/new). Create a matching tag such as `v1.0.1` on the reviewed commit and publish it. For user testing, use `v1.0.1-beta.1` and check **Set as a pre-release**. The TOC may remain `1.0.1` for that prerelease tag.
+4. Open [GitHub Releases](https://github.com/R3mixt/hotswap/releases/new). Create a matching tag such as `v1.0.5` on the reviewed commit and publish it. For user testing, use `v1.0.5-beta.1` and check **Set as a pre-release**. The TOC may remain `1.0.5` for that prerelease tag.
 5. Open the **Publish to CurseForge** Actions run. Its summary reports the uploaded file ID. Check the CurseForge Files page for moderation status and the correct versions/channel.
 
 Do not repeatedly rerun a successful upload: it can create duplicate files. If a connection fails after transmission, inspect CurseForge first. A release tag that differs from the TOC version fails before upload. Publishing a GitHub release here triggers the upload workflow; the workflow itself does not attach the ZIP to the GitHub release. A separately attached verified install ZIP may also be provided. The exact package remains available in the Actions artifacts.

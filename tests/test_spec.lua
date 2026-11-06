@@ -116,18 +116,52 @@ function Tests.import_is_data_only_and_rejects_malformed_profiles()
   equal(#Mock.writes,0,"import protected writes")
 end
 
-function Tests.help_macro_prioritizes_alt_and_has_no_implicit_self_fallback()
+function Tests.help_macro_prioritizes_alt_mouseover_target_then_automatic_self_with_legacy_false()
   local k=init()
+  k:GetSettings().selfFallback=false
   local body=k.Macros:Build({known=true,spellName="Rejuvenation",label="Rejuvenation",targeting="help"},k:GetSettings())
   local alt=assert(body:find("[mod:alt,@player]",1,true),"Alt self clause missing")
   local mouse=assert(body:find("[@mouseover,help,nodead]",1,true),"Mouseover clause missing")
   local target=assert(body:find("[help,nodead]",1,true),"Friendly target clause missing")
-  assert(alt<mouse and mouse<target,"Target precedence changed")
+  local self=assert(body:find("[@player]",1,true),"Automatic self fallback missing")
+  assert(alt<mouse and mouse<target and target<self,"Target precedence changed")
   assert(not contains(body,"[]"),"Unexpected unconditional target fallback")
-  assert(not contains(body,"][@player]"),"Unexpected implicit self fallback")
   k:GetSettings().selfFallback=true
-  body=k.Macros:Build({known=true,spellName="Rejuvenation",label="Rejuvenation",targeting="help"},k:GetSettings())
-  assert(contains(body,"[help,nodead][@player]"),"Explicit self fallback ignored")
+  local enabled=k.Macros:Build({known=true,spellName="Rejuvenation",label="Rejuvenation",targeting="help"},k:GetSettings())
+  equal(enabled,body,"Legacy fallback setting changed automatic healing targeting")
+end
+
+function Tests.owned_macro_body_comparison_accepts_only_registered_terminal_line_endings()
+  local k=init(); local body="#showtooltip Rejuvenation\n/cast Rejuvenation"
+  local name=k.Macros:Name(body); k.db.ownedMacros[name]=body
+  assert(k.Macros:SameBody(name,body,body.."\n"))
+  assert(k.Macros:SameBody(name,body.."\n",body.."\r\n\r\n"))
+  assert(k.Macros:SameBody(name,body,body.."\n",{[name]=body.."\r\n"}))
+  assert(not k.Macros:SameBody(name,body,body.." "))
+  assert(not k.Macros:SameBody(name,body,body.."\n "))
+  assert(not k.Macros:SameBody(name,body,body:gsub("Rejuvenation$","Regrowth").."\n"))
+  assert(not k.Macros:SameBody(name,body,body:gsub("\n","\r\n").."\n"))
+  assert(not k.Macros:SameBody(name,body,body.."\n",{[name]="/say a different recorded body"}))
+end
+
+function Tests.personal_macro_body_comparison_keeps_newlines_and_exact_equality()
+  local k=init(); local body="/say personal"
+  assert(k.Macros:SameBody("Personal",body,body))
+  assert(not k.Macros:SameBody("Personal",body,body.."\n"))
+  assert(not k.Macros:SameBody("Personal",nil,nil))
+  assert(not k.Macros:SameBody("Personal",body,false))
+end
+
+function Tests.owned_macro_find_exact_accepts_terminal_line_ending_but_rejects_personal_changes()
+  local k=init(); local body="#showtooltip Rejuvenation\n/cast Rejuvenation"
+  local name=k.Macros:Name(body); local index=CreateMacro(name,1,body.."\r\n",true)
+  k.db.ownedMacros[name]=body
+  assert(k.Macros:FindExact(name,body)==index,"Owned macro was detached because WoW appended a line ending")
+  k.db.ownedMacros[name]=nil
+  assert(not k.Macros:FindExact(name,body),"Unowned macro text was normalized")
+  k.db.ownedMacros[name]=body
+  EditMacro(index,nil,nil,body.." ")
+  assert(not k.Macros:FindExact(name,body),"Trailing spaces in an edited macro were ignored")
 end
 
 local function formMacroEffects(body,currentForm,destinationForm)
@@ -1485,6 +1519,7 @@ function Tests.modern_escape_menu_rebuilds_exactly_one_native_hot_swap_button()
       if candidate:GetText()=="Hot Swap" then count=count+1; button=candidate end
     end
     equal(count,1,"Duplicate or missing menu entry on rebuild "..i)
+    equal(button:GetParent(),menu,"Launcher was not integrated into the native menu")
     equal(button.layoutIndex,2.5,"Menu entry is not positioned after AddOns")
     button:Click()
     assert(not menu:IsShown() and k.UI.frame:IsShown(),"Menu entry failed to open the addon and dismiss menu")
@@ -1499,7 +1534,7 @@ function Tests.legacy_settings_and_escape_menu_launchers_register_once()
   equal(#Mock.legacyCategories,1,"Legacy settings category registration duplicated")
   equal(Mock.legacyCategories[1].name,"Hot Swap","Legacy settings category name")
   local first=k.Launcher.menuButton
-  equal(first:GetParent(),menu,"Legacy menu button is not a menu child")
+  equal(first:GetParent(),UIParent,"Legacy launcher joined the native menu layout")
   k.Launcher:RegisterMenu()
   equal(k.Launcher.menuButton,first,"Repeated legacy registration created another button")
   Mock:ResetWrites(); menu:Show(); first:Click()

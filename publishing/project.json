@@ -5,12 +5,14 @@
   "name": "Hot Swap",
   "summary": "Build and switch class keybind presets on Blizzard's original action bars, with a visual keyboard editor, generated macros, item choices, and named backups.",
   "release": {
-    "version": "1.0.4",
-    "displayName": "Hot Swap 1.0.4",
+    "version": "1.0.5",
+    "displayName": "Hot Swap 1.0.5",
     "releaseType": "release",
-    "automatedTests": 596,
+    "automatedTests": 681,
+    "packagingChecks": 7,
+    "publisherChecks": 8,
     "testMethod": "Actual Lua modules executed under Lua 5.1 with mocked WoW APIs",
-    "liveClientAcceptance": "RestedXP target-marking fix confirmed by user on Forever in 1.0.3; 1.0.4 old Mouseover heal repair covered by mocked regression tests, live acceptance pending"
+    "liveClientAcceptance": "Live verification of the latest Forever combat visibility and recovery fixes, full Classic Era / Hardcore behavior, and third-party action bars remains pending."
   },
   "game": "World of Warcraft",
   "projectClass": "Addons",
@@ -40,9 +42,9 @@
     "logo": "logo.png",
     "logoVectorSource": "logo.svg",
     "logoBuildScript": "build-logo.ps1",
-    "curseforgeUpload": "HotSwap-1.0.4-CurseForge.zip",
-    "developerArchive": "HotSwap-1.0.4-developer-source-NOT-FOR-UPLOAD.zip",
-    "changelog": "changelog-1.0.4.txt"
+    "curseforgeUpload": "HotSwap-1.0.5-CurseForge.zip",
+    "developerArchive": "HotSwap-1.0.5-developer-source-NOT-FOR-UPLOAD.zip",
+    "changelog": "changelog-1.0.5.txt"
   },
   "logo": {
     "width": 400,
@@ -54,7 +56,7 @@
   "publishingNotes": [
     "This file is a local worksheet, not a CurseForge API payload.",
     "Open the existing Hot Swap project for this file upload.",
-    "Do not label this build as live-client verified until acceptance checks pass.",
+    "Version 1.0.5 has automated regression coverage; do not present remaining live-client checks as completed.",
     "Keep the name Hot Swap without a version number; use the release display name for file uploads.",
     "Use the MIT license option for current project metadata; older published files may retain their original notices.",
     "GitHub Actions uploads on published releases; 1.0.2 uploaded successfully as CurseForge file 9453950."

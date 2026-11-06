@@ -270,7 +270,7 @@ local function flyoutLocation(id)
 end
 local function canRestore(data)
  if not data then return true end
- if data.kind=="spell" then return (C_Spell and C_Spell.PickupSpell or PickupSpell)~=nil end
+ if data.kind=="spell" then return (C_Spell and C_Spell.PickupSpell or PickupSpell or C_SpellBook and C_SpellBook.PickupSpellBookItem or PickupSpellBookItem)~=nil end
  if data.kind=="macro" then return not data.readError and data.name and type(data.body)=="string" and PickupMacro~=nil end
  if data.kind=="item" then return (C_Item and C_Item.PickupItem or PickupItem)~=nil end
  if data.kind=="flyout" then
@@ -306,17 +306,46 @@ end
 local function sameContent(a,b)
  if not a or not b then return not a and not b end
  if a.kind~=b.kind then return false end
- if a.kind=="macro" then return not a.readError and not b.readError and a.name~=nil and a.body~=nil and a.name==b.name and a.body==b.body end
+ if a.kind=="macro" then return not a.readError and not b.readError and a.name~=nil and a.body~=nil and a.name==b.name and K.Macros:SameBody(a.name,a.body,b.body) end
  return a.id==b.id and (a.kind~="companion" or a.subtype==b.subtype)
 end
 local function macroIndex(data)
  local index=GetMacroIndexByName(data.name or "")
- if index and index>0 then local _,_,body=GetMacroInfo(index); if body==data.body then return index end end
+ if index and index>0 then local name,_,body=GetMacroInfo(index); if name==data.name and K.Macros:SameBody(name,data.body,body) then return index end end
  if data.body then return K.Macros:FindOwned(K.Macros:Name(data.body),data.body) end
+end
+local function pickupSpell(id)
+ local direct=C_Spell and C_Spell.PickupSpell or PickupSpell
+ if direct then
+  direct(id)
+  if not GetCursorInfo or GetCursorInfo() then return end
+ end
+ -- A client can silently refuse pickup by ID even with the spell in its
+ -- book. Resolve a fresh, exact rank: cached positions can move after learning
+ -- spells, and a family/name lookup could silently replace a saved downrank.
+ local book=K.API:ScanSpellbook()
+ local exact=book.byExactID and book.byExactID[id]
+ if exact and exact.index then
+  if type(exact.bank)=="number" and C_SpellBook and C_SpellBook.PickupSpellBookItem then
+   C_SpellBook.PickupSpellBookItem(exact.index,exact.bank)
+  elseif (exact.bank=="spell" or exact.bank=="pet") and PickupSpellBookItem then
+   PickupSpellBookItem(exact.index,exact.bank)
+  end
+ end
+end
+local function describe(data)
+ if not data then return "empty" end
+ local text=data.kind.." "..tostring(data.name or data.id)
+ if data.kind=="spell" then
+  local name=K.API:SpellInfo(data.id)
+  local rank=K.API:SpellRank(data.id)
+  if name then text=text.." ["..name..(rank and " ("..rank..")" or "").."]" end
+ end
+ return text..(data.subtype and " ("..tostring(data.subtype)..")" or "")
 end
 local function pickup(data)
  if data.kind=="spell" then
-  local fn=C_Spell and C_Spell.PickupSpell or PickupSpell; if not fn then error("Native spell pickup is unavailable.") end; fn(data.id)
+  pickupSpell(data.id)
  elseif data.kind=="macro" then
   local index=macroIndex(data); if not index then error("The saved macro was changed or removed: "..tostring(data.name)) end; PickupMacro(index)
  elseif data.kind=="item" then (C_Item and C_Item.PickupItem or PickupItem)(data.id)
@@ -349,18 +378,14 @@ function N:WriteSlot(index,data)
  else
   local ok,why=pcall(function()
    pickup(data)
-   if GetCursorInfo and not GetCursorInfo() then error("Could not pick up the action for slot "..index) end
+   if GetCursorInfo and not GetCursorInfo() then error("Could not pick up the action for slot "..index..": "..describe(data)..". It may no longer be available on this character.") end
    PlaceAction(index)
   end)
   ClearCursor()
-  if not ok then error(why) end
+  if not ok then error(why,0) end
  end
  local actual=readSlot(index)
  if not sameContent(actual,data) then
-  local function describe(value)
-   if not value then return "empty" end
-   return value.kind.." "..tostring(value.name or value.id)..(value.subtype and " ("..tostring(value.subtype)..")" or "")
-  end
   error("Action-bar verification failed at slot "..index..": expected "..describe(data)..", found "..describe(actual)..(actual and actual.readError and ". "..actual.readError or ""))
  end
 end
@@ -416,10 +441,10 @@ local function macroLabelAction(button)
  if kind~="macro" then return nil,"" end
  local resolved,name,_,body=K.API:MacroForAction(at,index,subtype)
  if not resolved then return nil,"" end
- if not K.db or not K.db.enabled or not name or not body or (K.db.ownedMacros or {})[name]~=body then return nil,name end
+ if not K.db or not K.db.enabled or not name or not body or not K.Macros:SameBody(name,(K.db.ownedMacros or {})[name],body) then return nil,name end
  local a=N.macroLabelsBySlot and N.macroLabelsBySlot[at]
- if not a or a.macroName~=name or a.body~=body then a=N.macroLabelsByName and N.macroLabelsByName[name] end
- if a and a.macroName==name and a.body==body then return a,name end
+ if not a or a.macroName~=name or not K.Macros:SameBody(name,a.body,body) then a=N.macroLabelsByName and N.macroLabelsByName[name] end
+ if a and a.macroName==name and K.Macros:SameBody(name,a.body,body) then return a,name end
  return nil,name
 end
 local function friendlyMacroLabel(a)
@@ -512,54 +537,39 @@ function N:ApplyMacroTextPreference()
  end
  return true
 end
-local function refreshBars()
- if combat() then return end
- if MultiActionBar_Update then MultiActionBar_Update() end
- if Settings and Settings.GetSetting and Settings.NotifyUpdate then
-  for _,bar in ipairs(N:AvailableBars()) do
-   local variable="PROXY_SHOW_ACTIONBAR_"..(bar.toggle+1)
-   if Settings.GetSetting(variable) then Settings.NotifyUpdate(variable) end
-  end
- end
-end
-function N:QueueVisibilityRefresh()
- -- GetActionBarToggles is server-mirrored. Re-read for a bounded period,
- -- including after Restore, instead of forcing stale desired frame states.
- -- A new request replaces the existing observer; it never queues old writes.
- if not self.visibilityObserver then self.visibilityObserver=CreateFrame("Frame") end
- local elapsed,tick,last=0,0,nil
- self.visibilityObserver:SetScript("OnUpdate",function(frame,delta)
-  if combat() then return end
-  elapsed=elapsed+delta; tick=tick+delta
-  if tick<0.2 then return end
-  tick=0
-  local parts={}; for index,value in ipairs(N:ReadToggles()) do parts[index]=value and "1" or "0" end
-  local signature=table.concat(parts)
-  if signature~=last then
-   last=signature; refreshBars()
-   if K.QueueRefresh then K:QueueRefresh() end
-  end
-  if elapsed>=10 then frame:SetScript("OnUpdate",nil) end
- end)
- refreshBars()
+local function sameToggles(a,b)
+ if #a~=#b then return false end
+ for index=1,#a do if toggleFlag(a[index])~=toggleFlag(b[index]) then return false end end
+ return true
 end
 local function setToggles(values)
  if not values then return end
  if combat() then error("Leave combat before updating action bars.") end
+ local desired={}; for index=1,#values do desired[index]=toggleFlag(values[index]) end
+ local current=N:ReadToggles()
+ -- A prior write may still be awaiting the server mirror. Restore must send
+ -- its old mask even when that old mask is still what the client reports.
+ if N.pendingToggleMask and sameToggles(N.pendingToggleMask,current) then N.pendingToggleMask=nil end
+ if sameToggles(desired,current) and not N.pendingToggleMask then return end
  if not SetActionBarToggles then error("This client cannot enable native extra action bars.") end
  -- Era/Forever's proxy setter has a private ten-second full-mask cache.
  -- SetValue skips equal native values, so it cannot clear stale cached bits.
  -- Capability-check the actual proxy setter and synchronize every bit before
  -- sending our complete mask. Older clients use the direct full-mask API.
  local proxies={}; local complete=Settings and Settings.GetSetting and true or false
- if complete then for index=1,#values do
+ if complete then for index=1,#desired do
   local setting=Settings.GetSetting("PROXY_SHOW_ACTIONBAR_"..(index+1))
   if not setting or type(setting.SetValueDerived)~="function" then complete=false; break end
   proxies[index]=setting
  end end
- if complete then for index,value in ipairs(values) do proxies[index]:SetValueDerived(value) end end
- SetActionBarToggles(unpack(values,1,#values))
- N:QueueVisibilityRefresh()
+ -- Record intent before the first write so partial proxy failures also make
+ -- rollback resend its full mask instead of trusting a stale native mirror.
+ N.pendingToggleMask=K.Copy(desired)
+ if complete then for index,value in ipairs(desired) do proxies[index]:SetValueDerived(value) end end
+ SetActionBarToggles(unpack(desired,1,#desired))
+ if sameToggles(desired,N:ReadToggles()) then N.pendingToggleMask=nil end
+ -- Native controller events own visual updates. Do not notify Settings,
+ -- poll and refresh protected frames, or change pages to force a refresh.
 end
 function N:ApplySteps(plan,layout)
  layout=layout or plan.nativeLayout

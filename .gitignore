@@ -8,6 +8,7 @@
 /update-hotswap.ps1
 /ui-qa/*.json
 /ui-qa/*.png
+/ui-qa/.cache/
 __pycache__/
 *.pyc
 .venv/

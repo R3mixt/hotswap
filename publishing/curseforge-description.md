@@ -4,9 +4,9 @@ Build a comfortable keyboard layout, keep it consistent across your class, and s
 
 Hot Swap places spells and generated macros on **Blizzard's original action bars**. Its in-game keyboard opens on your current game bindings in edit mode, including native pet controls. Build your own Current layout with the spellbook or Hover bind, including future spells and missing items. Future reservations do not consume macro slots. Saved preset drafts provide a separate editor for Shift and Ctrl layers, mouse buttons, and optional wheel bindings. The interface uses WoW's own frames and controls.
 
-**1.0.4 mouseover repair:** Enabling Auto mouseover all spells also refreshes unchanged older Hot Swap healing macros so they can self-cast when neither a friendly mouseover nor target exists. Personal macro edits remain untouched. The repair has regression coverage; live acceptance is pending.
+**1.0.5 recovery update:** Current now offers **Sync from game** and **Reapply saved setup**, even with no pending edits. Generated healing macros fall back to the player without requiring Alt. Recovery recognizes client-added terminal line breaks, restores proved generated spell metadata, and preserves personal macro edits. Spell pickup, stance routes, bar refresh and the Escape-menu shortcut also receive fixes.
 
-**Compatibility:** Targets Forever 1.60.1 and Classic Era / Hardcore 1.15.9. Fixes the RestedXP target-marking conflict, confirmed in Forever after reload. Current reads supported Bartender4, ElvUI and Dominos live button mappings. These action-bar adapters have automated coverage; addon-specific live acceptance remains pending. Retail and other Classic expansions are not supported release targets.
+**Compatibility:** Targets Forever 1.60.1 and Classic Era / Hardcore 1.15.9. The earlier RestedXP target-marking fix was confirmed in Forever after reload. Current reads supported Bartender4, ElvUI and Dominos live button mappings, including verified form/stance routes where available. Live verification of the latest Forever combat visibility and recovery fixes, full Era / Hardcore behavior, and third-party action bars remains pending. Retail and other Classic expansions are not supported release targets.
 
 ## Set up your keys
 
@@ -18,6 +18,8 @@ Hot Swap places spells and generated macros on **Blizzard's original action bars
 - Record the mouse buttons your client receives and choose whether to use the wheel and middle click. Alt stays reserved for self-casting, with separate camera and movement shortcuts.
 - Generate mouseover, focus, self, or cursor macros where the action and client support them. Your existing personal macro text is not imported or overwritten.
 - Enable **Auto mouseover all spells** in Current bindings on supported clients, then Apply changes. Compatible spell buttons use WoW's native mouseover and automatic self-casting. Macros and some action-bar addons keep their own targeting rules.
+
+Generated helpful spells using default or Mouseover targeting try a friendly mouseover, a friendly target, then the player when self-casting is allowed. Alt remains an optional direct self-cast choice; it is not required for the final player fallback. Explicit Target and Focus modes, items, resurrection and no-self spells retain their own rules.
 
 In Hover bind, **Done - keep draft** saves the edits in your preset without installing them; **Apply & save** installs them with a named backup. The wheel binds over a spell and scrolls over blank grid space. No spells cast while the mode is active. Escape closes a confirmation first, then leaves the mode; closing the window or entering combat also releases capture.
 
@@ -39,23 +41,33 @@ The current view resolves bound pet-slot commands to Blizzard's native pet actio
 
 **Apply & save updates the keys assigned by your preset and preserves unrelated bindings and mouse controls.** It populates the original action bars, enables the extra bars it needs, and applies the selected self-cast settings. It records a named backup first, including bindings and affected bar contents. The Backups tab can restore a selected snapshot or the original setup.
 
+Use **Bindings → Current → Refresh... → Sync from game** to save the live bars, keys and casting settings without changing controls. **Reapply saved setup** restores that saved setup and rebuilds generated macros without applying pending drafts. Successful applies and restores also remember their resulting setup. Both refresh actions record a named backup; Reapply preserves the inactive binding set and rolls back if a later step fails.
+
+Ownership requires a recorded generated name and matching text, allowing only terminal line-break differences added by the client. Personal command edits are preserved. Reapply reuses correct helpers and removes obsolete unedited helpers only after success when they are no longer needed by bars, bindings or recovery snapshots. Missing generated metadata can be recovered only from matching recorded identities, never by interpreting personal macro text.
+
 When Hot Swap stops using a key from the previous layout, it restores that key's earlier binding only if the key still has Hot Swap's last assignment. Manual changes you made afterward are kept. Keys explicitly assigned by the new preset use its chosen actions.
 
 Setup and recovery run in small steps with a progress indicator. They cannot start in combat; an operation already underway pauses if combat begins and resumes afterward. Wait for completion before testing the result. Restore your original setup before disabling or removing the addon.
 
+If spell-ID pickup fails, recovery retries through the current spellbook while retaining the exact rank. This has automated regression coverage; the reported live restore failure still needs acceptance testing.
+
 ## Window settings and troubleshooting
 
 The **Settings** tab offers window opacity and scale, plus optional diagnostic logging that starts off. Logs stay local, retain the latest 200 entries, and can be viewed, copied or cleared. Opaque failure details remain readable independently of window transparency and explain whether nothing changed, recovery succeeded, or a backup needs attention.
+
+Hot Swap leaves native bar-layout updates to Blizzard's own events and skips unchanged visibility settings. If changed visibility has not appeared, use `/reload`. Hot Swap is integrated into the Game Menu after AddOns. Reload after upgrading to clear older UI state. Live combat verification of these changes remains pending.
 
 New characters can inherit custom or missing controls from WoW's saved account bindings. Hot Swap makes no binding changes on a fresh character's login. Explicit Apply & save installs a character-specific layout while preserving the account map; it does not automatically repair account binding files.
 
 ## Get started
 
 1. Install the `KeybindOptimizer` folder in your chosen client's `Interface/AddOns` directory. The folder name is retained for compatibility; the addon is displayed as **Hot Swap**.
-2. Open **Hot Swap** from the Escape menu, the AddOns settings page, or `/hotswap`.
+2. Open **Hot Swap** from the Escape menu after AddOns, the AddOns settings page, or `/hotswap`.
 3. Choose your mouse options. Inspect actual bindings on **Bindings**, or use **Presets → Preview recommendations → Save as new preset** to create an editable draft. You can also edit an existing saved preset. Review it, then choose **Apply & save** outside combat; only that step installs the layout and records a backup.
 4. Wait for completion and keep the backup until you have checked movement, forms, modifiers, and recovery in your client.
 
 The defaults are configurable recommendations, not a verified worldwide optimum or a completed top-20-player consensus. Automatic best-food/water selection is not implemented. Hot Swap does not choose a combat rotation or trigger actions without your input.
+
+Automated coverage: **681 Lua 5.1 scenarios, 7 packaging checks and 8 publisher checks**. Simulated APIs do not certify protected execution or combat behavior in WoW.
 
 **License: MIT.**

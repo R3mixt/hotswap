@@ -50,10 +50,21 @@ function C:ReadRoute(key)
  local page,kind=self:ActionPage()
  return K.ActionBars:Route(command,key,page,kind,true)
 end
+local function routeStance(route)
+ if not route then return end
+ if route.stanceSlot~=nil then return route.stanceSlot end
+ -- Older drafts recorded native stance commands before routes had a typed
+ -- stance index. Their saved command proves the index without consulting a
+ -- changed live button or guessing an addon CLICK mapping.
+ if route.slot==nil and type(route.effectiveCommand)=="string" then
+  local index=tonumber(route.effectiveCommand:match("^SHAPESHIFTBUTTON(%d+)$"))
+  if index and index>=1 and index<=10 then return index end
+ end
+end
 function C:ValidateRoutes(edits)
  for key,expected in pairs(edits.expectedRoutes or {}) do
   local actual=self:ReadRoute(key)
-  if actual.error or actual.command~=expected.command or actual.effectiveCommand~=expected.effectiveCommand or actual.slot~=expected.slot then
+  if actual.error or actual.command~=expected.command or actual.effectiveCommand~=expected.effectiveCommand or actual.slot~=expected.slot or actual.stanceSlot~=routeStance(expected) then
    error("Current action-bar routing changed on "..key..". Discard pending edits and review the active bar again.")
   end
  end
@@ -82,9 +93,10 @@ function C:VerifyEditedRoutes(edits)
  for key,command in pairs(edits.keys) do
   local route=self:ReadRoute(key)
   local source=edits.keyRoutes and edits.keyRoutes[key]
+  local stance=routeStance(source)
   local clear=not command and route.effectiveCommand~="" and route.effectiveCommand~="NONE"
-  local moved=source and source.slot and route.slot~=source.slot
-  local direct=command and not (source and source.slot) and route.effectiveCommand~=command
+  local moved=source and ((source.slot and route.slot~=source.slot) or (stance and route.stanceSlot~=stance))
+  local direct=command and not (source and (source.slot or stance)) and route.effectiveCommand~=command
   if route.error or clear or moved or direct then
    error("The action-bar addon did not update its key routing on "..key..". Change this key in that addon's binding settings.")
   end
@@ -151,8 +163,8 @@ local function macro(action,value,texture,labels)
  local id=positive(read(GetMacroSpell,index or value))
  if id then action.displaySpellID=id end
  local installed=labels and labels.bySlot[action.liveSlot]
- if not installed or installed.name~=name or installed.body~=body then installed=labels and labels.byName[name] end
- if installed and installed.name==name and installed.body==body and (K.db.ownedMacros or {})[name]==body then
+ if not installed or installed.name~=name or not K.Macros:SameBody(name,installed.body,body) then installed=labels and labels.byName[name] end
+ if installed and installed.name==name and K.Macros:SameBody(name,installed.body,body) and K.Macros:SameBody(name,(K.db.ownedMacros or {})[name],body) then
   action.label=installed.label
   if not texture then action.icon=installed.icon or icon; action.displayIcon=action.icon end
   action.displaySpellID=action.displaySpellID or installed.spellID
@@ -196,6 +208,7 @@ function C:Describe(command,key,page,pageType,labels,sourceRoute)
  local slot=route.slot
  if route.effectiveCommand~=command then a.label=commandLabel(route.effectiveCommand or command) end
  if route.error then a.category="Addon controls"; return a end
+ if route.stanceSlot then stanceAction(a,route.stanceSlot); return a end
  if slot then
   a.nativeSlot=slot; a.liveSlot=slot
   local readable,typ,id,subtype=pcall(GetActionInfo,slot)
@@ -229,8 +242,6 @@ function C:Describe(command,key,page,pageType,labels,sourceRoute)
  end
  local pet=tonumber(command:match("^BONUSACTIONBUTTON(%d+)$"))
  if pet and pet>=1 and pet<=10 then petAction(a,pet); return a end
- local stance=tonumber(command:match("^SHAPESHIFTBUTTON(%d+)$"))
- if stance and stance>=1 and stance<=10 then stanceAction(a,stance); return a end
  local value=command:match("^MACRO (.+)$")
  if value then macro(a,value,nil,labels); return a end
  value=command:match("^SPELL (.+)$")
@@ -338,8 +349,8 @@ function C:CollectMouseoverRepairs()
  local function candidate(entry)
   local content=entry.content
   if not entry.spellID or entry.targetMode~="mouseover" or type(content)~="table" or content.kind~="macro"
-      or not content.name or type(content.body)~="string" or entry.body~=content.body
-      or (K.db.ownedMacros or {})[content.name]~=content.body or not K.Macros:FindExact(content.name,content.body) then return end
+      or not content.name or type(content.body)~="string" or not K.Macros:SameBody(content.name,entry.body,content.body)
+      or not K.Macros:SameBody(content.name,(K.db.ownedMacros or {})[content.name],content.body) or not K.Macros:FindExact(content.name,content.body) then return end
   local target=self:TargetAction({kind="spell",spellID=entry.spellID,name=entry.name})
   if not target or target.targeting~="help" or target.noSelf then return end
   local ok,resolved=pcall(self.ResolveEntry,self,entry)
@@ -347,7 +358,7 @@ function C:CollectMouseoverRepairs()
   -- Reconstruct the previous generated helper, rather than interpreting an
   -- arbitrary owned macro as a spell merely because its saved label matches.
   local legacy=resolved.body:gsub("%[help,nodead%]%[@player%]","[help,nodead]",1)
-  if content.body~=legacy then return end
+  if not K.Macros:SameBody(content.name,content.body,legacy) then return end
   resolved.detached=nil
   return resolved
  end
@@ -400,7 +411,7 @@ function C:ValidateMouseoverRepair(edits,kind,id)
  local record=active and active[kind] and active[kind][id]; if not record then return end
  local original=record.original
  local route=self:ReadRoute(record.key)
- if (K.db.ownedMacros or {})[original.name]~=original.body or not K.Macros:FindExact(original.name,original.body)
+ if not K.Macros:SameBody(original.name,(K.db.ownedMacros or {})[original.name],original.body) or not K.Macros:FindExact(original.name,original.body)
      or route.error or route.command~=record.route.command or route.effectiveCommand~=record.route.effectiveCommand or route.slot~=record.route.slot
      or (kind=="slots" and not K.NativeBars:SameContent(K.NativeBars:ReadSlot(id),original))
      or (kind=="keys" and GetBindingAction(id)~=record.route.command) then
@@ -450,7 +461,7 @@ function C:Rebind(action,key)
  end
  if not command or command=="" then return false,"This binding changed. Review Current again." end
  local metadata; if not action.liveSlot then metadata=action.currentEntry end
- self:StageKey(key,command,metadata,action.liveSlot and action.actionRoute); self:StageKey(action.key,false)
+ self:StageKey(key,command,metadata,(action.liveSlot or action.stanceSlot) and action.actionRoute); self:StageKey(action.key,false)
  return true,"Binding moved in your Current layout. Apply changes installs it."
 end
 function C:ClearKey(action)
@@ -630,6 +641,281 @@ function C:PrepareEdits(edits)
   edits.entries[key]=self:ResolveEntry(entry); edits.keys[key]=edits.entries[key].command
  end
  return edits
+end
+-- The Current profile is the last successfully installed (or explicitly
+-- synchronized) live setup. It never contains an editing draft or undo history.
+local function profileContent(action)
+ if action.nativeHidden then return false end
+ if action.body and action.macroName then return {kind="macro",name=action.macroName,body=action.body} end
+ if action.known and action.spellID then return {kind="spell",id=action.spellID} end
+ return false
+end
+function C:CaptureProfile(snapshot,strictLive)
+ local _,class=UnitClass("player")
+ local profile={version=1,class=class,snapshot=K.Copy(snapshot),
+  currentLayout=K.Copy(K.db.currentLayout or {keys={},slots={}}),
+  appliedPlan=K.db.enabled and K.Copy(K.db.appliedPlan) or nil,
+  enabled=K.db.enabled and true or false,appliedPreset=K.db.appliedPreset,
+  appliedPresetSignature=K.db.appliedPresetSignature,ownedMacros=K.Copy(K.db.ownedMacros or {})}
+ -- Reapplying Current restores its active binding set, not another scope's
+ -- saved controls. Full operation backups still retain both sets for rollback.
+ profile.snapshot.accountBindings=nil; profile.snapshot.characterBindings=nil
+ local saved=profile.currentLayout
+ saved.keys=saved.keys or {}; saved.slots=saved.slots or {}
+ if strictLive then
+  for name,body in pairs(profile.ownedMacros) do
+   if not K.Macros:FindExact(name,body) then profile.ownedMacros[name]=nil end
+  end
+  for at,entry in pairs(saved.slots) do
+   if K.NativeBars:SameContent(snapshot.native.actions[at],entry.content) then entry.detached=nil
+   else saved.slots[at]=nil end
+  end
+  for key,entry in pairs(saved.keys) do
+   local matches=(snapshot.bindings[key] or false)==(entry.command or false)
+   if entry.body then matches=matches and K.Macros:FindExact(entry.macroName or tostring(entry.command):match("^MACRO (.+)$"),entry.body) end
+   if matches then entry.detached=nil else saved.keys[key]=nil end
+  end
+ end
+ local plan=profile.appliedPlan
+ if not strictLive and plan and plan.nativeLayout then
+  plan.nativeLayout.detachedKeys={}
+  for _,placement in ipairs(plan.nativeLayout.placements or {}) do placement.detached=nil end
+ end
+ if strictLive and plan and plan.nativeLayout then
+  local actions={}; for _,action in ipairs(plan.actions or {}) do actions[action.id]=action end
+  local layout=plan.nativeLayout; layout.detachedKeys={}
+  for _,placement in ipairs(layout.placements or {}) do
+   local action=actions[placement.actionID]
+   placement.detached=not action or action.kind=="macroref" or not K.NativeBars:SameContent(snapshot.native.actions[placement.slot],profileContent(action)) or nil
+  end
+  for key,binding in pairs(layout.keys or {}) do
+   local action=actions[binding.macroAction]
+   local command=binding.command or (action and action.macroName and "MACRO "..action.macroName)
+   if snapshot.bindings[key]~=command or (action and action.body and not K.Macros:FindExact(action.macroName,action.body)) then layout.detachedKeys[key]=true end
+  end
+ end
+ return profile
+end
+local function recoverProfileMetadata(result)
+ -- Earlier Sync/Reapply versions discarded unchanged generated metadata when
+ -- WoW appended a newline. Recover only a proved identity at its saved
+ -- destination, never restore a backup's positions or infer spells from text.
+ local ledger=K.db.ownedMacros or {}; local snapshot=result.snapshot
+ local saved=result.currentLayout or {keys={},slots={}}; result.currentLayout=saved
+ saved.keys=saved.keys or {}; saved.slots=saved.slots or {}
+ local function registered(name,body,owned)
+  return type(name)=="string" and type(owned[name])=="string" and K.Macros:SameBody(name,owned[name],body,owned)
+ end
+ local function matches(content,name,body)
+  return content and content.kind=="macro" and content.name==name and registered(name,body,ledger)
+   and K.Macros:SameBody(name,body,content.body,ledger)
+ end
+ local function keyMatches(key,name,body)
+  if not registered(name,body,ledger) or snapshot.bindings[key]~="MACRO "..name then return false end
+  local evidence=false
+  for _,content in pairs(snapshot.native.actions) do
+   if content and content.kind=="macro" and content.name==name then
+    if not matches(content,name,body) then return false end
+    evidence=true
+   end
+  end
+  -- A direct binding records only the macro's name. Without saved body
+  -- evidence, its live text must still prove the registered generated identity.
+  return evidence or K.Macros:FindExact(name,ledger[name])~=nil
+ end
+ local function adopt(layout,owned)
+  owned=owned or {}
+  for _,kind in ipairs({"slots","keys"}) do
+   for at,entry in pairs(layout and layout[kind] or {}) do
+    local content=entry.content; local name=entry.macroName
+    if not saved[kind][at] and (entry.spellID or entry.itemID) and content and content.kind=="macro"
+     and content.name==name and entry.command=="MACRO "..tostring(name)
+     and registered(name,entry.body,ledger) and registered(name,entry.body,owned)
+     and K.Macros:SameBody(name,entry.body,content.body,ledger)
+     and (kind=="slots" and matches(snapshot.native.actions[at],name,entry.body)
+      or kind=="keys" and keyMatches(at,name,entry.body)) then
+     saved[kind][at]=K.Copy(entry); saved[kind][at].detached=nil
+     result.ownedMacros[name]=ledger[name]
+    end
+   end
+  end
+ end
+ adopt(K.db.currentLayout,ledger)
+ local order=K.db.bindingBackupOrder or {}; local history={}
+ for index=#order,math.max(1,#order-31),-1 do
+  local backup=(K.db.bindingBackups or {})[order[index]]
+  if backup and backup.complete and backup.runtime then
+   adopt(backup.runtime.currentLayout,backup.runtime.ownedMacros); history[#history+1]=backup.runtime
+  end
+ end
+ local plan=result.appliedPlan
+ if plan and plan.nativeLayout then
+  local actions={}; for _,action in ipairs(plan.actions or {}) do actions[action.id]=action end
+  -- A buggy reapply could also regenerate a detached action's body without
+  -- installing it, losing its old macro name. Recover that identity only from
+  -- the same historical action and destination; keep this plan's settings,
+  -- semantic action fields, placements and key assignments.
+  local recovered={}
+  local function restoreIdentity(action,old,owned)
+   if not action or action.kind=="macroref" or not old or old.kind=="macroref" or action.id~=old.id
+    or not registered(old.macroName,old.body,ledger) or not registered(old.macroName,old.body,owned or {}) then return false end
+   if recovered[action.id] and (action.macroName~=old.macroName or not K.Macros:SameBody(old.macroName,action.body,old.body,ledger)) then return false end
+   action.macroName=old.macroName; action.body=old.body; action.macroIndex=nil
+   recovered[action.id]=true; result.ownedMacros[old.macroName]=ledger[old.macroName]
+   return true
+  end
+  for _,runtime in ipairs(history) do
+   local previous=runtime.enabled and runtime.appliedPlan
+   if previous and previous.nativeLayout then
+    local priorActions={}; for _,action in ipairs(previous.actions or {}) do priorActions[action.id]=action end
+    local priorSlots={}; for _,placement in ipairs(previous.nativeLayout.placements or {}) do priorSlots[placement.slot]=placement.actionID end
+    for _,placement in ipairs(plan.nativeLayout.placements or {}) do
+     local old=priorActions[placement.actionID]
+     if placement.detached and priorSlots[placement.slot]==placement.actionID and old
+      and matches(snapshot.native.actions[placement.slot],old.macroName,old.body)
+      and restoreIdentity(actions[placement.actionID],old,runtime.ownedMacros) then placement.detached=nil end
+    end
+    for key in pairs(plan.nativeLayout.detachedKeys or {}) do
+     local binding=(plan.nativeLayout.keys or {})[key]; local prior=(previous.nativeLayout.keys or {})[key]
+     local id=binding and binding.macroAction; local old=id and priorActions[id]
+     if old and prior and prior.macroAction==id and keyMatches(key,old.macroName,old.body)
+      and restoreIdentity(actions[id],old,runtime.ownedMacros) then plan.nativeLayout.detachedKeys[key]=nil end
+    end
+   end
+  end
+  for _,placement in ipairs(plan.nativeLayout.placements or {}) do
+   local action=actions[placement.actionID]
+   if placement.detached and action and action.kind~="macroref" and matches(snapshot.native.actions[placement.slot],action.macroName,action.body) then
+    placement.detached=nil; result.ownedMacros[action.macroName]=ledger[action.macroName]
+   end
+  end
+  for key in pairs(plan.nativeLayout.detachedKeys or {}) do
+   local binding=(plan.nativeLayout.keys or {})[key]; local action=binding and actions[binding.macroAction]
+   if action and action.kind~="macroref" and keyMatches(key,action.macroName,action.body) then
+    plan.nativeLayout.detachedKeys[key]=nil; result.ownedMacros[action.macroName]=ledger[action.macroName]
+   end
+  end
+ end
+end
+function C:BuildProfileReapply(profile)
+ local _,class=UnitClass("player")
+ if type(profile)~="table" or profile.class~=class or type(profile.snapshot)~="table"
+  or type(profile.snapshot.bindings)~="table" or type(profile.snapshot.native)~="table"
+  or type(profile.snapshot.native.actions)~="table" then error("No saved Current setup is available for this character. Use Sync from game first.") end
+ local result=K.Copy(profile)
+ result.ownedMacros=result.ownedMacros or {}
+ result.snapshot.accountBindings=nil; result.snapshot.characterBindings=nil
+ result.slotSources={}; result.keySources={}
+ result.macroPlan={actions={},settings={allowAccountMacros=false}}
+ local snapshot=result.snapshot
+ local supported={}; for _,at in ipairs(K.NativeBars:ManagedSlots()) do supported[at]=true end
+ for at in pairs(snapshot.native.actions) do if not supported[at] then error("Saved action slot "..tostring(at).." is unavailable on this client.") end end
+ recoverProfileMetadata(result)
+ K.API:InvalidateSpellbook()
+ local book=K.API:GetCachedSpellbook(); local forms=K.API:GetForms()
+ local plan=result.appliedPlan
+ if plan and plan.nativeLayout then
+  local actions={}
+  for index,action in ipairs(plan.actions or {}) do
+   local updated=action
+   if not action.kind and not action.builtin then
+    local why; updated,why=K.AvailabilityEngine:Resolve(action,plan,book,forms)
+    if not updated then error(why) end
+   elseif action.kind~="macroref" and action.kind~="system" then
+    updated=K.Copy(action)
+    local body,why=K.Macros:Build(updated,plan.settings)
+    if why then error(why) end
+    updated.body=body
+    local ok,problem=K.NativeBars:MakeMacro(updated,plan.settings,updated.nativeOverflow or updated.nativeBlockAlt)
+    if not ok then error(problem) end
+   end
+   plan.actions[index]=updated; actions[updated.id]=updated
+  end
+  for _,placement in ipairs(plan.nativeLayout.placements or {}) do
+   local action=actions[placement.actionID]
+   if action and not placement.detached and action.kind~="macroref" then
+    if not supported[placement.slot] then error("Saved action slot "..tostring(placement.slot).." is unavailable on this client.") end
+    result.slotSources[placement.slot]={action=action}
+   end
+  end
+  for key,binding in pairs(plan.nativeLayout.keys or {}) do
+   if not (plan.nativeLayout.detachedKeys or {})[key] then
+    local action=actions[binding.macroAction]
+    if binding.command then snapshot.bindings[key]=binding.command
+    elseif action and action.kind~="macroref" then result.keySources[key]={action=action} end
+   end
+  end
+  plan.formSignature=K.API:FormSignature()
+ end
+ local saved=result.currentLayout or {keys={},slots={}}; result.currentLayout=saved
+ saved.keys=saved.keys or {}; saved.slots=saved.slots or {}
+ for at,entry in pairs(saved.slots) do
+  if not supported[at] then error("Saved action slot "..tostring(at).." is unavailable on this client.") end
+  local resolved=self:ResolveEntry(entry); resolved.detached=nil; saved.slots[at]=resolved
+  result.slotSources[at]={action=resolved,entry=true}
+ end
+ for key,entry in pairs(saved.keys) do
+  local resolved=self:ResolveEntry(entry); resolved.detached=nil; saved.keys[key]=resolved
+  result.keySources[key]={action=resolved,entry=true}
+ end
+ -- Generated macros without spell metadata (for example saved emotes) can be
+ -- recreated verbatim. Personal macro text remains an exact external reference.
+ local rawMacros={}
+ local function rawMacro(name,body,icon)
+  if not name or type(body)~="string" or not K.Macros:SameBody(name,result.ownedMacros[name],body,result.ownedMacros) then return end
+  body=result.ownedMacros[name]
+  local token=name.."\n"..body
+  if not rawMacros[token] then rawMacros[token]={body=body,macroName=name,label=name,icon=icon,known=true,nativeMacro=true} end
+  return rawMacros[token]
+ end
+ for at,content in pairs(snapshot.native.actions) do
+  if not result.slotSources[at] and content and content.kind=="macro" then
+   local action=rawMacro(content.name,content.body,content.icon)
+   if action then result.slotSources[at]={action=action} end
+  end
+ end
+ for key,command in pairs(snapshot.bindings) do
+  if not result.keySources[key] then
+   local name=command:match("^MACRO (.+)$")
+   local action=name and rawMacro(name,result.ownedMacros[name])
+   if action then result.keySources[key]={action=action} end
+  end
+ end
+ local seen={}
+ for _,sources in ipairs({result.slotSources,result.keySources}) do
+  for _,source in pairs(sources) do
+   local action=source.action
+   if action.body and not seen[action] then
+    action.nativeMacro=true; seen[action]=true
+    result.macroPlan.actions[#result.macroPlan.actions+1]=action
+   end
+  end
+ end
+ return result
+end
+function C:FinalizeProfileReapply(result)
+ local function content(source)
+  local action=source.action
+  if action.body then
+   local index,name,icon=K.Macros:FindExact(action.macroName,action.body)
+   if not index or (K.db.ownedMacros or {})[name]~=action.body then error("A refreshed macro changed before reapplying the setup.") end
+   local value={kind="macro",id=index,name=name,icon=icon,body=action.body}
+   if source.entry then action.content=K.Copy(value); action.command="MACRO "..name end
+   return value
+  end
+  return source.entry and action.content or profileContent(action)
+ end
+ for at,source in pairs(result.slotSources) do result.snapshot.native.actions[at]=content(source) or false end
+ for key,source in pairs(result.keySources) do
+  local action=source.action
+  if action.body then content(source); result.snapshot.bindings[key]="MACRO "..action.macroName
+  elseif source.entry then result.snapshot.bindings[key]=action.command or nil
+  else error("A saved macro shortcut is unavailable: "..key) end
+ end
+ for key,owner in pairs(result.appliedPlan and result.appliedPlan.bindingOwnership or {}) do
+  if not (result.appliedPlan.nativeLayout.detachedKeys or {})[key] then owner.command=result.snapshot.bindings[key] end
+ end
+ return result
 end
 local function sameEntry(a,b)
  return a.command==b.command and a.pending==b.pending and K.NativeBars:SameContent(a.content,b.content)

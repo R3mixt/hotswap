@@ -1,10 +1,12 @@
 local addonName, K = ...
 _G.KeybindOptimizer = K
-K.name, K.version = addonName or "KeybindOptimizer", "1.0.4"
+K.name, K.version = addonName or "KeybindOptimizer", "1.0.5"
 K.defaults = {
     wheel = true, middle = true, ctrl = true,
     mouseButtons = { BUTTON4 = true, BUTTON5 = true },
-    selfFallback = false, cancelForUtility = false,
+    -- Retained for preset import/export compatibility; helpful mouseover
+    -- spells now always include automatic self fallback.
+    selfFallback = true, cancelForUtility = false,
     flavor = "auto", primarySchool = "frost", groundAtCursor=false,
     preserveMovement=false, preserveCamera=false, preserveChat=false,
     preserveInterface=false, preserveTargeting=false, preserveGameSettings=false,

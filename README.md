@@ -8,12 +8,13 @@ Hot Swap is a World of Warcraft addon with a visual keyboard editor, spellbook d
 
 [Download on CurseForge](https://www.curseforge.com/wow/addons/hot-swap) · [Player guide](KeybindOptimizer/README.md) · [Documentation](docs/README.md) · [Changelog](CHANGELOG.md) · [Report a bug](https://github.com/R3mixt/hotswap/issues)
 
-Version **1.0.4** repairs older Hot Swap healing macros when you enable **Auto mouseover all spells** and Apply changes. It also prevents a temporary failure to read macro details from permanently disabling future updates. The 1.0.3 RestedXP fix and action-bar adapters are retained. The RestedXP fix was confirmed in game on Forever; this mouseover repair and addon-specific behavior still need live acceptance. The CurseForge download may lag the source version while a file is awaiting publication.
+Version **1.0.5** adds **Sync from game** and **Reapply saved setup** in Current, so you can save or restore a setup without staging key changes. Generated healing macros now fall back to the player without requiring Alt, and recovery recognizes client-added terminal line breaks while preserving personal macro edits. It also improves spell pickup and stance routing, removes forced native bar-layout updates, and keeps Hot Swap in the Game Menu after AddOns. The CurseForge download may lag the source version while a file is awaiting publication.
 
 ## What it does
 
 - Opens on **Current**, your actual binding layout, with the miniature spellbook ready.
 - Stages spell, item and game-control edits; applies them explicitly with a backup.
+- Syncs the live Current setup or reapplies its saved bars, keys and casting settings while keeping pending drafts.
 - Supports native spellbook drops, modifier layers, ranks and form-linked positions.
 - Reserves unlearned spells without placeholder macros and fills owned reservations outside combat when learned.
 - Creates character-specific macros only where conditional behavior requires them.
@@ -43,11 +44,13 @@ The folder and SavedVariables name remain `KeybindOptimizer` for upgrade compati
 4. For a complete preset, preview it in **Presets**, save a draft, then explicitly **Apply & save**.
 5. Use **Backups** to restore a saved layout, the original setup, or Blizzard's default character keys.
 
+In **Current → Refresh...**, **Sync from game** saves the live setup without changing controls. **Reapply saved setup** restores the last saved setup and refreshes generated macros, even when no edits are pending. Both retain your drafts and record a named backup.
+
 To import a downloaded `.hotswap` profile, open it in a text editor and paste its complete code into **Import / export**. Imported presets remain separate until selected and applied.
 
 ## Compatibility and limits
 
-Forever and Classic Era / Hardcore are the release targets. Retail and other Classic expansions are not supported release targets. Current reads supported live buttons and key overrides from Bartender4, ElvUI and Dominos. It preserves their profiles and paging rules. Unsupported custom button actions remain unchanged.
+Forever and Classic Era / Hardcore are the release targets. Retail and other Classic expansions are not supported release targets. Current reads supported live buttons and key overrides from Bartender4, ElvUI and Dominos. It preserves their profiles and paging rules. Unsupported custom button actions remain unchanged. Live verification of the latest Forever combat visibility and recovery fixes, full Era / Hardcore behavior, and third-party action bars remains pending.
 
 Character macro capacity still applies. New presets leave optional utility form cancellation off to conserve slots; existing preferences are preserved. Protected setup changes wait for out-of-combat execution. The addon does not automate combat decisions or casts.
 
@@ -65,7 +68,7 @@ python tests/run_tests.py
 python package.py
 ```
 
-The 1.0.4 release includes **596 Lua 5.1 scenarios**, **7 packaging checks** and **8 publisher checks**. The Lua tests execute the addon modules against simulated WoW APIs. `package.py` reruns validation, checks the TOC and archive layout, and writes install/source ZIPs and SHA-256 files into `dist/`. GitHub Actions performs the same build on pushes and pull requests.
+Version 1.0.5 includes **681 Lua 5.1 scenarios**, **7 packaging checks** and **8 publisher checks**. The Lua tests execute the addon modules against simulated WoW APIs and cannot certify protected execution in the client. `package.py` reruns validation, checks the TOC and archive layout, and writes install/source ZIPs and SHA-256 files into `dist/`. GitHub Actions performs the same build on pushes and pull requests.
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) for the module map, change workflow and useful bug-report details. [CurseForge publishing](docs/curseforge.md) explains release sync and its one-time secret setup.
 

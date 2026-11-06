@@ -71,6 +71,32 @@ function A:ButtonSlot(name,mouse)
  end
  return buttonSlot(button),owner,true
 end
+function A:StanceSlot(command)
+ local index=tonumber(command:match("^SHAPESHIFTBUTTON(%d+)$"))
+ if index and index>=1 and index<=10 then return index,"Blizzard",true end
+ local name,mouse=command:match("^CLICK ([%w_]+):([%w]+)$")
+ if not name then return end
+ local owner
+ index=tonumber(name:match("^StanceButton(%d+)$"))
+ if index then owner="Blizzard"
+ else
+  index=tonumber(name:match("^BT4StanceButton(%d+)$"))
+  if index then owner="Bartender4"
+  else
+   index=tonumber(name:match("^ElvUI_StanceBarButton(%d+)$"))
+   if index then owner="ElvUI" end
+  end
+ end
+ if not owner then return end
+ -- These named buttons use Blizzard's StanceButtonTemplate and SetID(N).
+ -- Their ID is a GetShapeshiftFormInfo index, never a native action slot.
+ -- HotKey text and action-bar Hotkey children are not stance click targets.
+ if mouse~="LeftButton" or index<1 or index>10 then return nil,owner,true end
+ local button=_G[name]
+ local live=slot(read(button and button.GetID,button))
+ if live~=index then return nil,owner,true end
+ return live,owner,true
+end
 function A:Slot(command,page,pageType)
  local name,mouse=command:match("^CLICK ([%w_]+):([%w]+)$")
  if name then return self:ButtonSlot(name,mouse) end
@@ -105,10 +131,13 @@ function A:Route(command,key,page,pageType,useOverrides)
   end
   effective=result
  end
- local at,owner,recognized=self:Slot(effective,page,pageType)
- local route={key=key,command=command,effectiveCommand=effective,slot=at,provider=owner}
- if (recognized and not at) or (effective~=command and not at) or (command=="" and effective~="") then
-  route.error="This key is controlled by "..(owner or "another addon").." without a readable action slot. Edit it in that addon's binding settings."
+ local stance,owner,recognized=self:StanceSlot(effective)
+ local stanceRoute=recognized
+ local at
+ if not recognized then at,owner,recognized=self:Slot(effective,page,pageType) end
+ local route={key=key,command=command,effectiveCommand=effective,slot=at,stanceSlot=stance,provider=owner}
+ if (recognized and not at and not stance) or (effective~=command and not at and not stance) or (command=="" and effective~="" and not stance) then
+  route.error="This key is controlled by "..(owner or "another addon").." without a readable "..(stanceRoute and "stance" or "action").." slot. Edit it in that addon's binding settings."
  end
  return route
 end

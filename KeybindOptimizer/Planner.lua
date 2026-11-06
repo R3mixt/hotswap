@@ -374,7 +374,7 @@ function P:Build(useCachedData)
     if settings.hideUnavailableSpells or settings.adaptTalents or next(settings.talentAlternatives or {}) then
         plan.changes[#plan.changes+1]="Learned spells and talent choices update owned slots outside combat. Keys stay in place; personal bar edits are preserved."
     else plan.warnings[#plan.warnings+1]="Review new spells and talents here. Established keys are not moved automatically." end
-    plan.changes[#plan.changes+1]=settings.preserveGameSettings and "Existing casting modifiers and game settings are preserved." or ("Alt self-cast; focus-cast modifier cleared; automatic self fallback "..(settings.selfFallback and "enabled in helpful macros" or "disabled")..".")
+    plan.changes[#plan.changes+1]=settings.preserveGameSettings and "Existing casting modifiers and game settings are preserved." or "Alt self-cast; focus-cast modifier cleared; helpful mouseover spells automatically fall back to you."
     plan.changes[#plan.changes+1]=settings.preserveCamera and "Existing camera and mouse controls are protected." or ("Mouse wheel abilities "..(settings.wheel and "on; Alt-wheel zoom" or "off; normal wheel zoom restored")..".")
     plan.changes[#plan.changes+1]="A named backup is saved first. Applying updates planned keys and preserves unrelated bindings."
     table.sort(plan.actions,function(a,b)

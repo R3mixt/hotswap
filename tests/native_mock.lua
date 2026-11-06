@@ -18,6 +18,35 @@ function MultiActionBar_Update()
     if frame then frame:SetShown(MainActionBar:IsShown() and Mock.actionToggles[index] and true or false) end
   end
 end
+-- Forever's proxy settings maintain a full-mask cache, while NotifyUpdate
+-- reads the native mirror and dispatches the controller callback through the
+-- Settings registry. The marker distinguishes that call path; it does not
+-- attempt to emulate WoW's secure execution or taint propagation.
+local barSettings={}; local cachedToggles,lastToggleTime
+for index=1,7 do
+  local at=index
+  barSettings["PROXY_SHOW_ACTIONBAR_"..(index+1)]={
+    GetValueDerived=function() return select(at,GetActionBarToggles()) end,
+    SetValueDerived=function(_,value)
+      if not cachedToggles or GetTime()-(lastToggleTime or 0)>10 then cachedToggles={GetActionBarToggles()} end
+      lastToggleTime=GetTime(); cachedToggles[at]=value
+      SetActionBarToggles(unpack(cachedToggles))
+    end,
+  }
+end
+function Settings.GetSetting(variable) return barSettings[variable] end
+function Settings.NotifyUpdate(variable)
+  local setting=Settings.GetSetting(variable)
+  if not setting then return end
+  local value=setting:GetValueDerived()
+  if barSettings[variable] then
+    Mock.settingsNotifications=(Mock.settingsNotifications or 0)+1
+    local previous=Mock.inSettingsCallback; Mock.inSettingsCallback=true
+    local ok,why=pcall(MultiActionBar_Update)
+    Mock.inSettingsCallback=previous
+    if not ok then error(why,0) end
+  end
+end
 function GetActionBarPage() return Mock.actionPage end
 function ChangeActionBarPage(page) Mock:Write("actionpage",page); Mock.actionPage=page end
 C_ActionBar={GetActionBarPage=GetActionBarPage,SetActionBarPage=ChangeActionBarPage}

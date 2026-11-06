@@ -13,15 +13,15 @@ function Tests.full_presets_keep_independent_binding_settings_and_item_choices()
   k.db.presets.Leveling.items.potion=1710
   assert(k.Presets:Create("Raid night",true))
   k:UpdateSetting("bindingOverrides",{["druid.rejuvenation"]="NUMPAD8"})
-  k:UpdateSetting("selfFallback",true)
+  k:UpdateSetting("selfFallback",false) -- Legacy serialized values still round-trip independently.
   k.db.presets["Raid night"].items.potion=118
   assert(k.Presets:Select("Leveling"))
   eq(k:GetSettings().bindingOverrides["druid.rejuvenation"],"NUMPAD9","Original bindings changed with a duplicate")
-  eq(k:GetSettings().selfFallback,false,"Original settings changed with a duplicate")
+  eq(k:GetSettings().selfFallback,true,"Original settings changed with a duplicate")
   eq(k.Items:GetSelected("potion"),1710,"Original item selection changed")
   assert(k.Presets:Select("Raid night"))
   eq(k:GetSettings().bindingOverrides["druid.rejuvenation"],"NUMPAD8","Custom bindings were not saved")
-  eq(k:GetSettings().selfFallback,true,"Custom self-cast setting was not saved")
+  eq(k:GetSettings().selfFallback,false,"Legacy serialized setting was not saved")
   eq(k.Items:GetSelected("potion"),118,"Custom item selection was not saved")
 end
 

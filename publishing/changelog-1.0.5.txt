@@ -1,0 +1,11 @@
+Hot Swap 1.0.5
+
+- Add Current → Refresh... with Sync from game and Reapply saved setup. Save live bars, keys and casting settings or restore the saved setup without staging key changes. Pending drafts are retained; operations record named backups, and Reapply uses rollback and preserves the inactive binding set.
+- Give generated default and Mouseover healing macros an automatic player fallback when no friendly mouseover or target is valid. Alt remains optional, not required. Explicit Target/Focus, item, resurrection and no-self rules remain separate.
+- Recognize client-added terminal line breaks only for recorded generated macro identities. Recover matching spell metadata lost by older Sync/Reapply, reuse correct helpers, and clean up superseded unused helpers after success. Preserve personal macro edits and recovery references.
+- Retry failed spell-ID pickup through the current spellbook while retaining exact ranks. Recognize supported form/stance routes separately from ordinary action-bar slots.
+- Remove forced action-bar layout callbacks, including settings notifications and delayed refreshes. Skip unchanged visibility settings. Blizzard updates changed bar visibility through its own events; use /reload if it has not appeared yet. Keep Hot Swap integrated into the Game Menu after AddOns. Reload after upgrading to clear older UI state.
+
+Targets Forever 1.60.1 and Classic Era / Hardcore 1.15.9. Live verification of the latest Forever combat visibility and recovery fixes, full Era / Hardcore behavior, and third-party action bars remains pending.
+
+Validation: 681 Lua 5.1 scenarios, 7 packaging checks and 8 publisher checks. Simulated APIs do not certify WoW's protected execution or combat behavior.

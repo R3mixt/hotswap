@@ -75,7 +75,6 @@ function L:AppendMenuButton(menu)
     local button = menu:AddButton("Hot Swap", self.menuCallback)
     if button and type(insertAfter) == "number" then button.layoutIndex = insertAfter + 0.5 end
     self.menuButton = button
-    if menu.MarkDirty then menu:MarkDirty() end
 end
 
 function L:RegisterMenu()
@@ -83,19 +82,30 @@ function L:RegisterMenu()
     if not menu or self.hookedMenu == menu then return self.hookedMenu ~= nil end
     self.menuCallback = self.menuCallback or function() L:Open() end
     if type(menu.InitButtons) == "function" and type(menu.AddButton) == "function" and hooksecurefunc then
-        hooksecurefunc(menu, "InitButtons", function(frame) L:AppendMenuButton(frame) end)
+        hooksecurefunc(menu, "InitButtons", function(frame)
+            if L.hookedMenu == frame then L:AppendMenuButton(frame) end
+        end)
         self.hookedMenu = menu
         if menu:IsShown() then self:AppendMenuButton(menu) end
         return true
     end
-    -- Older Classic menus do not have the pooled menu API. Keep their layout
-    -- untouched and attach a native button immediately below the frame.
-    local button = CreateFrame("Button", "HotSwapGameMenuButton", menu, "UIPanelButtonTemplate")
-    button:SetSize(180, 26)
+    -- Older clients without the pooled menu API use an independent shortcut.
+    -- Do not attach it to their layout or change their native menu geometry.
+    local button = self.menuButton
+    if not button then
+        button = CreateFrame("Button", "HotSwapGameMenuButton", UIParent, "UIPanelButtonTemplate")
+        button:SetSize(180, 26)
+        button:SetFrameStrata("DIALOG")
+        button:SetText("Hot Swap")
+        button:SetScript("OnClick", self.menuCallback)
+        self.menuButton = button
+    end
+    button:ClearAllPoints()
     button:SetPoint("TOP", menu, "BOTTOM", 0, -4)
-    button:SetText("Hot Swap")
-    button:SetScript("OnClick", self.menuCallback)
-    self.menuButton, self.hookedMenu = button, menu
+    menu:HookScript("OnShow", function() if L.hookedMenu == menu then button:Show() end end)
+    menu:HookScript("OnHide", function() if L.hookedMenu == menu then button:Hide() end end)
+    self.hookedMenu = menu
+    button:SetShown(menu:IsShown())
     return true
 end
 

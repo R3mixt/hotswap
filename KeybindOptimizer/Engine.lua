@@ -215,6 +215,34 @@ local function readSteps(result,probeKeys)
     return steps
 end
 local bindingSteps
+-- Remember the actual active controls without loading another binding set or
+-- creating a second undo snapshot. This also supplies the read-only Sync job.
+local function liveProfileSteps(job)
+    local snapshot={bindings={},modified={},cvars={},native={},mouseBindingsVersion=1}
+    job.profileSnapshot=snapshot
+    local steps={}
+    addStep(steps,function()
+        snapshot.bindingSet=GetCurrentBindingSet and GetCurrentBindingSet() or 2
+        snapshot.createdAt=time and time() or 0
+        for _,key in ipairs({"SELFCAST","FOCUSCAST"}) do snapshot.modified[key]=GetModifiedClick and GetModifiedClick(key) or "NONE" end
+        snapshot.cvars.autoSelfCast=getCVar("autoSelfCast")
+        local mouseover=K.API:GetNativeMouseoverState()
+        if mouseover.supported then
+            snapshot.modified.MOUSEOVERCAST=mouseover.modifier
+            snapshot.cvars.enableMouseoverCast=mouseover.enableMouseoverCast
+        end
+    end,"Reading current profile settings",true,false)
+    local probes={}
+    for _,map in ipairs({job.probeKeys or {},job.expected or {},job.currentBindings or {}}) do
+        for key in pairs(map) do probes[key]=true end
+    end
+    for _,step in ipairs(readSteps(snapshot.bindings,probes)) do steps[#steps+1]=step end
+    if K.NativeBars and K.NativeBars.SnapshotSteps then appendNative(steps,K.NativeBars:SnapshotSteps(snapshot.native),"Reading current profile bars",false) end
+    addStep(steps,function()
+        if GetCurrentBindingSet and GetCurrentBindingSet()~=snapshot.bindingSet then error("The active binding set changed while reading the current profile. Try again.") end
+    end,"Checking current profile",true,false)
+    return steps
+end
 local function snapshotSteps(job)
     local snapshot={bindings={},bindingSet=GetCurrentBindingSet and GetCurrentBindingSet() or 2,modified={},cvars={},createdAt=time and time() or 0,native={},mouseBindingsVersion=1}
     job.before=snapshot
@@ -416,6 +444,13 @@ function E:FinishJob(job,ok,message)
     record(ok and "info" or "error","operation-finished",message,job,{outcome=ok and "success" or (job.rollbackComplete and "rolled-back" or (job.rollingBack and "rollback-failed" or "failed"))})
     if K.OnApplyComplete then K:OnApplyComplete(ok,message,job.plan,job.kind)
     elseif message then K:Print(message) end
+    -- Core finalizes preset identity/signatures in OnApplyComplete. Keep the
+    -- remembered installed profile aligned without recapturing game state or
+    -- copying the editing draft after that callback.
+    if ok and job.rememberedProfile and K.db.currentProfile==job.rememberedProfile then
+        job.rememberedProfile.appliedPreset=K.db.appliedPreset
+        job.rememberedProfile.appliedPresetSignature=K.db.appliedPresetSignature
+    end
     if K.QueueRefresh then K:QueueRefresh() end
 end
 function E:StartJob(job)
@@ -460,15 +495,41 @@ function E:StartJob(job)
             if step.barrier or clockMS()-started>=4 then break end
         end
         if job.index>#job.steps then
+            local remember=job.kind=="apply" or job.kind=="current-edit" or job.kind=="restore" or job.kind=="restore-original" or job.kind=="restore-defaults"
+            if not job.rollingBack and remember and not job.profileReadQueued then
+                job.profileReadQueued=true
+                local ok,why=protectedStep(function()
+                    for _,step in ipairs(liveProfileSteps(job)) do job.steps[#job.steps+1]=step end
+                    job.total=#job.steps
+                end)
+                if ok then return end
+                job.profileReadError=why
+            end
             if job.rollingBack then
                 job.rollbackComplete=true
                 record("info","rollback-complete","Previous state restored.",job,{outcome="restored"})
                 E:FinishJob(job,false,"Setup failed and was rolled back: "..tostring(job.failure))
             else
-                local ok,message,trace=protectedStep(function() return job.commit(job) end)
+                local ok,message,trace=protectedStep(function()
+                    if job.profileReadError then error(job.profileReadError,0) end
+                    -- A failed post-commit profile capture must not consume an
+                    -- unapplied Current draft that the commit just discarded.
+                    job.commitDraft=K.Copy(K.db.currentEditDraft)
+                    job.commitEdits=K.Copy(K.CurrentBindings and K.CurrentBindings.edits)
+                    job.commitDraftCaptured=true
+                    local result=job.commit(job)
+                    if remember then
+                        local profile,why=K.CurrentBindings:CaptureProfile(job.profileSnapshot,true)
+                        if not profile then error(why or "Could not remember the applied Current profile.") end
+                        K.db.currentProfile=profile
+                        job.rememberedProfile=profile
+                    end
+                    return result
+                end)
                 if not ok then
                     job.failure=tostring(message)
-                    job.failureStage="Committing saved preset"
+                    job.failureStage=(job.kind=="current-sync" or job.kind=="current-reapply") and "Saving current profile" or "Committing saved preset"
+                    if job.entry then job.entry.status="failed"; job.entry.error=job.failure end
                     record("error","commit-error",trace or job.failure,job,{stage=job.failureStage})
                     local built,rollback=pcall(job.rollback,job)
                     if built then
@@ -484,7 +545,13 @@ function E:StartJob(job)
 end
 local function rollbackJob(job)
     local steps={}
-    addStep(steps,function() E:Deactivate(); restoreRuntime(job.previous,false) end,"Restoring previous preset state",true,false)
+    addStep(steps,function()
+        E:Deactivate(); restoreRuntime(job.previous,false)
+        if job.commitDraftCaptured then
+            K.db.currentEditDraft=K.Copy(job.commitDraft)
+            if K.CurrentBindings then K.CurrentBindings.edits=K.Copy(job.commitEdits) end
+        end
+    end,"Restoring previous preset state",true,false)
     for _,step in ipairs(macroSteps(job.previous.enabled and job.previous.appliedPlan,{})) do steps[#steps+1]=step end
     for _,step in ipairs(restoreSteps(job,job.before)) do steps[#steps+1]=step end
     -- Restore the slots before removing newly-created macros they may still
@@ -501,6 +568,171 @@ local function validSnapshot(snapshot)
         end
     end
     return true
+end
+function E:CanReapplyCurrentProfile()
+    local db=K.db
+    if not db then return false,"Sync Current first to save the setup you want to reapply." end
+    local profile=db.currentProfile
+    if profile then
+        local _,class=UnitClass("player")
+        if type(profile)~="table" or not validSnapshot(profile.snapshot) then return false,"The saved Current profile is incomplete. Sync Current to save a new one." end
+        if profile.class and profile.class~=class then return false,"The saved Current profile belongs to another class. Sync Current for this character." end
+        return true
+    end
+    local current=db.currentLayout
+    if current and (next(current.keys or {}) or next(current.slots or {})) then return true end
+    if db.enabled and db.appliedPlan and db.appliedPlan.nativeLayout then return true end
+    return false,"Sync Current first to save the setup you want to reapply."
+end
+function E:SyncCurrentProfile()
+    if self.busy or inCombat() then return false,"Leave combat and wait for the current operation." end
+    local job={kind="current-sync",previous=runtimeState(),created={}}
+    job.steps=liveProfileSteps(job)
+    -- Sync has no game mutations to undo. Its active-only snapshot is still a
+    -- useful named backup, and never loads or writes the inactive binding set.
+    job.rollback=function() return {} end
+    addStep(job.steps,function()
+        job.before=job.profileSnapshot
+        local _,entry=E:CaptureBackup(job.kind,job.before)
+        job.entry=entry; entry.complete=true; job.backupReady=true
+    end,"Saving current profile backup",true,false)
+    job.commit=function()
+        local profile,why=K.CurrentBindings:CaptureProfile(job.profileSnapshot,true)
+        if not profile then error(why or "Could not sync the Current profile.") end
+        K.db.currentProfile=profile
+        job.entry.status="saved"; K.db.lastBindingBackupID=job.entry.id
+        return "Current profile synced. Live controls are unchanged. Backup: "..job.entry.name
+    end
+    return self:StartJob(job)
+end
+local function supersededProfileMacros(profile,target,before,recoveredOwned)
+    local candidates={}
+    local source=profile.snapshot or {}
+    local owned=recoveredOwned or profile.ownedMacros or {}
+    for _,content in pairs(source.native and source.native.actions or {}) do
+        if content and content.kind=="macro" and type(content.body)=="string" and K.Macros:SameBody(content.name,owned[content.name],content.body,owned) then
+            candidates[content.name]=owned[content.name]
+        end
+    end
+    for _,command in pairs(source.bindings or {}) do
+        local name=type(command)=="string" and command:match("^MACRO (.+)$")
+        if name and type(owned[name])=="string" then candidates[name]=owned[name] end
+    end
+    -- A shared original is not superseded while any saved destination keeps
+    -- it. Live references and personal edits are checked again by cleanup.
+    for _,content in pairs(target.native and target.native.actions or {}) do
+        if content and content.kind=="macro" then candidates[content.name]=nil end
+    end
+    local function protectBindings(bindings)
+        for _,command in pairs(bindings or {}) do
+            local name=type(command)=="string" and command:match("^MACRO (.+)$")
+            if name then candidates[name]=nil end
+        end
+    end
+    protectBindings(target.bindings)
+    -- Reapply changes only its saved active scope. A direct macro binding in
+    -- the other scope must remain callable after switching back to that set.
+    local inactive=target.bindingSet==1 and 2 or 1
+    protectBindings(before and (inactive==before.bindingSet and before.bindings or before[inactive==1 and "accountBindings" or "characterBindings"]))
+    local function references(snapshot)
+        local names={}
+        for _,content in pairs(snapshot and snapshot.native and snapshot.native.actions or {}) do
+            if content and content.kind=="macro" and candidates[content.name] then names[content.name]=true end
+        end
+        for _,map in ipairs({snapshot and snapshot.bindings or {},snapshot and snapshot.accountBindings or {},snapshot and snapshot.characterBindings or {}}) do
+            for _,command in pairs(map) do
+                local name=type(command)=="string" and command:match("^MACRO (.+)$")
+                if name and candidates[name] then names[name]=true end
+            end
+        end
+        return names
+    end
+    -- Original restore never recreates macros. Named restore can recreate
+    -- only generated identities retained in its installed action metadata;
+    -- a raw snapshot reference alone is not enough to safely delete a macro.
+    for name in pairs(references(K.db.backup)) do candidates[name]=nil end
+    for _,backup in pairs(K.db.bindingBackups or {}) do
+        local needed=references(backup.snapshot)
+        if next(needed) then
+            local runtime=backup.runtime or {}; local recoverable={}
+            local function available(action)
+                local name=action.macroName
+                if name and needed[name] and action.body==candidates[name] and (runtime.ownedMacros or {})[name]==action.body then recoverable[name]=true end
+            end
+            for _,action in ipairs(runtime.enabled and runtime.appliedPlan and runtime.appliedPlan.actions or {}) do
+                if action.known or action.nativeMacro then available(action) end
+            end
+            for _,map in ipairs({runtime.currentLayout and runtime.currentLayout.keys or {},runtime.currentLayout and runtime.currentLayout.slots or {}}) do
+                for _,action in pairs(map) do available(action) end
+            end
+            for name in pairs(needed) do if not recoverable[name] then candidates[name]=nil end end
+        end
+    end
+    return candidates
+end
+function E:ReapplyCurrentProfile()
+    if self.busy or inCombat() then return false,"Leave combat and wait for the current operation." end
+    local available,why=self:CanReapplyCurrentProfile()
+    if not available then return self:Reject(why,"current-reapply") end
+    local profile=K.Copy(K.db.currentProfile)
+    local job={kind="current-reapply",previous=runtimeState(),created={},probeKeys=profile and profile.snapshot and profile.snapshot.bindings}
+    job.steps=snapshotSteps(job); job.rollback=rollbackJob
+    addStep(job.steps,function()
+        if not profile then
+            local problem
+            profile,problem=K.CurrentBindings:CaptureProfile(job.before,false)
+            if not profile then error(problem or "Could not recover the installed Current profile.") end
+        end
+        local prepared,problem=K.CurrentBindings:BuildProfileReapply(profile)
+        if not prepared then error(problem or "Could not prepare the saved Current profile.") end
+        if not validSnapshot(prepared.snapshot) then error("The saved Current profile is incomplete. Sync Current to save a new one.") end
+        prepared.snapshot.accountBindings=nil; prepared.snapshot.characterBindings=nil
+        prepared.macroPlan=prepared.macroPlan or {actions={},settings={allowAccountMacros=false}}
+        local owned=K.Copy(K.db.ownedMacros or {})
+        for name,body in pairs(prepared.ownedMacros or {}) do if owned[name]==nil then owned[name]=body end end
+        -- Budget against the same merged ownership used for creation, but do
+        -- not adopt it or clear any actions if character macro space is full.
+        local previous=K.db.ownedMacros; K.db.ownedMacros=owned
+        local ok,needed,free=pcall(K.Macros.Budget,K.Macros,prepared.macroPlan)
+        K.db.ownedMacros=previous
+        if not ok then error(needed,0) end
+        if needed>free then error(K.Macros:CapacityMessage(prepared.macroPlan,needed,free,"restore")) end
+        job.prepared=prepared; job.plan=prepared.appliedPlan
+        local steps={}
+        addStep(steps,function() K.db.ownedMacros=owned end,"Preparing saved profile ownership",true,true)
+        for _,step in ipairs(macroSteps(prepared.macroPlan,job.created)) do steps[#steps+1]=step end
+        addStep(steps,function()
+            local result,reason=K.CurrentBindings:FinalizeProfileReapply(prepared)
+            if result==false then error(reason or "Could not resolve the saved profile macros.") end
+            job.profileCleanup=supersededProfileMacros(profile,prepared.snapshot,job.before,prepared.ownedMacros)
+            if K.Presets and K.Presets.EnsureButtons then K.Presets:EnsureButtons() end
+            insertSteps(job,restoreSteps(job,prepared.snapshot))
+        end,"Resolving saved profile actions",true,false)
+        insertSteps(job,steps)
+    end,"Preparing current profile reapply",true,false)
+    job.commit=function()
+        local prepared=assert(job.prepared,"No Current profile was prepared.")
+        K.db.currentLayout=K.Copy(prepared.currentLayout)
+        K.db.appliedPlan=K.Copy(prepared.appliedPlan)
+        K.db.enabled=prepared.enabled and true or false
+        K.db.appliedPreset=prepared.appliedPreset
+        K.db.appliedPresetSignature=prepared.appliedPresetSignature
+        -- The active editing preset, its settings and Current draft stay as
+        -- they were. Reapply operates only on the saved installed profile.
+        local updated,problem=K.CurrentBindings:CaptureProfile(prepared.snapshot,true)
+        if not updated then error(problem or "Could not remember the reapplied Current profile.") end
+        K.CurrentBindings:Invalidate()
+        K.db.currentProfile=updated
+        job.entry.status="applied"; K.db.lastBindingBackupID=job.entry.id
+        local message="Current profile reapplied. Pending edits are unchanged. Backup: "..job.entry.name
+        -- Deletion is deferred until the successful transaction has finished.
+        -- Cleanup rechecks ownership, exact content and every live reference.
+        if K.AvailabilityEngine and K.AvailabilityEngine.QueueCleanup and next(job.profileCleanup or {}) then
+            pcall(K.AvailabilityEngine.QueueCleanup,K.AvailabilityEngine,job.profileCleanup)
+        end
+        return message
+    end
+    return self:StartJob(job)
 end
 local function nativePrepare(plan)
     if not K.NativeBars or not K.NativeBars.Prepare then return nil,"Native action bar support is unavailable." end
@@ -829,6 +1061,16 @@ function E:RepairMouseControls()
     end
     return self:StartJob(job)
 end
+-- After an authorized in-place edit, the runtime ownership ledger still holds
+-- the old body until commit. Verify only this operation's recorded body, with
+-- the same terminal-line-ending tolerance as other owned macro reads.
+local function findOperationMacro(name,body)
+    local index=GetMacroIndexByName(name)
+    if index and index>0 then
+        local actual,_,current=GetMacroInfo(index)
+        if actual==name and K.Macros:SameBody(name,body,current,{[name]=body}) then return index end
+    end
+end
 function E:QuarantineForms()
     if self.busy or inCombat() then return false,"Recovery waits until the current operation and combat finish." end
     local job={kind="recovery",previous=runtimeState(),created={}}
@@ -839,9 +1081,9 @@ function E:QuarantineForms()
             addStep(job.steps,function()
                 local index=GetMacroIndexByName(name)
                 local actual,_,body=GetMacroInfo(index)
-                if actual==name and body==expected and K.db.ownedMacros[name]==expected then
+                if actual==name and K.db.ownedMacros[name]==expected and K.Macros:SameBody(name,expected,body) then
                     EditMacro(index,nil,nil,"#showtooltip")
-                    if select(3,GetMacroInfo(GetMacroIndexByName(name)))~="#showtooltip" then error("Could not quarantine "..name) end
+                    if not findOperationMacro(name,"#showtooltip") then error("Could not quarantine "..name) end
                     K.db.ownedMacros[name]="#showtooltip"
                 end
             end,"Disabling stale owned form actions",true,true)
@@ -1071,7 +1313,7 @@ function E:RepairLearnedActions(plan,itemsOnly)
             if not index or K.db.ownedMacros[c.name]~=c.oldBody then error("A managed macro changed before maintenance. Review and apply your preset.") end
             c.touched=true
             EditMacro(index,nil,c.updated.icon,c.newBody)
-            if not K.Macros:FindExact(c.name,c.newBody) then error("The client rejected an ability macro update.") end
+            if not findOperationMacro(c.name,c.newBody) then error("The client rejected an ability macro update.") end
         end,"Updating learned ability macros",true,true)
     end
     job.rollback=function()
@@ -1079,11 +1321,11 @@ function E:RepairLearnedActions(plan,itemsOnly)
         for _,change in ipairs(operations) do local c=change
             addStep(steps,function()
                 if not c.touched then return end
-                if K.Macros:FindExact(c.name,c.oldBody) then return end
-                local index=K.Macros:FindExact(c.name,c.newBody)
+                if findOperationMacro(c.name,c.oldBody) then return end
+                local index=findOperationMacro(c.name,c.newBody)
                 if not index then error("A macro was edited while maintenance was running; its personal edits were preserved.") end
                 EditMacro(index,nil,c.action.icon,c.oldBody)
-                if not K.Macros:FindExact(c.name,c.oldBody) then error("The client rejected restoration of an ability macro.") end
+                if not findOperationMacro(c.name,c.oldBody) then error("The client rejected restoration of an ability macro.") end
             end,"Restoring ability macros",true,true)
         end
         return steps
@@ -1091,7 +1333,7 @@ function E:RepairLearnedActions(plan,itemsOnly)
     job.commit=function()
         -- Verify every update before changing any saved action/ownership state.
         for _,c in ipairs(changes) do
-            c.currentIndex=K.Macros:FindExact(c.name,c.newBody)
+            c.currentIndex=findOperationMacro(c.name,c.newBody)
             if not c.currentIndex then error("An updated macro changed before maintenance finished; personal edits were preserved.") end
         end
         for _,c in ipairs(changes) do

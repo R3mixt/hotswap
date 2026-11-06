@@ -187,7 +187,7 @@ function L:List(options)
         for bank,count in ipairs({account,character}) do for n=1,count do
             local index=bank==1 and n or maxAccount+n; local name,icon,body=GetMacroInfo(index)
             if name and body then
-                local generated=K.db.ownedMacros[name]==body
+                local generated=K.Macros:SameBody(name,K.db.ownedMacros[name],body)
                 entries[#entries+1]={id="macro."..index,label=name,icon=icon,known=true,generated=generated,category=generated and "Hot Swap" or "Your macros",descriptor={kind="macroref",macroName=name,macroFingerprint=K.Macros:Name(body)}}
             end
         end end

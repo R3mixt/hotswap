@@ -83,7 +83,10 @@ function K.Macros:Build(action,settings)
         local cond=""
         if target=="help" then
             if action.noSelf then cond="[nomod:alt,@mouseover,help,nodead][nomod:alt,help,nodead]"
-            else cond="[mod:alt,@player][@mouseover,help,nodead][help,nodead]"..(settings.selfFallback and "[@player]" or "") end
+            -- Default helpful targeting is also mouseover targeting. Older
+            -- saved selfFallback=false settings must not leave it unable to
+            -- cast when neither a friendly mouseover nor target is available.
+            else cond="[mod:alt,@player][@mouseover,help,nodead][help,nodead][@player]" end
         elseif target=="dead" then cond="[@mouseover,help,dead][help,dead]"
         elseif target=="focus" then cond="[@focus,harm,nodead]"
         elseif target=="self" then cond="" -- Catalog self-only spells already target the player.
@@ -124,12 +127,24 @@ function K.Macros:Name(body)
     for i=1,#body do hash=(hash*33+body:byte(i))%2147483647 end
     return "KBO_"..string.format("%08x",hash)
 end
+function K.Macros:SameBody(name,expected,actual,owned)
+    if type(expected)~="string" or type(actual)~="string" then return false end
+    if expected==actual then return true end
+    local ledger=owned or (K.db and K.db.ownedMacros)
+    local registered=type(ledger)=="table" and ledger[name]
+    if type(registered)~="string" then return false end
+    -- WoW can append terminal line endings when saving a generated macro.
+    -- Only its recorded owner may ignore those endings; spaces and all other
+    -- edits remain meaningful, as do the original hash and personal text.
+    local wanted=expected:gsub("[\r\n]+$","")
+    return actual:gsub("[\r\n]+$","")==wanted and registered:gsub("[\r\n]+$","")==wanted
+end
 function K.Macros:FindExact(name,body)
     if type(name)~="string" or type(body)~="string" then return nil end
     local index=GetMacroIndexByName and GetMacroIndexByName(name) or 0
     if index and index>0 then
         local found,icon,current=GetMacroInfo(index)
-        if found==name and current==body then return index,name,icon end
+        if found==name and self:SameBody(name,body,current) then return index,name,icon end
     end
 end
 function K.Macros:FindOwned(name,body)

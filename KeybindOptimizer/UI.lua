@@ -210,7 +210,7 @@ function UI:ClearOperationError()
     if self.reviewButton then self.reviewButton:SetText("Review") end
 end
 function UI:RecordOperationFailure(message,kind,job)
-    local action=kind=="maintenance" and "Update" or tostring(kind or "apply"):find("restore",1,true) and "Restore" or "Apply"
+    local action=kind=="current-sync" and "Sync" or kind=="current-reapply" and "Reapply" or kind=="maintenance" and "Update" or tostring(kind or "apply"):find("restore",1,true) and "Restore" or "Apply"
     local record={message=tostring(message or "The operation could not finish."),kind=kind or "apply",outcome="not-started"}
     if job then
         record.reason=job.failure; record.stage=job.failureStage
@@ -289,9 +289,9 @@ function UI:Call(owner, method, ...)
         self:Notice("This feature is not available in this client.", true)
         return nil
     end
-    local operation=(owner==K.Presets and method=="Activate") or (owner==K and (method=="Apply" or method=="Restore")) or (owner==K.Engine and (method=="RestoreBackup" or method=="ApplyCurrentEdits"))
+    local operation=(owner==K.Presets and method=="Activate") or (owner==K and (method=="Apply" or method=="Restore")) or (owner==K.Engine and (method=="RestoreBackup" or method=="ApplyCurrentEdits" or method=="SyncCurrentProfile" or method=="ReapplyCurrentProfile"))
     local priorError=self.operationError
-    local kind=method:find("Restore",1,true) and "restore" or "apply"
+    local kind=method=="SyncCurrentProfile" and "current-sync" or method=="ReapplyCurrentProfile" and "current-reapply" or method:find("Restore",1,true) and "restore" or "apply"
     local ok,a,b
     local diagnostics=K.Diagnostics
     if diagnostics and diagnostics:IsEnabled() then
@@ -342,7 +342,7 @@ function UI:UpdateBusyState()
                 control:SetEnabled(false)
             end
         end
-        for _,name in ipairs({"apply","saveRecommendation","restore","reviewButton","discard"}) do disable(self[name]) end
+        for _,name in ipairs({"apply","saveRecommendation","restore","reviewButton","discard","refreshCurrent"}) do disable(self[name]) end
         for _,tab in pairs(self.nav or {}) do disable(tab) end
         local pages=self.pages or {}
         for _,name in ipairs({"Setup","Presets","Bindings","Items","Safety","Share","Settings"}) do
@@ -402,7 +402,7 @@ function UI:UpdateBusyState()
     f.step:SetText(index and total and total>0 and ("Step "..math.min(index,total).." of "..total) or (progress>0 and (math.floor(progress*100).."%") or "In progress"))
     f.note:SetText(paused and "This resumes when combat ends. You can close this window." or "You can close this window. The update continues in the background.")
     f:Show()
-    for _,control in ipairs({self.apply,self.restore,self.reviewButton,self.saveRecommendation}) do if control then control:SetEnabled(false) end end
+    for _,control in ipairs({self.apply,self.restore,self.reviewButton,self.saveRecommendation,self.refreshCurrent}) do if control then control:SetEnabled(false) end end
     for _,tab in pairs(self.nav or {}) do tab:SetEnabled(false) end
     if self.status then self.status:SetText((paused and "Paused for combat: " or "Updating: ")..message); color(self.status,paused and C.warning or C.muted) end
     return true
@@ -456,7 +456,10 @@ function UI:Menu(anchor, options, selected, callback)
         row:SetPoint("TOPLEFT", 4, -4 - (i - 1) * 30)
         row:SetWidth(panel:GetWidth() - 8)
         row.text:SetText((option.value == selected and "> " or "") .. option.label)
-        row:SetScript("OnClick", function() UI:CloseMenu(); callback(option.value) end)
+        row:SetEnabled(not option.disabled)
+        color(row.text,option.disabled and C.muted or C.text)
+        tooltip(row,option.label,option.reason or option.detail)
+        row:SetScript("OnClick", function() if option.disabled then return end; UI:CloseMenu(); callback(option.value) end)
         row:Show()
     end
     outside:Show()
@@ -760,7 +763,7 @@ function UI:CloseBindingEditor()
 end
 function UI:BindingSelectionSnapshot(action)
     if not action or not action.current then return end
-    return {command=GetBindingAction(action.key) or "",slot=action.liveSlot,
+    return {command=GetBindingAction(action.key) or "",slot=action.liveSlot,stanceSlot=action.stanceSlot,
         content=action.liveSlot and K.NativeBars:ReadSlot(action.liveSlot) or false}
 end
 function UI:ValidateBindingSelection(action,snapshot)
@@ -768,10 +771,11 @@ function UI:ValidateBindingSelection(action,snapshot)
     K.CurrentBindings:Build()
     local current=K.CurrentBindings:EditingView().byKey[action.key]
     local same=self.bindingSource=="current" and current~=nil
-    for _,field in ipairs({"command","effectiveCommand","actionBarError","liveSlot","spellID","itemID","targetMode","macroFingerprint"}) do
+    for _,field in ipairs({"command","effectiveCommand","actionBarError","liveSlot","stanceSlot","spellID","itemID","targetMode","macroFingerprint"}) do
         if not current or current[field]~=action[field] then same=false end
     end
     if snapshot and ((GetBindingAction(action.key) or "")~=snapshot.command or (current and current.liveSlot)~=snapshot.slot
+        or (current and current.stanceSlot)~=snapshot.stanceSlot
         or (snapshot.slot and not K.NativeBars:SameContent(K.NativeBars:ReadSlot(snapshot.slot),snapshot.content))) then same=false end
     if same then return true end
     self:CloseBindingEditor(); self:EndCapture(); self:CloseMenu()
@@ -950,7 +954,7 @@ function UI:RenderNativeBars()
         row.check:SetChecked(row.effective)
         row:SetEnabled(option.available and not option.required)
         row.check:SetEnabled(option.available and not option.required)
-        tooltip(row,option.label,option.required and "Hot Swap enables this bar automatically so the preset's actions remain visible." or option.available and "Choose its visibility for this preset. Apply & save installs the change." or "This client does not provide the bar, so it cannot be enabled here.")
+        tooltip(row,option.label,option.required and "Hot Swap saves this bar as enabled because the preset uses it." or option.available and "Choose its visibility for this preset. Apply & save installs the change." or "This client does not provide the bar, so it cannot be enabled here.")
         row:Show()
     end
 end
@@ -962,7 +966,7 @@ function UI:OpenNativeBars()
         f:SetAllPoints(self.frame); f:SetFrameStrata("DIALOG"); f:SetFrameLevel(self.frame:GetFrameLevel()+50)
         f:EnableMouse(true); f.rows={}
         label(f,"Action bars",22):SetPoint("TOPLEFT",50,-43)
-        local note=label(f,"Bars needed by this preset are always enabled. Choose which other Blizzard bars to show.\nThese preferences stay in the draft until you choose Apply & save.",12,C.muted)
+        local note=label(f,"Required bars are enabled automatically. Other choices stay in the draft until Apply & save.\nIf changed bar visibility has not appeared, use /reload to refresh WoW's bars.",12,C.muted)
         note:SetPoint("TOPLEFT",50,-80); note:SetWidth(755)
         f.reset=button(f,"Use defaults",145,function() UI:Stage("nativeBars",{}) end)
         f.reset:SetPoint("BOTTOMLEFT",50,50)
@@ -1019,7 +1023,8 @@ function UI:BuildSetup(page)
     local inner = CreateFrame("Frame", nil, page.advanced)
     inner:SetPoint("TOPLEFT", 14, -55)
     inner:SetSize(595, 250)
-    page.checks[#page.checks+1] = check(inner, "Allow self as the final healing fallback", "Alt explicitly casts on you either way.", "selfFallback", 0)
+    page.selfFallbackNote=label(inner,"Mouseover heals fall back to you automatically. Alt forces self-cast.",12,C.muted)
+    page.selfFallbackNote:SetPoint("TOPLEFT",0,-6); page.selfFallbackNote:SetWidth(585)
     page.checks[#page.checks+1] = check(inner, "Allow utility macros to leave form", "Some healing and control spells require caster form.", "cancelForUtility", -37)
     page.checks[#page.checks+1] = check(inner, "Place ground spells at the cursor", "Cast immediately at the cursor instead of confirming a targeting circle.", "groundAtCursor", -74)
     page.mageLabel = label(inner, "Mage primary filler", 12)
@@ -1938,6 +1943,35 @@ end
 function UI:Optimize()
     return self:PreviewRecommendations()
 end
+function UI:CurrentProfileAction(value)
+    if self.bindingSource~="current" or self.activePage~="Bindings" then return false end
+    if K.Engine.busy then self:UpdateBusyState(); return false end
+    if InCombatLockdown and InCombatLockdown() then self:Notice("Leave combat before refreshing your saved setup.",true); return false end
+    local method=value=="sync" and "SyncCurrentProfile" or value=="reapply" and "ReapplyCurrentProfile"
+    if not method then return false end
+    if value=="reapply" then
+        local ready,why=K.Engine:CanReapplyCurrentProfile()
+        if not ready then self:Notice(why or "Sync from game before reapplying a saved setup.",true); return false end
+    end
+    self.notice=nil
+    local ok,why=self:Call(K.Engine,method)
+    self.currentBindingPlan=nil; self:Refresh()
+    return ok,why
+end
+function UI:OpenCurrentProfileMenu(anchor)
+    if self.bindingSource~="current" or self.activePage~="Bindings" then return end
+    if K.Engine.busy then self:UpdateBusyState(); return end
+    if InCombatLockdown and InCombatLockdown() then self:Notice("Leave combat before refreshing your saved setup.",true); return end
+    local ready,why=K.Engine:CanReapplyCurrentProfile()
+    self:Menu(anchor,{
+        {value="sync",label="Sync from game",detail="Save your live bars, keys and casting settings as Current's saved setup. Pending edits stay saved."},
+        {value="reapply",label="Reapply saved setup",disabled=not ready,reason=not ready and why or nil,detail="Back up your live controls, then restore Current's saved setup and rebuild Hot Swap macros. Pending edits stay saved."},
+    },nil,function(value) UI:CurrentProfileAction(value) end)
+    -- The footer sits at the bottom edge; open its menu upward.
+    local panel=self.menu.panel
+    panel:ClearAllPoints(); panel:SetPoint("BOTTOMRIGHT",anchor,"TOPRIGHT",0,3); panel:SetWidth(240)
+    for _,row in ipairs(panel.rows) do row:SetWidth(232) end
+end
 function UI:UseSelectedPreset(savedChoice)
     if self.bindingSource=="current" then
         local ok,why=self:Call(K.Engine,"ApplyCurrentEdits")
@@ -2335,6 +2369,9 @@ function UI:Create()
     self.apply = button(footer, APPLY_LABEL, 128, function() UI:UseSelectedPreset() end, true)
     self.apply:SetPoint("RIGHT", -10, 0)
     tooltip(self.apply,APPLY_LABEL,APPLY_DETAIL)
+    self.refreshCurrent=button(footer,"Refresh...",90,function(self) UI:OpenCurrentProfileMenu(self) end)
+    self.refreshCurrent:SetPoint("RIGHT",-148,0)
+    tooltip(self.refreshCurrent,"Refresh Current setup","Sync from game saves your live bars, keys and casting settings. Reapply saved setup restores that saved setup and rebuilds Hot Swap macros. Pending edits stay saved.")
     self.saveRecommendation=button(footer,"Save preset...",166,function() UI:SaveRecommendation() end,true)
     self.saveRecommendation:SetPoint("RIGHT",-10,0); self.saveRecommendation:Hide()
     self.events = CreateFrame("Frame", nil, f)
@@ -2422,12 +2459,17 @@ function UI:Refresh()
     self.apply:SetShown(not recommendation); self.saveRecommendation:SetShown(recommendation)
     self.saveRecommendation:SetEnabled(not combat)
     local current=self.bindingSource=="current"
+    local refreshCurrent=current and self.activePage=="Bindings"
+    self.refreshCurrent:SetShown(refreshCurrent); self.refreshCurrent:SetEnabled(not combat)
+    self.restore:ClearAllPoints(); self.restore:SetPoint("RIGHT",refreshCurrent and -244 or -184,0)
+    self.discard:ClearAllPoints(); self.discard:SetPoint("RIGHT",refreshCurrent and -342 or -282,0)
+    self.reviewButton:ClearAllPoints(); self.reviewButton:SetPoint("RIGHT",refreshCurrent and -342 or -282,0)
     self.apply.text:SetText(current and "Apply changes" or APPLY_LABEL)
     tooltip(self.apply,current and "Apply changes" or APPLY_LABEL,current and "Back up your controls, install only pending Current binding edits, then save character bindings. Preset drafts are unchanged." or APPLY_DETAIL)
     self.apply:SetEnabled(not combat and (current and K.CurrentBindings:HasEdits() or editable and errors==0 and not self.previewFailed))
     self.discard:SetShown(current and self.activePage=="Bindings" and not self.operationError)
     self.reviewButton:SetShown(not current or self.operationError~=nil)
-    self.status:SetWidth(current and 390 or 440)
+    self.status:SetWidth(refreshCurrent and 350 or current and 390 or 440)
     self.discard:SetEnabled(K.CurrentBindings:HasEdits())
     self.reviewButton:SetEnabled(self.operationError~=nil or self.bindingSource~="current")
     self.restore:SetEnabled(true)

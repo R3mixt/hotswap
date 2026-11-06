@@ -1,5 +1,19 @@
 # Changelog
 
+## 1.0.5 - 2026-11-05
+
+- Leave native action-bar layout updates to Blizzard's own events. Remove forced settings notifications and delayed refresh callbacks, and avoid rewriting unchanged visibility settings. Keep full-mask synchronization and rollback for real visibility changes; use `/reload` if changed visibility has not appeared yet. Live combat verification is pending.
+- Keep Hot Swap integrated into the Game Menu after AddOns, with one entry per menu rebuild.
+- Give default helpful spell macros the same automatic self fallback as explicit Mouseover mode, including reapplying older profiles saved with self fallback disabled. Keep Alt as an optional override and preserve explicit targeting, resurrection and no-self rules.
+- Keep registered generated macros owned when only terminal line endings differ, so Sync retains their spell metadata and Reapply can refresh them. Personal macro fingerprints and changes to commands or other whitespace remain protected.
+- Recover spell details lost by older Sync/Reapply runs only from recorded generated identities at matching saved destinations, using a bounded backup search. Keep saved key assignments and personal macro edits intact.
+- Resolve supported stance-bar button clicks and overrides to their live form, stance or aura in Current. Keep stance indices separate from normal action slots and validate the route when rebinding.
+- Add **Current → Refresh... → Sync from game** to save live bars, keys and casting settings as Current's profile, and **Reapply saved setup** to restore that profile and regenerate Hot Swap macros without editing a key first. Preserve pending drafts and use named backups and rollback.
+- Remember the resulting live setup after successful applies and restores, separately from pre-operation undo backups. Sync adopts personal macro edits; Reapply preserves personal macro text and uses character-specific replacements for generated macros when necessary.
+- After a successful Reapply, clean up superseded generated macros only when exact ownership still matches and no live bars, binding scopes or recovery snapshots require the old copy. Keep unchanged correct macros, personal edits and arbitrary macro targeting intact.
+- When native spell pickup leaves the cursor empty during backup restoration or action placement, retry through the current spellbook using the exact saved spell ID and rank. Keep rollback and exact-content verification if the spell remains unavailable.
+- Include the saved action type, ID, spell name and rank in pickup failures, without repeating the same Lua source prefix. Live verification of the reported slot 107 restore failure is pending.
+
 ## 1.0.4 - 2026-11-05
 
 - Enabling Auto mouseover all spells explicitly stages a refresh of unchanged, previously generated Hot Swap Mouseover heals that lack the final self-cast fallback, including entries detached by an earlier read failure. Apply validates the live macro and binding before replacing it; personal edits remain untouched.
